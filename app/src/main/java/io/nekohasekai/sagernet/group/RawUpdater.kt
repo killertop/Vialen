@@ -11,7 +11,6 @@ import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
 import io.nekohasekai.sagernet.fmt.shadowsocks.parseShadowsocks
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
 import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
-import io.nekohasekai.sagernet.fmt.trojan_go.parseTrojanGo
 import io.nekohasekai.sagernet.fmt.tuic.TuicBean
 import io.nekohasekai.sagernet.fmt.v2ray.StandardV2RayBean
 import io.nekohasekai.sagernet.fmt.v2ray.VMessBean
@@ -759,10 +758,6 @@ object RawUpdater : GroupUpdater() {
 
                 json.has("method") -> {
                     return listOf(json.parseShadowsocks())
-                }
-
-                json.has("remote_addr") -> {
-                    return listOf(json.parseTrojanGo())
                 }
 
                 json.has("outbounds") -> {

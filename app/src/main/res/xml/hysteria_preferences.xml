@@ -45,14 +45,6 @@
             app:icon="@drawable/ic_settings_password"
             app:key="serverPassword"
             app:title="@string/hysteria_auth_payload" />
-        <moe.matsuri.nb4a.ui.SimpleMenuPreference
-            app:defaultValue="https"
-            app:entries="@array/hysteria_protocol"
-            app:entryValues="@array/int_array_3"
-            app:icon="@drawable/ic_baseline_layers_24"
-            app:key="serverProtocol"
-            app:title="@string/protocol"
-            app:useSimpleSummaryProvider="true" />
         <EditTextPreference
             app:icon="@drawable/ic_action_copyright"
             app:key="serverSNI"
@@ -101,6 +93,51 @@
             app:key="hopInterval"
             app:title="@string/hop_interval"
             app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="hysteria2AdvancedCategory"
+        app:title="@string/route_advanced">
+
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue=""
+            app:entries="@array/hysteria2_bbr_profile_entries"
+            app:entryValues="@array/hysteria2_bbr_profile_values"
+            app:key="serverBbrProfile"
+            app:title="@string/bbr_profile"
+            app:useSimpleSummaryProvider="true" />
+
+        <SwitchPreference
+            app:defaultValue="false"
+            app:key="serverDisableChromeParrot"
+            app:summary="@string/disable_chrome_parrot_sum"
+            app:title="@string/disable_chrome_parrot" />
+
+        <EditTextPreference
+            app:key="hopIntervalMax"
+            app:title="@string/hop_interval_max"
+            app:useSimpleSummaryProvider="true" />
+
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="salamander"
+            app:entries="@array/hysteria2_obfs_type_entries"
+            app:entryValues="@array/hysteria2_obfs_type_values"
+            app:key="serverObfsType"
+            app:title="@string/hysteria_obfs_type"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:defaultValue="512"
+            app:key="serverObfsMinPacketSize"
+            app:title="@string/obfs_min_packet_size"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:defaultValue="1200"
+            app:key="serverObfsMaxPacketSize"
+            app:title="@string/obfs_max_packet_size"
+            app:useSimpleSummaryProvider="true" />
+
     </PreferenceCategory>
 
 </PreferenceScreen> 

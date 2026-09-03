@@ -6,13 +6,11 @@ import io.nekohasekai.sagernet.fmt.Serializable
 import io.nekohasekai.sagernet.fmt.http.parseHttp
 import io.nekohasekai.sagernet.fmt.hysteria.parseHysteria1
 import io.nekohasekai.sagernet.fmt.hysteria.parseHysteria2
-import io.nekohasekai.sagernet.fmt.naive.parseNaive
 import io.nekohasekai.sagernet.fmt.parseUniversal
 import io.nekohasekai.sagernet.fmt.shadowsocks.parseShadowsocks
 import io.nekohasekai.sagernet.fmt.socks.parseSOCKS
 import io.nekohasekai.sagernet.fmt.trojan.parseTrojan
 import io.nekohasekai.sagernet.fmt.tuic.parseTuic
-import io.nekohasekai.sagernet.fmt.trojan_go.parseTrojanGo
 import io.nekohasekai.sagernet.fmt.v2ray.parseV2Ray
 import moe.matsuri.nb4a.proxy.anytls.parseAnytls
 import moe.matsuri.nb4a.utils.JavaUtil.gson
@@ -168,24 +166,10 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
             }.onFailure {
                 Logs.w(it)
             }
-        } else if (startsWith("trojan-go://")) {
-            Logs.d("Try parse trojan-go link: $this")
-            runCatching {
-                entities.add(parseTrojanGo(this))
-            }.onFailure {
-                Logs.w(it)
-            }
         } else if (startsWith("ss://")) {
             Logs.d("Try parse shadowsocks link: $this")
             runCatching {
                 entities.add(parseShadowsocks(this))
-            }.onFailure {
-                Logs.w(it)
-            }
-        } else if (startsWith("naive+")) {
-            Logs.d("Try parse naive link: $this")
-            runCatching {
-                entities.add(parseNaive(this))
             }.onFailure {
                 Logs.w(it)
             }

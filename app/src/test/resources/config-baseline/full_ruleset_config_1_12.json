@@ -1,0 +1,167 @@
+{
+  "dns": {
+    "final": "dns-remote",
+    "independent_cache": true,
+    "rules": [
+      {
+        "domain": [
+          "ss.baseline.internal"
+        ],
+        "server": "dns-direct"
+      },
+      {
+        "outbound": [
+          "any"
+        ],
+        "server": "dns-direct"
+      },
+      {
+        "domain_suffix": [
+          "cn"
+        ],
+        "rule_set": [
+          "geosite:cn"
+        ],
+        "server": "dns-direct"
+      },
+      {
+        "disable_cache": true,
+        "rule_set": [
+          "geosite:category-ads-all"
+        ],
+        "server": "dns-block"
+      }
+    ],
+    "servers": [
+      {
+        "address": "rcode://success",
+        "tag": "dns-block"
+      },
+      {
+        "address": "local",
+        "detour": "direct",
+        "tag": "dns-local"
+      },
+      {
+        "address": "223.5.5.5",
+        "address_resolver": "dns-local",
+        "detour": "direct",
+        "strategy": "prefer_ipv4",
+        "tag": "dns-direct"
+      },
+      {
+        "address": "tls://8.8.8.8",
+        "address_resolver": "dns-direct",
+        "strategy": "prefer_ipv4",
+        "tag": "dns-remote"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "domain_strategy": "",
+      "endpoint_independent_nat": true,
+      "inet4_address": [
+        "172.19.0.1/28"
+      ],
+      "inet6_address": [
+        "fdfe:dcba:9876::1/126"
+      ],
+      "mtu": 1500,
+      "sniff": true,
+      "sniff_override_destination": false,
+      "stack": "gvisor",
+      "tag": "tun-in",
+      "type": "tun"
+    },
+    {
+      "domain_strategy": "",
+      "listen": "127.0.0.1",
+      "listen_port": 2080,
+      "sniff": true,
+      "sniff_override_destination": false,
+      "tag": "mixed-in",
+      "type": "mixed"
+    }
+  ],
+  "log": {
+    "level": "info"
+  },
+  "outbounds": [
+    {
+      "domain_strategy": "prefer_ipv4",
+      "method": "chacha20-ietf-poly1305",
+      "password": "mypassword",
+      "server": "ss.baseline.internal",
+      "server_port": 8388,
+      "tag": "proxy",
+      "type": "shadowsocks"
+    },
+    {
+      "tag": "direct",
+      "type": "direct"
+    },
+    {
+      "tag": "bypass",
+      "type": "direct"
+    }
+  ],
+  "route": {
+    "auto_detect_interface": true,
+    "rule_set": [
+      {
+        "format": "binary",
+        "path": "geoip:cn",
+        "tag": "geoip:cn",
+        "type": "local"
+      },
+      {
+        "format": "binary",
+        "path": "geosite:category-ads-all",
+        "tag": "geosite:category-ads-all",
+        "type": "local"
+      }
+    ],
+    "rules": [
+      {
+        "action": "hijack-dns",
+        "port": [
+          53
+        ]
+      },
+      {
+        "action": "hijack-dns",
+        "protocol": [
+          "dns"
+        ]
+      },
+      {
+        "domain_suffix": [
+          "cn"
+        ],
+        "ip_is_private": true,
+        "outbound": "bypass",
+        "rule_set": [
+          "geoip:cn"
+        ]
+      },
+      {
+        "action": "reject",
+        "rule_set": [
+          "geosite:category-ads-all"
+        ]
+      },
+      {
+        "action": "reject",
+        "ip_cidr": [
+          "224.0.0.0/3",
+          "ff00::/8"
+        ],
+        "source_ip_cidr": [
+          "224.0.0.0/3",
+          "ff00::/8"
+        ]
+      }
+    ]
+  }
+}

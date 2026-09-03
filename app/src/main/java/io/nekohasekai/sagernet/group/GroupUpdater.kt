@@ -8,9 +8,7 @@ import io.nekohasekai.sagernet.database.SubscriptionBean
 import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.fmt.http.HttpBean
 import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
-import io.nekohasekai.sagernet.fmt.naive.NaiveBean
 import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
-import io.nekohasekai.sagernet.fmt.trojan_go.TrojanGoBean
 import io.nekohasekai.sagernet.fmt.v2ray.StandardV2RayBean
 import io.nekohasekai.sagernet.fmt.v2ray.isTLS
 import io.nekohasekai.sagernet.ktx.*
@@ -50,11 +48,6 @@ abstract class GroupUpdater {
         val ipv6First = ipv6Mode >= IPv6Mode.PREFER
 
         for (profile in profiles) {
-            when (profile) {
-                // SNI rewrite unsupported
-                is NaiveBean -> continue
-            }
-
             if (profile.serverAddress.isIpAddress()) continue
 
             lookupJobs.add(GlobalScope.launch(lookupPool) {
@@ -105,9 +98,6 @@ abstract class GroupUpdater {
                     }
                 }
                 is TrojanBean -> {
-                    if (sni.isBlank()) sni = bean.serverAddress
-                }
-                is TrojanGoBean -> {
                     if (sni.isBlank()) sni = bean.serverAddress
                 }
                 is HysteriaBean -> {

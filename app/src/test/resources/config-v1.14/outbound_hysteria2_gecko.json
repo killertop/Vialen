@@ -1,0 +1,23 @@
+{
+  "down_mbps": 0,
+  "hop_interval": "10s",
+  "obfs": {
+    "max_packet_size": 1300,
+    "min_packet_size": 600,
+    "password": "geckosecret",
+    "type": "gecko"
+  },
+  "password": "hy2password",
+  "server": "hy2.example.com",
+  "server_port": 443,
+  "tls": {
+    "alpn": [
+      "h3"
+    ],
+    "enabled": true,
+    "insecure": false,
+    "server_name": "hy2.example.com"
+  },
+  "type": "hysteria2",
+  "up_mbps": 0
+}

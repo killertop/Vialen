@@ -16,7 +16,6 @@ import io.nekohasekai.sagernet.bg.proto.ProxyInstance
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.ktx.*
-import io.nekohasekai.sagernet.plugin.PluginManager
 import io.nekohasekai.sagernet.utils.DefaultNetworkListener
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
@@ -155,11 +154,6 @@ class BaseService {
         fun stateChanged(s: State, msg: String?) = launch {
             val profileName = profileName
             broadcast { it.stateChanged(s.ordinal, profileName, msg) }
-        }
-
-        fun missingPlugin(pluginName: String) = launch {
-            val profileName = profileName
-            broadcast { it.missingPlugin(profileName, pluginName) }
         }
 
         override fun close() {
@@ -360,15 +354,9 @@ class BaseService {
                 try {
                     data.notification = createNotification(ServiceNotification.genTitle(profile))
 
-                    Executable.killAll()    // clean up old processes
                     preInit()
                     proxy.init()
                     DataStore.currentProfile = profile.id
-
-                    proxy.processes = GuardedProcessPool {
-                        Logs.w(it)
-                        stopRunner(false, it.readableMessage)
-                    }
 
                     startProcesses()
                     data.changeState(State.Connected)
@@ -377,11 +365,6 @@ class BaseService {
                 } catch (_: CancellationException) { // if the job was cancelled, it is canceller's responsibility to call stopRunner
                 } catch (_: UnknownHostException) {
                     stopRunner(false, getString(R.string.invalid_server))
-                } catch (e: PluginManager.PluginNotFoundException) {
-                    Toast.makeText(this@Interface, e.readableMessage, Toast.LENGTH_SHORT).show()
-                    Logs.w(e)
-                    data.binder.missingPlugin(e.plugin)
-                    stopRunner(false, null)
                 } catch (exc: Throwable) {
                     if (exc.javaClass.name.endsWith("proxyerror")) {
                         // error from golang

@@ -1,0 +1,280 @@
+package io.nekohasekai.sagernet
+
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import io.nekohasekai.sagernet.aidl.ISagerNetService
+import io.nekohasekai.sagernet.bg.BaseService
+import io.nekohasekai.sagernet.bg.SagerConnection
+import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.database.ProxyEntity
+import io.nekohasekai.sagernet.database.SagerDatabase
+import io.nekohasekai.sagernet.fmt.buildConfig
+import io.nekohasekai.sagernet.fmt.v2ray.VMessBean
+import io.nekohasekai.sagernet.fmt.v2ray.buildSingBoxOutboundStandardV2RayBean
+import io.nekohasekai.sagernet.fmt.v2ray.parseV2Ray
+import io.nekohasekai.sagernet.ktx.applyDefaultValues
+import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+import moe.matsuri.nb4a.SingBoxOptions.Outbound_VLESSOptions
+import org.junit.After
+import org.junit.Assert.*
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.net.HttpURLConnection
+import java.net.URL
+
+@RunWith(AndroidJUnit4::class)
+class RealDeviceVlessRealityLiveTest {
+
+    private lateinit var profile: ProxyEntity
+    private lateinit var connection: SagerConnection
+    private var vlessUri: String = ""
+
+    @Volatile
+    private var callbackState: BaseService.State = BaseService.State.Idle
+
+    private val callback = object : SagerConnection.Callback {
+        override fun stateChanged(state: BaseService.State, profileName: String?, msg: String?) {
+            println("[VLESS-TEST-CALLBACK] stateChanged: $state (msg: $msg)")
+            callbackState = state
+        }
+
+        override fun onServiceConnected(service: ISagerNetService) {
+            println("[VLESS-TEST-SERVICE] onServiceConnected")
+            connection.updateConnectionId(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND)
+        }
+    }
+
+    data class StateObservation(
+        val stage: String,
+        val expected: BaseService.State,
+        val actualState: BaseService.State,
+        val source: String,
+        val elapsedMs: Long,
+    )
+
+    private suspend fun awaitProductionState(
+        stage: String,
+        expected: BaseService.State,
+        timeoutMs: Long = 15_000
+    ): StateObservation {
+        val start = System.currentTimeMillis()
+        var lastState: BaseService.State = BaseService.State.Idle
+        var lastSource = "none"
+
+        while (System.currentTimeMillis() - start < timeoutMs) {
+            val binderState = try {
+                val s = connection.service?.state
+                if (s != null && s >= 0 && s < BaseService.State.values().size) {
+                    BaseService.State.values()[s]
+                } else null
+            } catch (_: Exception) {
+                null
+            }
+
+            val dsState = DataStore.serviceState
+            val cbState = callbackState
+
+            if (binderState == expected) {
+                lastState = binderState
+                lastSource = "ISagerNetService.getState()"
+                val elapsed = System.currentTimeMillis() - start
+                return StateObservation(stage, expected, lastState, lastSource, elapsed)
+            } else if (cbState == expected) {
+                lastState = cbState
+                lastSource = "SagerConnection.Callback.stateChanged"
+                val elapsed = System.currentTimeMillis() - start
+                return StateObservation(stage, expected, lastState, lastSource, elapsed)
+            } else if (dsState == expected) {
+                lastState = dsState
+                lastSource = "DataStore.serviceState"
+                val elapsed = System.currentTimeMillis() - start
+                return StateObservation(stage, expected, lastState, lastSource, elapsed)
+            }
+
+            lastState = binderState ?: cbState
+            lastSource = if (binderState != null) "ISagerNetService.getState()" else "SagerConnection.Callback"
+            delay(100)
+        }
+
+        val elapsed = System.currentTimeMillis() - start
+        val failMsg = "$stage FAILED: expected=$expected actual=$lastState source=$lastSource elapsed=${elapsed}ms"
+        println(failMsg)
+        fail(failMsg)
+        throw AssertionError(failMsg)
+    }
+
+    @Before
+    fun setup() {
+        val args = InstrumentationRegistry.getArguments()
+        val b64 = args.getString("vless_uri_b64")
+        vlessUri = if (!b64.isNullOrBlank()) {
+            String(android.util.Base64.decode(b64, android.util.Base64.DEFAULT)).trim()
+        } else {
+            args.getString("vless_uri")
+                ?: System.getProperty("vless_uri")
+                ?: System.getenv("VIALEN_TEST_VLESS_URI")
+                ?: ""
+        }
+
+        assertTrue("VLESS Reality URI argument must be provided via -e vless_uri or -e vless_uri_b64", vlessUri.isNotBlank())
+
+        runBlocking {
+            val app = ApplicationProvider.getApplicationContext<SagerNet>()
+            SagerNet.application = app
+
+            // 1. Ephemeral Import and Parse
+            val bean = (parseV2Ray(vlessUri) as VMessBean).applyDefaultValues()
+            assertTrue("Expected isVLESS == true", bean.isVLESS)
+            assertTrue("Expected serverAddress to not be empty", bean.serverAddress.isNotBlank())
+            assertEquals("Expected serverPort == 443", 443, bean.serverPort)
+            assertEquals("Expected flow == xtls-rprx-vision", "xtls-rprx-vision", bean.encryption)
+            assertTrue("Expected realityPubKey to be set", bean.realityPubKey.isNotBlank())
+            assertTrue("Expected realityShortId to be set", bean.realityShortId.isNotBlank())
+            assertEquals("Expected utlsFingerprint == chrome", "chrome", bean.utlsFingerprint)
+            println("[VLESS-TEST] Ephemeral parse success: server=${bean.serverAddress}:${bean.serverPort}, sni=${bean.sni}, flow=${bean.encryption}")
+
+            // 2. Build and assert outbound
+            val outbound = buildSingBoxOutboundStandardV2RayBean(bean)
+            assertTrue("Expected outbound is Outbound_VLESSOptions", outbound is Outbound_VLESSOptions)
+            val vlessOutbound = outbound as Outbound_VLESSOptions
+            assertEquals("Expected type == vless", "vless", vlessOutbound.type)
+            assertEquals("Expected flow == xtls-rprx-vision", "xtls-rprx-vision", vlessOutbound.flow)
+            assertNotNull("Expected TLS options", vlessOutbound.tls)
+            assertEquals("Expected TLS enabled", true, vlessOutbound.tls?.enabled)
+            assertNotNull("Expected Reality options", vlessOutbound.tls?.reality)
+            assertEquals("Expected Reality enabled", true, vlessOutbound.tls?.reality?.enabled)
+            assertEquals("Expected Reality public key match", bean.realityPubKey, vlessOutbound.tls?.reality?.public_key)
+            assertEquals("Expected Reality short id match", bean.realityShortId, vlessOutbound.tls?.reality?.short_id)
+            assertNotNull("Expected uTLS options", vlessOutbound.tls?.utls)
+            assertEquals("Expected uTLS fingerprint chrome", "chrome", vlessOutbound.tls?.utls?.fingerprint)
+            println("[VLESS-TEST] Outbound assertion PASS: type=vless, flow=xtls-rprx-vision, reality=true, utls=chrome")
+
+            // 3. Ephemeral ProxyEntity insertion
+            profile = ProxyEntity().apply {
+                id = 9901L
+                groupId = 0L
+                type = ProxyEntity.TYPE_VMESS
+                putBean(bean)
+            }
+
+            // Verify full config building
+            val configRes = buildConfig(profile, forTest = false)
+            assertNotNull(configRes.config)
+            assertTrue("Config should contain vless", configRes.config.contains("\"type\":\"vless\"") || configRes.config.contains("\"type\": \"vless\""))
+            assertTrue("Config should contain xtls-rprx-vision", configRes.config.contains("xtls-rprx-vision"))
+            println("[VLESS-TEST] Full configuration build PASS")
+
+            runOnDefaultDispatcher {
+                SagerDatabase.proxyDao.deleteById(profile.id)
+                SagerDatabase.proxyDao.addProxy(profile)
+            }
+
+            DataStore.serviceMode = Key.MODE_VPN
+            DataStore.selectedProxy = profile.id
+            DataStore.directDns = "local\n223.5.5.5\n1.1.1.1"
+            DataStore.remoteDns = "1.1.1.1\n8.8.8.8\nhttps://1.1.1.1/dns-query"
+            DataStore.enableDnsRouting = true
+
+            connection = SagerConnection(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND)
+            connection.connect(app, callback)
+        }
+    }
+
+    @After
+    fun tearDown() {
+        runBlocking {
+            try {
+                SagerNet.stopService()
+            } catch (_: Exception) {}
+            try {
+                val app = ApplicationProvider.getApplicationContext<SagerNet>()
+                connection.disconnect(app)
+            } catch (_: Exception) {}
+            runOnDefaultDispatcher {
+                if (::profile.isInitialized) {
+                    SagerDatabase.proxyDao.deleteById(profile.id)
+                }
+            }
+            println("[VLESS-TEST] Teardown & ephemeral profile cleanup completed")
+        }
+    }
+
+    private fun testHttpsEndpoints(maxRetries: Int = 6): Pair<String, Int> {
+        val testUrls = listOf(
+            "https://cp.cloudflare.com/generate_204",
+            "https://www.google.com/generate_204",
+            "https://connectivitycheck.gstatic.com/generate_204"
+        )
+        var lastError: Exception? = null
+
+        for (attempt in 1..maxRetries) {
+            for (urlStr in testUrls) {
+                try {
+                    val url = URL(urlStr)
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.connectTimeout = 5000
+                    conn.readTimeout = 5000
+                    conn.requestMethod = "GET"
+                    conn.instanceFollowRedirects = true
+
+                    val code = conn.responseCode
+                    conn.disconnect()
+                    if (code == 200 || code == 204) {
+                        println("[VLESS-TEST-TRAFFIC] Attempt $attempt: GET $urlStr -> HTTP $code SUCCESS")
+                        return urlStr to code
+                    } else {
+                        println("[VLESS-TEST-TRAFFIC] Attempt $attempt: GET $urlStr -> HTTP $code")
+                    }
+                } catch (e: Exception) {
+                    lastError = e
+                    println("[VLESS-TEST-TRAFFIC] Attempt $attempt: GET $urlStr -> ${e.javaClass.simpleName}: ${e.message}")
+                }
+            }
+            Thread.sleep(1000)
+        }
+        throw lastError ?: RuntimeException("All HTTPS traffic endpoints failed after $maxRetries attempts")
+    }
+
+    @Test
+    fun testRealDeviceVlessRealityLiveLifecycle() {
+        runBlocking {
+            // 1. START VPN & CONNECT
+            callbackState = BaseService.State.Idle
+            DataStore.selectedProxy = profile.id
+            println("[VLESS-TEST] Calling SagerNet.startService()...")
+            SagerNet.startService()
+
+            val connectObs = awaitProductionState(
+                stage = "VLESS_CONNECT",
+                expected = BaseService.State.Connected,
+                timeoutMs = 15_000
+            )
+            assertEquals("Expected Connected state", BaseService.State.Connected, connectObs.actualState)
+            println("VLESS_VPN_CONNECTED: expected=${connectObs.expected} actual=${connectObs.actualState} source=${connectObs.source} elapsed=${connectObs.elapsedMs}ms PASS")
+
+            // 2. LIVE HTTPS TRAFFIC OVER TUN
+            val (endpoint, responseCode) = testHttpsEndpoints()
+            assertTrue("Expected HTTP 200 or 204", responseCode == 200 || responseCode == 204)
+            println("VLESS_HTTPS_TRAFFIC: endpoint=$endpoint status=$responseCode PASS")
+
+            // 3. STOP SERVICE & DISCONNECT
+            callbackState = BaseService.State.Stopping
+            println("[VLESS-TEST] Calling SagerNet.stopService()...")
+            SagerNet.stopService()
+
+            val stopObs = awaitProductionState(
+                stage = "VLESS_DISCONNECT",
+                expected = BaseService.State.Stopped,
+                timeoutMs = 10_000
+            )
+            assertEquals("Expected Stopped state", BaseService.State.Stopped, stopObs.actualState)
+            println("VLESS_DISCONNECT: expected=${stopObs.expected} actual=${stopObs.actualState} source=${stopObs.source} elapsed=${stopObs.elapsedMs}ms PASS")
+        }
+    }
+}

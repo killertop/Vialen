@@ -110,6 +110,12 @@ object Key {
     const val SERVER_CONNECTION_RECEIVE_WINDOW = "serverConnectionReceiveWindow"
     const val SERVER_DISABLE_MTU_DISCOVERY = "serverDisableMtuDiscovery"
     const val SERVER_HOP_INTERVAL = "hopInterval"
+    const val SERVER_HOP_INTERVAL_MAX = "hopIntervalMax"
+    const val SERVER_DISABLE_CHROME_PARROT = "serverDisableChromeParrot"
+    const val SERVER_BBR_PROFILE = "serverBbrProfile"
+    const val SERVER_OBFS_TYPE = "serverObfsType"
+    const val SERVER_OBFS_MIN_PACKET_SIZE = "serverObfsMinPacketSize"
+    const val SERVER_OBFS_MAX_PACKET_SIZE = "serverObfsMaxPacketSize"
 
     const val SERVER_PRIVATE_KEY = "serverPrivateKey"
     const val SERVER_INSECURE_CONCURRENCY = "serverInsecureConcurrency"
@@ -178,10 +184,10 @@ object GroupOrder {
 }
 
 object Action {
-    const val SERVICE = "io.nekohasekai.sagernet.SERVICE"
-    const val CLOSE = "io.nekohasekai.sagernet.CLOSE"
-    const val RELOAD = "io.nekohasekai.sagernet.RELOAD"
+    val SERVICE = BuildConfig.APPLICATION_ID + ".SERVICE"
+    val CLOSE = BuildConfig.APPLICATION_ID + ".CLOSE"
+    val RELOAD = BuildConfig.APPLICATION_ID + ".RELOAD"
 
     // const val SWITCH_WAKE_LOCK = "io.nekohasekai.sagernet.SWITCH_WAKELOCK"
-    const val RESET_UPSTREAM_CONNECTIONS = "moe.nb4a.RESET_UPSTREAM_CONNECTIONS"
+    val RESET_UPSTREAM_CONNECTIONS = BuildConfig.APPLICATION_ID + ".RESET_UPSTREAM_CONNECTIONS"
 }

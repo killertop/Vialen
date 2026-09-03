@@ -35,6 +35,12 @@ class HysteriaSettingsActivity : ProfileSettingsActivity<HysteriaBean>() {
         DataStore.serverConnectionReceiveWindow = connectionReceiveWindow
         DataStore.serverDisableMtuDiscovery = disableMtuDiscovery
         DataStore.serverHopInterval = hopInterval
+        DataStore.serverDisableChromeParrot = disableChromeParrot ?: false
+        DataStore.serverBbrProfile = bbrProfile ?: ""
+        DataStore.serverHopIntervalMax = hopIntervalMax ?: 0
+        DataStore.serverObfsType = obfsType ?: "salamander"
+        DataStore.serverObfsMinPacketSize = obfsMinPacketSize ?: 512
+        DataStore.serverObfsMaxPacketSize = obfsMaxPacketSize ?: 1200
     }
 
     override fun HysteriaBean.serialize() {
@@ -56,6 +62,12 @@ class HysteriaSettingsActivity : ProfileSettingsActivity<HysteriaBean>() {
         connectionReceiveWindow = DataStore.serverConnectionReceiveWindow
         disableMtuDiscovery = DataStore.serverDisableMtuDiscovery
         hopInterval = DataStore.serverHopInterval
+        disableChromeParrot = DataStore.serverDisableChromeParrot
+        bbrProfile = DataStore.serverBbrProfile
+        hopIntervalMax = DataStore.serverHopIntervalMax
+        obfsType = DataStore.serverObfsType
+        obfsMinPacketSize = DataStore.serverObfsMinPacketSize
+        obfsMaxPacketSize = DataStore.serverObfsMaxPacketSize
     }
 
     override fun PreferenceFragmentCompat.createPreferences(
@@ -72,15 +84,34 @@ class HysteriaSettingsActivity : ProfileSettingsActivity<HysteriaBean>() {
             true
         }
 
-        val protocol = findPreference<SimpleMenuPreference>(Key.SERVER_PROTOCOL)!!
         val alpn = findPreference<EditTextPreference>(Key.SERVER_ALPN)!!
+        val advancedCategory = findPreference<androidx.preference.PreferenceCategory>("hysteria2AdvancedCategory")
+        val hopIntervalMaxPref = findPreference<EditTextPreference>(Key.SERVER_HOP_INTERVAL_MAX)
+        val obfsTypePref = findPreference<SimpleMenuPreference>(Key.SERVER_OBFS_TYPE)
+        val obfsMinSizePref = findPreference<EditTextPreference>(Key.SERVER_OBFS_MIN_PACKET_SIZE)
+        val obfsMaxSizePref = findPreference<EditTextPreference>(Key.SERVER_OBFS_MAX_PACKET_SIZE)
+
+        hopIntervalMaxPref?.setOnBindEditTextListener(EditTextPreferenceModifiers.Number)
+        obfsMinSizePref?.setOnBindEditTextListener(EditTextPreferenceModifiers.Number)
+        obfsMaxSizePref?.setOnBindEditTextListener(EditTextPreferenceModifiers.Number)
+
+        fun updateObfsType(type: String) {
+            val isGecko = type.equals("gecko", ignoreCase = true)
+            obfsMinSizePref?.isVisible = isGecko
+            obfsMaxSizePref?.isVisible = isGecko
+        }
+
+        obfsTypePref?.setOnPreferenceChangeListener { _, newValue ->
+            updateObfsType(newValue.toString())
+            true
+        }
+        updateObfsType(DataStore.serverObfsType)
 
         fun updateVersion(v: Int) {
             if (v == 2) {
                 authPayload.isVisible = true
                 //
                 authType.isVisible = false
-                protocol.isVisible = false
                 alpn.isVisible = false
                 //
                 findPreference<EditTextPreference>(Key.SERVER_STREAM_RECEIVE_WINDOW)!!.isVisible =
@@ -89,12 +120,12 @@ class HysteriaSettingsActivity : ProfileSettingsActivity<HysteriaBean>() {
                     false
                 findPreference<SwitchPreference>(Key.SERVER_DISABLE_MTU_DISCOVERY)!!.isVisible =
                     false
+                advancedCategory?.isVisible = true
                 //
                 authPayload.title = resources.getString(R.string.password)
             } else {
                 authType.isVisible = true
                 authPayload.isVisible = true
-                protocol.isVisible = true
                 alpn.isVisible = true
                 //
                 findPreference<EditTextPreference>(Key.SERVER_STREAM_RECEIVE_WINDOW)!!.isVisible =
@@ -103,6 +134,7 @@ class HysteriaSettingsActivity : ProfileSettingsActivity<HysteriaBean>() {
                     true
                 findPreference<SwitchPreference>(Key.SERVER_DISABLE_MTU_DISCOVERY)!!.isVisible =
                     true
+                advancedCategory?.isVisible = false
                 //
                 authPayload.title = resources.getString(R.string.hysteria_auth_payload)
             }

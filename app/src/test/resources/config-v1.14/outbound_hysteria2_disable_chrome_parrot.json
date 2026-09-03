@@ -1,0 +1,18 @@
+{
+  "disable_chrome_parrot": true,
+  "down_mbps": 0,
+  "hop_interval": "10s",
+  "password": "hy2password",
+  "server": "hy2.example.com",
+  "server_port": 443,
+  "tls": {
+    "alpn": [
+      "h3"
+    ],
+    "enabled": true,
+    "insecure": false,
+    "server_name": "hy2.example.com"
+  },
+  "type": "hysteria2",
+  "up_mbps": 0
+}

@@ -1,0 +1,10 @@
+{
+  "password": "anypassword",
+  "server": "anytls.example.com",
+  "server_port": 443,
+  "tls": {
+    "enabled": true,
+    "server_name": "anytls.example.com"
+  },
+  "type": "anytls"
+}

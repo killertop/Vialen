@@ -24,11 +24,9 @@ import io.nekohasekai.sagernet.BuildConfig
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.databinding.LayoutAboutBinding
 import io.nekohasekai.sagernet.ktx.*
-import io.nekohasekai.sagernet.plugin.PluginManager.loadString
 import io.nekohasekai.sagernet.utils.PackageCache
 import io.nekohasekai.sagernet.widget.ListListener
 import libcore.Libcore
-import moe.matsuri.nb4a.plugin.Plugins
 import androidx.core.net.toUri
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.SagerNet
@@ -119,38 +117,6 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                                     )
                                 }
                                 .build())
-                        .apply {
-                            PackageCache.awaitLoadSync()
-                            for ((_, pkg) in PackageCache.installedPluginPackages) {
-                                try {
-                                    val pluginId =
-                                        pkg.providers?.get(0)?.loadString(Plugins.METADATA_KEY_ID)
-                                    if (pluginId.isNullOrBlank()) continue
-                                    addItem(
-                                        MaterialAboutActionItem.Builder()
-                                            .icon(R.drawable.ic_baseline_nfc_24)
-                                            .text(
-                                                getString(
-                                                    R.string.version_x,
-                                                    pluginId
-                                                ) + " (${Plugins.displayExeProvider(pkg.packageName)})"
-                                            )
-                                            .subText("v" + pkg.versionName)
-                                            .setOnClickAction {
-                                                startActivity(Intent().apply {
-                                                    action =
-                                                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS
-                                                    data = Uri.fromParts(
-                                                        "package", pkg.packageName, null
-                                                    )
-                                                })
-                                            }
-                                            .build())
-                                } catch (e: Exception) {
-                                    Logs.w(e)
-                                }
-                            }
-                        }
                         .apply {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                                 val pm = app.getSystemService(Context.POWER_SERVICE) as PowerManager

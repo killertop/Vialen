@@ -332,21 +332,6 @@
         <item>TPROXY</item>
     </string-array>
 
-    <string-array name="mieru_protocol">
-        <item>TCP</item>
-        <item>UDP</item>
-    </string-array>
-
-    <string-array name="naive_proto_entry">
-        <item>HTTPS</item>
-        <item>QUIC</item>
-    </string-array>
-
-    <string-array name="naive_proto_value">
-        <item>https</item>
-        <item>quic</item>
-    </string-array>
-
     <string-array name="night_mode">
         <item>@string/follow_system</item>
         <item>@string/enable</item>
@@ -396,6 +381,30 @@
     <string-array name="hysteria_version">
         <item>1</item>
         <item>2</item>
+    </string-array>
+
+    <string-array name="hysteria2_bbr_profile_entries">
+        <item>Default</item>
+        <item>Conservative</item>
+        <item>Standard</item>
+        <item>Aggressive</item>
+    </string-array>
+
+    <string-array name="hysteria2_bbr_profile_values">
+        <item></item>
+        <item>conservative</item>
+        <item>standard</item>
+        <item>aggressive</item>
+    </string-array>
+
+    <string-array name="hysteria2_obfs_type_entries">
+        <item>Salamander</item>
+        <item>Gecko</item>
+    </string-array>
+
+    <string-array name="hysteria2_obfs_type_values">
+        <item>salamander</item>
+        <item>gecko</item>
     </string-array>
 
     <string-array name="tuic_version">

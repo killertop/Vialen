@@ -1,0 +1,21 @@
+{
+  "alter_id": 0,
+  "packet_encoding": "",
+  "security": "auto",
+  "server": "vmess.example.com",
+  "server_port": 443,
+  "tls": {
+    "enabled": true,
+    "insecure": false,
+    "server_name": "vmess.example.com"
+  },
+  "transport": {
+    "headers": {
+      "Host": "vmess.example.com"
+    },
+    "path": "/websocket",
+    "type": "ws"
+  },
+  "type": "vmess",
+  "uuid": "a3424107-160a-4286-9051-7d1c5a93b482"
+}

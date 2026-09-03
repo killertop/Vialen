@@ -46,8 +46,6 @@ class SagerConnection(
 
         fun stateChanged(state: BaseService.State, profileName: String?, msg: String?)
 
-        fun missingPlugin(profileName: String, pluginName: String) {}
-
         fun onServiceConnected(service: ISagerNetService)
 
         /**
@@ -90,13 +88,6 @@ class SagerConnection(
             val callback = callback ?: return
             runOnMainDispatcher {
                 callback.cbSelectorUpdate(id)
-            }
-        }
-
-        override fun missingPlugin(profileName: String, pluginName: String) {
-            val callback = callback ?: return
-            runOnMainDispatcher {
-                callback.missingPlugin(profileName, pluginName)
             }
         }
 

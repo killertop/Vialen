@@ -1,0 +1,15 @@
+{
+  "disable_mtu_discovery": false,
+  "down_mbps": 200,
+  "hop_interval": "10s",
+  "obfs": "",
+  "server": "hy1.example.com",
+  "server_port": 36712,
+  "tls": {
+    "enabled": true,
+    "insecure": false,
+    "server_name": "hy1.example.com"
+  },
+  "type": "hysteria",
+  "up_mbps": 100
+}

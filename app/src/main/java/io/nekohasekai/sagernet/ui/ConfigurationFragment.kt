@@ -76,16 +76,11 @@ import io.nekohasekai.sagernet.ktx.showAllowingStateLoss
 import io.nekohasekai.sagernet.ktx.snackbar
 import io.nekohasekai.sagernet.ktx.startFilesForResult
 import io.nekohasekai.sagernet.ktx.tryToShow
-import io.nekohasekai.sagernet.plugin.PluginManager
 import io.nekohasekai.sagernet.ui.profile.ChainSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.HttpSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.HysteriaSettingsActivity
-import io.nekohasekai.sagernet.ui.profile.MieruSettingsActivity
-import io.nekohasekai.sagernet.ui.profile.NaiveSettingsActivity
-import io.nekohasekai.sagernet.ui.profile.SSHSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.ShadowsocksSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.SocksSettingsActivity
-import io.nekohasekai.sagernet.ui.profile.TrojanGoSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.TrojanSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.TuicSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.VMessSettingsActivity
@@ -401,28 +396,12 @@ class ConfigurationFragment @JvmOverloads constructor(
                 startActivity(Intent(requireActivity(), TrojanSettingsActivity::class.java))
             }
 
-            R.id.action_new_trojan_go -> {
-                startActivity(Intent(requireActivity(), TrojanGoSettingsActivity::class.java))
-            }
-
-            R.id.action_new_mieru -> {
-                startActivity(Intent(requireActivity(), MieruSettingsActivity::class.java))
-            }
-
-            R.id.action_new_naive -> {
-                startActivity(Intent(requireActivity(), NaiveSettingsActivity::class.java))
-            }
-
             R.id.action_new_hysteria -> {
                 startActivity(Intent(requireActivity(), HysteriaSettingsActivity::class.java))
             }
 
             R.id.action_new_tuic -> {
                 startActivity(Intent(requireActivity(), TuicSettingsActivity::class.java))
-            }
-
-            R.id.action_new_ssh -> {
-                startActivity(Intent(requireActivity(), SSHSettingsActivity::class.java))
             }
 
             R.id.action_new_wg -> {
@@ -854,9 +833,6 @@ class ConfigurationFragment @JvmOverloads constructor(
                             val result = urlTest.doTest(profile)
                             profile.status = 1
                             profile.ping = result
-                        } catch (e: PluginManager.PluginNotFoundException) {
-                            profile.status = 2
-                            profile.error = e.readableMessage
                         } catch (e: Exception) {
                             profile.status = 3
                             profile.error = e.readableMessage
@@ -1612,10 +1588,6 @@ class ConfigurationFragment @JvmOverloads constructor(
                 editButton.isGone = select
                 removeButton.isGone = select
 
-                proxyEntity.nekoBean?.apply {
-                    shareLayout.isGone = true
-                }
-
                 runOnDefaultDispatcher {
                     val selected = (selectedItem?.id ?: DataStore.selectedProxy) == proxyEntity.id
                     val started =
@@ -1642,10 +1614,6 @@ class ConfigurationFragment @JvmOverloads constructor(
                                 popup.menu.removeItem(R.id.action_group_qr)
                                 popup.menu.removeItem(R.id.action_group_clipboard)
                             }
-                        }
-
-                        if (proxyEntity.nekoBean != null) {
-                            popup.menu.removeItem(R.id.action_group_configuration)
                         }
 
                         popup.setOnMenuItemClickListener(this@ConfigurationHolder)

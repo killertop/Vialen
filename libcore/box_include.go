@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/sagernet/sing-box/adapter"
+	"github.com/sagernet/sing-box/adapter/certificate"
 	"github.com/sagernet/sing-box/adapter/endpoint"
 	"github.com/sagernet/sing-box/adapter/inbound"
 	"github.com/sagernet/sing-box/adapter/outbound"
@@ -29,8 +30,6 @@ import (
 	"github.com/sagernet/sing-box/protocol/shadowsocks"
 	"github.com/sagernet/sing-box/protocol/shadowtls"
 	"github.com/sagernet/sing-box/protocol/socks"
-	"github.com/sagernet/sing-box/protocol/ssh"
-	"github.com/sagernet/sing-box/protocol/tor"
 	"github.com/sagernet/sing-box/protocol/trojan"
 	"github.com/sagernet/sing-box/protocol/tuic"
 	"github.com/sagernet/sing-box/protocol/tun"
@@ -53,6 +52,8 @@ func nekoboxAndroidInboundRegistry() *inbound.Registry {
 	socks.RegisterInbound(registry)
 	http.RegisterInbound(registry)
 	mixed.RegisterInbound(registry)
+	shadowsocks.RegisterInbound(registry)
+	trojan.RegisterInbound(registry)
 
 	return registry
 }
@@ -73,8 +74,6 @@ func nekoboxAndroidOutboundRegistry() *outbound.Registry {
 	shadowsocks.RegisterOutbound(registry)
 	vmess.RegisterOutbound(registry)
 	trojan.RegisterOutbound(registry)
-	tor.RegisterOutbound(registry)
-	ssh.RegisterOutbound(registry)
 	shadowtls.RegisterOutbound(registry)
 	vless.RegisterOutbound(registry)
 	anytls.RegisterOutbound(registry)
@@ -82,8 +81,6 @@ func nekoboxAndroidOutboundRegistry() *outbound.Registry {
 	hysteria.RegisterOutbound(registry)
 	tuic.RegisterOutbound(registry)
 	hysteria2.RegisterOutbound(registry)
-
-	wireguard.RegisterOutbound(registry)
 
 	return registry
 }
@@ -123,6 +120,12 @@ func nekoboxAndroidDNSTransportRegistry(localTransport LocalDNSTransport) *dns.T
 
 func nekoboxAndroidServiceRegistry() *service.Registry {
 	registry := service.NewRegistry()
+
+	return registry
+}
+
+func nekoboxAndroidCertificateProviderRegistry() *certificate.Registry {
+	registry := certificate.NewRegistry()
 
 	return registry
 }

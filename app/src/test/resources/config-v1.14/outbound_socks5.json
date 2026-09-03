@@ -1,0 +1,8 @@
+{
+  "password": "testpass",
+  "server": "192.168.1.100",
+  "server_port": 1080,
+  "type": "socks",
+  "username": "testuser",
+  "version": "5"
+}

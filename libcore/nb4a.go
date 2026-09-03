@@ -13,9 +13,9 @@ import (
 
 	"github.com/matsuridayo/libneko/neko_common"
 	"github.com/matsuridayo/libneko/neko_log"
-	"github.com/sagernet/sing-box/nekoutils"
 	"github.com/sagernet/sing-box/option"
 	"golang.org/x/sys/unix"
+	"libcore/nekoutils"
 )
 
 //go:linkname resourcePaths github.com/sagernet/sing-box/constant.resourcePaths

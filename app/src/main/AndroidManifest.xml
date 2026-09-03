@@ -130,9 +130,6 @@
                 <data android:scheme="sock5" />
                 <data android:scheme="vmess" />
                 <data android:scheme="trojan" />
-                <data android:scheme="trojan-go" />
-                <data android:scheme="naive+https" />
-                <data android:scheme="naive+quic" />
                 <data android:scheme="hysteria" />
 
             </intent-filter>
@@ -164,19 +161,7 @@
             android:name="io.nekohasekai.sagernet.ui.profile.TrojanSettingsActivity"
             android:configChanges="uiMode" />
         <activity
-            android:name="io.nekohasekai.sagernet.ui.profile.TrojanGoSettingsActivity"
-            android:configChanges="uiMode" />
-        <activity
-            android:name="io.nekohasekai.sagernet.ui.profile.MieruSettingsActivity"
-            android:configChanges="uiMode" />
-        <activity
-            android:name="io.nekohasekai.sagernet.ui.profile.NaiveSettingsActivity"
-            android:configChanges="uiMode" />
-        <activity
             android:name="io.nekohasekai.sagernet.ui.profile.HysteriaSettingsActivity"
-            android:configChanges="uiMode" />
-        <activity
-            android:name="io.nekohasekai.sagernet.ui.profile.SSHSettingsActivity"
             android:configChanges="uiMode" />
         <activity
             android:name="io.nekohasekai.sagernet.ui.profile.WireGuardSettingsActivity"

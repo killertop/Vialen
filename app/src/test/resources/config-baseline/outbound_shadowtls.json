@@ -1,0 +1,12 @@
+{
+  "password": "shadowpass",
+  "server": "stls.example.com",
+  "server_port": 443,
+  "tls": {
+    "enabled": true,
+    "insecure": false,
+    "server_name": "gateway.icloud.com"
+  },
+  "type": "shadowtls",
+  "version": 3
+}

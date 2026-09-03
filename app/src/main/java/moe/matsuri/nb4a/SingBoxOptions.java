@@ -111,9 +111,13 @@ public class SingBoxOptions {
 
         public List<Inbound> inbounds;
 
+        public List<SingBoxOption> endpoints;
+
         public List<SingBoxOption> outbounds;
 
         public RouteOptions route;
+
+        public List<HTTPClient> http_clients;
 
         public ExperimentalOptions experimental;
 
@@ -177,7 +181,25 @@ public class SingBoxOptions {
 
         public RouteOptions route;
 
+        public List<HTTPClient> http_clients;
+
         public ExperimentalOptions experimental;
+
+    }
+
+    public static class HTTPClient extends SingBoxOption {
+
+        public String tag;
+
+        public String detour;
+
+        public String engine;
+
+        public Integer version;
+
+        public Boolean disable_version_fallback;
+
+        public OutboundTLSOptions tls;
 
     }
 
@@ -321,7 +343,7 @@ public class SingBoxOptions {
 
         public Boolean disable_expire;
 
-        public Boolean independent_cache;
+        public Boolean store_dns;
 
         // End of public DNSClientOptions ;
 
@@ -331,15 +353,19 @@ public class SingBoxOptions {
 
         public String tag;
 
-        public String address;
+        public String type;
 
-        public String address_resolver;
+        public String server;
 
-        public String address_strategy;
+        public Integer server_port;
 
-        public Long address_fallback_delay;
+        public String domain_resolver;
 
-        public String strategy;
+        public String path;
+
+        public String inet4_range;
+
+        public String inet6_range;
 
         public String detour;
 
@@ -591,6 +617,10 @@ public class SingBoxOptions {
 
         public String password;
 
+        public Integer min_packet_size;
+
+        public Integer max_packet_size;
+
     }
 
     public static class Hysteria2User extends SingBoxOption {
@@ -656,6 +686,12 @@ public class SingBoxOptions {
         public List<String> server_ports;
 
         public String hop_interval;
+
+        public String hop_interval_max;
+
+        public String bbr_profile;
+
+        public Boolean disable_chrome_parrot;
 
     }
 
@@ -1063,6 +1099,8 @@ public class SingBoxOptions {
 
         public Integer default_mark;
 
+        public String default_http_client;
+
     }
 
 
@@ -1087,6 +1125,12 @@ public class SingBoxOptions {
         public String path;
 
         public String url;
+
+        public Object http_client;
+
+        public String update_interval;
+
+        public String initial_path;
 
     }
 
@@ -2778,22 +2822,23 @@ public class SingBoxOptions {
 
     public static class WireGuardPeer extends SingBoxOption {
 
-        // Generate note: nested type ServerOptions
+        public String address;
+
+        public Integer port;
+
         public String server;
 
         public Integer server_port;
-
-        // End of public ServerOptions ;
 
         public String public_key;
 
         public String pre_shared_key;
 
-        // Generate note: Listable
         public List<String> allowed_ips;
 
-        // Generate note: Base64 String
-        public String reserved;
+        public List<Integer> reserved;
+
+        public Integer persistent_keepalive_interval;
 
     }
 
@@ -2802,6 +2847,12 @@ public class SingBoxOptions {
         public String interface_name;
 
         public Integer mtu;
+
+        public List<String> address;
+
+        public List<String> route_address;
+
+        public List<String> route_exclude_address;
 
         // Generate note: Listable
         public List<String> inet4_address;
@@ -3851,6 +3902,18 @@ public class SingBoxOptions {
 
     }
 
+    public static class Endpoint_WireGuardOptions extends SingBoxOption {
+        public String type = "wireguard";
+        public String tag;
+        public List<String> address;
+        public String private_key;
+        public Integer mtu;
+        public List<WireGuardPeer> peers;
+        public String detour;
+        public String domain_resolver;
+        public String domain_strategy;
+    }
+
     public static class Outbound_WireGuardOptions extends Outbound {
 
         // Generate note: nested type DialerOptions
@@ -4358,6 +4421,12 @@ public class SingBoxOptions {
 
         public String hop_interval;
 
+        public String hop_interval_max;
+
+        public String bbr_profile;
+
+        public Boolean disable_chrome_parrot;
+
     }
 
     public static class Outbound_SelectorOptions extends Outbound {
@@ -4411,6 +4480,8 @@ public class SingBoxOptions {
 
         public List<String> rule_set;
 
+        public Boolean rule_set_ip_cidr_match_source;
+
         public Boolean source_ip_is_private;
 
         public Boolean ip_is_private;
@@ -4448,11 +4519,13 @@ public class SingBoxOptions {
         // Generate note: Listable
         public List<Integer> user_id;
 
-        public String clash_mode;
-
-        public Boolean invert;
-
         public String action;
+
+        public String strategy;
+
+        public Boolean override_destination;
+
+        public String timeout;
 
         public String outbound;
 
@@ -4491,6 +4564,16 @@ public class SingBoxOptions {
 
         public List<String> rule_set;
 
+        public Boolean rule_set_ip_cidr_match_source;
+
+        public Object match_response;
+
+        public Boolean ip_is_private;
+
+        public List<String> ip_cidr;
+
+        public String tag;
+
         // Generate note: Listable
         public List<String> source_ip_cidr;
 
@@ -4524,9 +4607,29 @@ public class SingBoxOptions {
         // Generate note: Listable
         public List<String> outbound;
 
+        public String action;
+
         public String clash_mode;
 
         public Boolean invert;
+
+        public String server;
+
+        public Boolean disable_cache;
+
+        public Integer rewrite_ttl;
+
+    }
+
+    public static class DNSRule_LogicalOptions extends DNSRule {
+
+        public String mode;
+
+        public List<DNSRule> rules;
+
+        public Boolean invert;
+
+        public String action;
 
         public String server;
 

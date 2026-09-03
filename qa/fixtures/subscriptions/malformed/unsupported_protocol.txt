@@ -1,0 +1,1 @@
+unknownproto://user:pass@1.1.1.1:8080#Unsupported

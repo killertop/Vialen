@@ -6,8 +6,8 @@ import (
 
 	geosites "github.com/sagernet/sing-box/common/geosite"
 	C "github.com/sagernet/sing-box/constant"
-	"github.com/sagernet/sing-box/nekoutils"
 	"github.com/sagernet/sing-box/option"
+	"libcore/nekoutils"
 )
 
 type geosite struct {

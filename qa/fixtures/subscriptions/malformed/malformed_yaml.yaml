@@ -1,0 +1,4 @@
+proxies:
+  - name: node1
+  type: ss
+  [invalid: indentation

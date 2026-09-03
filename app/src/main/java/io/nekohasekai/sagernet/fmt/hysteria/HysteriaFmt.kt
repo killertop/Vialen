@@ -16,8 +16,10 @@ fun parseHysteria1(url: String): HysteriaBean {
         "invalid hysteria link $url"
     )
     return HysteriaBean().apply {
+        initializeDefaultValues()
         protocolVersion = 1
         serverAddress = link.host
+        serverPort = link.port
         serverPorts = link.port.toString()
         name = link.fragment
 
@@ -47,13 +49,15 @@ fun parseHysteria1(url: String): HysteriaBean {
             obfuscation = it
         }
         link.queryParameter("protocol")?.also {
-            when (it) {
-                "faketcp" -> {
-                    protocol = HysteriaBean.PROTOCOL_FAKETCP
+            when (it.lowercase()) {
+                "faketcp", "wechat-video" -> {
+                    throw IllegalArgumentException("Unsupported Hysteria 1 protocol '$it': external plugin mode has been removed")
                 }
-
-                "wechat-video" -> {
-                    protocol = HysteriaBean.PROTOCOL_WECHAT_VIDEO
+                "udp" -> {
+                    protocol = HysteriaBean.PROTOCOL_UDP
+                }
+                else -> {
+                    throw IllegalArgumentException("Unknown Hysteria 1 protocol: $it")
                 }
             }
         }
@@ -67,8 +71,10 @@ fun parseHysteria2(url: String): HysteriaBean {
         .replace("hy2://", "https://")
         .toHttpUrlOrNull() ?: error("invalid hysteria link $url")
     return HysteriaBean().apply {
+        initializeDefaultValues()
         protocolVersion = 2
         serverAddress = link.host
+        serverPort = link.port
         serverPorts = link.port.toString()
         authPayload = if (link.password.isNotBlank()) {
             link.username + ":" + link.password
@@ -92,6 +98,13 @@ fun parseHysteria2(url: String): HysteriaBean {
 //        link.queryParameter("downmbps")?.also {
 //            downloadMbps = it.toIntOrNull() ?: downloadMbps
 //        }
+        link.queryParameter("obfs")?.also {
+            if (it.equals("gecko", ignoreCase = true)) {
+                obfsType = "gecko"
+            } else if (it.equals("salamander", ignoreCase = true)) {
+                obfsType = "salamander"
+            }
+        }
         link.queryParameter("obfs-password")?.also {
             obfuscation = it
         }
@@ -143,21 +156,16 @@ fun HysteriaBean.toUri(): String {
             builder.addQueryParameter("obfs", "xplus")
             builder.addQueryParameter("obfsParam", obfuscation)
         }
-        when (protocol) {
-            HysteriaBean.PROTOCOL_FAKETCP -> {
-                builder.addQueryParameter("protocol", "faketcp")
-            }
-
-            HysteriaBean.PROTOCOL_WECHAT_VIDEO -> {
-                builder.addQueryParameter("protocol", "wechat-video")
-            }
-        }
     } else {
         if (sni.isNotBlank()) {
             builder.addQueryParameter("sni", sni)
         }
         if (obfuscation.isNotBlank()) {
-            builder.addQueryParameter("obfs", "salamander")
+            if (obfsType?.equals("gecko", ignoreCase = true) == true) {
+                builder.addQueryParameter("obfs", "gecko")
+            } else {
+                builder.addQueryParameter("obfs", "salamander")
+            }
             builder.addQueryParameter("obfs-password", obfuscation)
         }
     }
@@ -182,13 +190,15 @@ fun JSONObject.parseHysteria1Json(): HysteriaBean {
             authPayload = it
         }
         getStr("protocol")?.also {
-            when (it) {
-                "faketcp" -> {
-                    protocol = HysteriaBean.PROTOCOL_FAKETCP
+            when (it.lowercase()) {
+                "faketcp", "wechat-video" -> {
+                    throw IllegalArgumentException("Unsupported Hysteria 1 protocol '$it': external plugin mode has been removed")
                 }
-
-                "wechat-video" -> {
-                    protocol = HysteriaBean.PROTOCOL_WECHAT_VIDEO
+                "udp" -> {
+                    protocol = HysteriaBean.PROTOCOL_UDP
+                }
+                else -> {
+                    throw IllegalArgumentException("Unknown Hysteria 1 protocol: $it")
                 }
             }
         }
@@ -202,60 +212,6 @@ fun JSONObject.parseHysteria1Json(): HysteriaBean {
     }
 }
 
-fun HysteriaBean.buildHysteria1Config(port: Int, cacheFile: (() -> File)?): String {
-    if (protocolVersion != 1) {
-        throw Exception("error version: $protocolVersion")
-    }
-    return JSONObject().apply {
-        put("server", displayAddress())
-        when (protocol) {
-            HysteriaBean.PROTOCOL_FAKETCP -> {
-                put("protocol", "faketcp")
-            }
-
-            HysteriaBean.PROTOCOL_WECHAT_VIDEO -> {
-                put("protocol", "wechat-video")
-            }
-        }
-        put("up_mbps", uploadMbps)
-        put("down_mbps", downloadMbps)
-        put(
-            "socks5", JSONObject(
-                mapOf(
-                    "listen" to "$LOCALHOST:$port",
-                )
-            )
-        )
-        put("retry", 5)
-        put("fast_open", true)
-        put("lazy_start", true)
-        put("obfs", obfuscation)
-        when (authPayloadType) {
-            HysteriaBean.TYPE_BASE64 -> put("auth", authPayload)
-            HysteriaBean.TYPE_STRING -> put("auth_str", authPayload)
-        }
-        if (sni.isBlank() && finalAddress == LOCALHOST && !serverAddress.isIpAddress()) {
-            sni = serverAddress
-        }
-        if (sni.isNotBlank()) {
-            put("server_name", sni)
-        }
-        if (alpn.isNotBlank()) put("alpn", alpn)
-        if (caText.isNotBlank() && cacheFile != null) {
-            val caFile = cacheFile()
-            caFile.writeText(caText)
-            put("ca", caFile.absolutePath)
-        }
-
-        if (allowInsecure) put("insecure", true)
-        if (streamReceiveWindow > 0) put("recv_window_conn", streamReceiveWindow)
-        if (connectionReceiveWindow > 0) put("recv_window", connectionReceiveWindow)
-        if (disableMtuDiscovery) put("disable_mtu_discovery", true)
-
-        put("hop_interval", hopInterval)
-    }.toStringPretty()
-}
-
 fun isMultiPort(hyAddr: String): Boolean {
     if (!hyAddr.contains(":")) return false
     val p = hyAddr.substringAfterLast(":")
@@ -267,49 +223,42 @@ fun getFirstPort(portStr: String): Int {
     return portStr.substringBefore(":").substringBefore(",").toIntOrNull() ?: 443
 }
 
-fun HysteriaBean.canUseSingBox(): Boolean {
-    if (protocol != HysteriaBean.PROTOCOL_UDP) return false
-    return true
-}
-
 fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean): SingBoxOptions.SingBoxOption {
     return when (bean.protocolVersion) {
-        1 -> SingBoxOptions.Outbound_HysteriaOptions().apply {
-            type = "hysteria"
-            server = bean.serverAddress
-            val port = bean.serverPorts.toIntOrNull()
-            if (port != null) {
-                server_port = port
-            } else {
-                server_ports = hopPortsToSingboxList(bean.serverPorts)
+        1 -> {
+            if (bean.protocol != null && bean.protocol != HysteriaBean.PROTOCOL_UDP) {
+                error("Unsupported Hysteria 1 protocol (${bean.protocol}): external plugin mode has been removed")
             }
-            hop_interval = "${bean.hopInterval}s"
-            up_mbps = bean.uploadMbps
-            down_mbps = bean.downloadMbps
-            obfs = bean.obfuscation
-            disable_mtu_discovery = bean.disableMtuDiscovery
-            when (bean.authPayloadType) {
-                HysteriaBean.TYPE_BASE64 -> auth = bean.authPayload
-                HysteriaBean.TYPE_STRING -> auth_str = bean.authPayload
-            }
-            if (bean.streamReceiveWindow > 0) {
-                recv_window_conn = bean.streamReceiveWindow.toLong()
-            }
-            if (bean.connectionReceiveWindow > 0) {
-                recv_window_conn = bean.connectionReceiveWindow.toLong()
-            }
-            tls = SingBoxOptions.OutboundTLSOptions().apply {
-                if (bean.sni.isNotBlank()) {
-                    server_name = bean.sni
+            SingBoxOptions.Outbound_HysteriaOptions().apply {
+                type = "hysteria"
+                server = bean.serverAddress
+                val port = bean.serverPorts.toIntOrNull()
+                if (port != null) {
+                    server_port = port
+                } else {
+                    server_ports = hopPortsToSingboxList(bean.serverPorts)
                 }
-                if (bean.alpn.isNotBlank()) {
-                    alpn = bean.alpn.listByLineOrComma()
+                hop_interval = "${bean.hopInterval}s"
+                up_mbps = bean.uploadMbps
+                down_mbps = bean.downloadMbps
+                obfs = bean.obfuscation
+                when (bean.authPayloadType) {
+                    HysteriaBean.TYPE_BASE64 -> auth = bean.authPayload
+                    HysteriaBean.TYPE_STRING -> auth_str = bean.authPayload
                 }
-                if (bean.caText.isNotBlank()) {
-                    certificate = bean.caText
+                tls = SingBoxOptions.OutboundTLSOptions().apply {
+                    if (bean.sni.isNotBlank()) {
+                        server_name = bean.sni
+                    }
+                    if (bean.alpn.isNotBlank()) {
+                        alpn = bean.alpn.listByLineOrComma()
+                    }
+                    if (bean.caText.isNotBlank()) {
+                        certificate = bean.caText
+                    }
+                    insecure = bean.allowInsecure || DataStore.globalAllowInsecure
+                    enabled = true
                 }
-                insecure = bean.allowInsecure || DataStore.globalAllowInsecure
-                enabled = true
             }
         }
 
@@ -323,28 +272,39 @@ fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean): SingBoxOptions.SingBox
                 server_ports = hopPortsToSingboxList(bean.serverPorts)
             }
             hop_interval = "${bean.hopInterval}s"
+            if (bean.hopIntervalMax != null && bean.hopIntervalMax > 0) {
+                hop_interval_max = "${bean.hopIntervalMax}s"
+            }
             up_mbps = bean.uploadMbps
             down_mbps = bean.downloadMbps
+            if (!bean.bbrProfile.isNullOrBlank() && !bean.bbrProfile.equals("default", ignoreCase = true)) {
+                bbr_profile = bean.bbrProfile.lowercase()
+            }
+            if (bean.disableChromeParrot == true) {
+                disable_chrome_parrot = true
+            }
             if (bean.obfuscation.isNotBlank()) {
                 obfs = SingBoxOptions.Hysteria2Obfs().apply {
-                    type = "salamander"
+                    val oType = if (bean.obfsType?.equals("gecko", ignoreCase = true) == true) "gecko" else "salamander"
+                    type = oType
                     password = bean.obfuscation
+                    if (oType == "gecko") {
+                        if (bean.obfsMinPacketSize != null && bean.obfsMinPacketSize != 512) {
+                            min_packet_size = bean.obfsMinPacketSize
+                        }
+                        if (bean.obfsMaxPacketSize != null && bean.obfsMaxPacketSize != 1200) {
+                            max_packet_size = bean.obfsMaxPacketSize
+                        }
+                    }
                 }
             }
-//            disable_mtu_discovery = bean.disableMtuDiscovery
             password = bean.authPayload
-//            if (bean.streamReceiveWindow > 0) {
-//                recv_window_conn = bean.streamReceiveWindow.toLong()
-//            }
-//            if (bean.connectionReceiveWindow > 0) {
-//                recv_window_conn = bean.connectionReceiveWindow.toLong()
-//            }
             tls = SingBoxOptions.OutboundTLSOptions().apply {
-                if (bean.sni.isNotBlank()) {
+                if (!bean.sni.isNullOrBlank()) {
                     server_name = bean.sni
                 }
                 alpn = listOf("h3")
-                if (bean.caText.isNotBlank()) {
+                if (!bean.caText.isNullOrBlank()) {
                     certificate = bean.caText
                 }
                 insecure = bean.allowInsecure || DataStore.globalAllowInsecure

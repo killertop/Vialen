@@ -43,15 +43,6 @@
                         android:id="@+id/action_new_trojan"
                         android:title="@string/action_trojan" />
                     <item
-                        android:id="@+id/action_new_trojan_go"
-                        android:title="@string/action_trojan_go" />
-                    <item
-                        android:id="@+id/action_new_mieru"
-                        android:title="@string/action_mieru" />
-                    <item
-                        android:id="@+id/action_new_naive"
-                        android:title="@string/action_naive" />
-                    <item
                         android:id="@+id/action_new_hysteria"
                         android:title="@string/action_hysteria" />
                     <item
@@ -63,9 +54,6 @@
                     <item
                         android:id="@+id/action_new_anytls"
                         android:title="@string/action_anytls" />
-                    <item
-                        android:id="@+id/action_new_ssh"
-                        android:title="@string/action_ssh" />
                     <item
                         android:id="@+id/action_new_wg"
                         android:title="@string/action_wireguard" />

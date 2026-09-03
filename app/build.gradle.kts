@@ -10,6 +10,9 @@ plugins {
 setupApp()
 
 android {
+    defaultConfig {
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
     }
@@ -35,6 +38,38 @@ android {
     }
     androidResources {
         generateLocaleConfig = true
+    }
+    sourceSets {
+        getByName("test").assets.srcDir("$projectDir/schemas")
+    }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        unitTests.isReturnDefaultValues = true
+    }
+}
+
+tasks.withType<Test>().configureEach {
+    maxHeapSize = "2048m"
+    doFirst {
+        listOf(
+            "ossDebug", "ossRelease",
+            "fdroidDebug", "fdroidRelease",
+            "playDebug", "playRelease",
+            "previewDebug", "previewRelease"
+        ).forEach { variant ->
+            copy {
+                from("$projectDir/schemas")
+                into("${project.buildDir}/intermediates/assets/$variant/merge${variant.replaceFirstChar { it.uppercase() }}Assets")
+            }
+            copy {
+                from("$projectDir/schemas")
+                into("${project.buildDir}/intermediates/assets/test/$variant/merge${variant.replaceFirstChar { it.uppercase() }}TestAssets")
+            }
+            copy {
+                from("$projectDir/schemas")
+                into("${project.buildDir}/intermediates/javaResources/test${variant.replaceFirstChar { it.uppercase() }}UnitTest")
+            }
+        }
     }
 }
 
@@ -85,4 +120,18 @@ dependencies {
     ksp("com.github.MatrixDev.Roomigrant:RoomigrantCompiler:0.3.4")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.xerial:sqlite-jdbc:3.45.1.0")
+    testImplementation("io.mockk:mockk:1.13.10")
+    testImplementation("androidx.room:room-testing:2.6.1")
+    testImplementation("androidx.test:core:1.5.0")
+    testImplementation("androidx.test.ext:junit:1.1.5")
+    testImplementation("org.robolectric:robolectric:4.11.1")
+
+    androidTestImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:core:1.5.0")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation("androidx.test:rules:1.5.0")
 }
