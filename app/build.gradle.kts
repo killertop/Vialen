@@ -73,6 +73,32 @@ tasks.withType<Test>().configureEach {
     }
 }
 
+val rustJniLibsDir = layout.buildDirectory.dir("generated/rustJniLibs")
+
+android.sourceSets.getByName("main").jniLibs.srcDir(rustJniLibsDir)
+
+val buildRustAndroid by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Build the Phase E1 Rust JNI POC for all supported Android ABIs"
+    val rustRoot = rootProject.file("rust/vialen-core")
+    val buildScript = rootProject.file("scripts/build-rust-android.sh")
+    inputs.file(rootProject.file("rust-toolchain.toml"))
+    inputs.file(rustRoot.resolve("Cargo.toml"))
+    inputs.file(rustRoot.resolve("Cargo.lock"))
+    inputs.dir(rustRoot.resolve("src"))
+    inputs.file(buildScript)
+    outputs.dir(rustJniLibsDir)
+    commandLine("bash", buildScript.absolutePath, rustJniLibsDir.get().asFile.absolutePath)
+}
+
+tasks.configureEach {
+    if (name.startsWith("merge") &&
+        (name.endsWith("JniLibFolders") || name.endsWith("NativeLibs"))
+    ) {
+        dependsOn(buildRustAndroid)
+    }
+}
+
 dependencies {
 
     implementation(fileTree("libs"))
