@@ -50,6 +50,11 @@ android {
 
 tasks.withType<Test>().configureEach {
     maxHeapSize = "2048m"
+    dependsOn("buildRustHost")
+    systemProperty(
+        "java.library.path",
+        "${rootProject.file("rust/vialen-core/target/release")}:${rootProject.file("rust/vialen-core/target/debug")}"
+    )
     doFirst {
         listOf(
             "ossDebug", "ossRelease",
@@ -72,6 +77,21 @@ tasks.withType<Test>().configureEach {
         }
     }
 }
+
+val buildRustHost by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Build libvialen_core.dylib for the macOS host JVM (used by unit tests via java.library.path)"
+    val rustRoot = rootProject.file("rust/vialen-core")
+    val buildScript = rootProject.file("scripts/build-rust-host.sh")
+    inputs.file(rootProject.file("rust-toolchain.toml"))
+    inputs.file(rustRoot.resolve("Cargo.toml"))
+    inputs.file(rustRoot.resolve("Cargo.lock"))
+    inputs.dir(rustRoot.resolve("src"))
+    inputs.file(buildScript)
+    outputs.file(rustRoot.resolve("target/release/libvialen_core.dylib"))
+    commandLine("bash", buildScript.absolutePath)
+}
+
 
 val rustJniLibsDir = layout.buildDirectory.dir("generated/rustJniLibs")
 
