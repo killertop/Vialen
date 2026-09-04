@@ -1,8 +1,8 @@
 use super::base64::decode_base64_url_safe;
-use super::shadowsocks::CanonicalProxy;
 use super::url::{parse_url, percent_decode};
+use crate::model::CanonicalNode;
 
-pub fn parse_socks(url: &str) -> Result<CanonicalProxy, &'static str> {
+pub fn parse_socks(url: &str) -> Result<CanonicalNode, &'static str> {
     let protocol = if url.starts_with("socks4a://") {
         "socks4a"
     } else if url.starts_with("socks4://") {
@@ -40,15 +40,15 @@ pub fn parse_socks(url: &str) -> Result<CanonicalProxy, &'static str> {
         }
     }
 
-    Ok(CanonicalProxy {
-        protocol: protocol.to_string(),
-        server: parsed.host.to_string(),
+    Ok(CanonicalNode::new(
+        protocol,
+        parsed.host,
         port,
-        username,
-        password,
-        plugin: String::new(),
-        name: fragment,
-    })
+        &username,
+        &password,
+        "",
+        &fragment,
+    ))
 }
 
 #[cfg(test)]

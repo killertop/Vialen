@@ -79,6 +79,7 @@ pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeProbe<
     .unwrap_or(ptr::null_mut())
 }
 
+pub mod model;
 pub mod parser;
 
 #[unsafe(no_mangle)]

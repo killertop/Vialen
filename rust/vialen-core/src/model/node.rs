@@ -1,0 +1,171 @@
+use super::normalize::NormalizationEngine;
+use std::fmt;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Protocol {
+    Shadowsocks,
+    Socks4,
+    Socks4a,
+    Socks5,
+    Trojan,
+    Tuic,
+    Hysteria1,
+    Hysteria2,
+    Vless,
+    Vmess,
+    Unknown,
+}
+
+impl Protocol {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Protocol::Shadowsocks => "shadowsocks",
+            Protocol::Socks4 => "socks4",
+            Protocol::Socks4a => "socks4a",
+            Protocol::Socks5 => "socks5",
+            Protocol::Trojan => "trojan",
+            Protocol::Tuic => "tuic",
+            Protocol::Hysteria1 => "hysteria1",
+            Protocol::Hysteria2 => "hysteria2",
+            Protocol::Vless => "vless",
+            Protocol::Vmess => "vmess",
+            Protocol::Unknown => "unknown",
+        }
+    }
+
+    pub fn from_str_loose(s: &str) -> Self {
+        match s.to_ascii_lowercase().as_str() {
+            "ss" | "shadowsocks" => Protocol::Shadowsocks,
+            "socks4" => Protocol::Socks4,
+            "socks4a" => Protocol::Socks4a,
+            "socks" | "socks5" => Protocol::Socks5,
+            "trojan" => Protocol::Trojan,
+            "tuic" => Protocol::Tuic,
+            "hysteria" | "hysteria1" | "hy1" => Protocol::Hysteria1,
+            "hysteria2" | "hy2" => Protocol::Hysteria2,
+            "vless" => Protocol::Vless,
+            "vmess" => Protocol::Vmess,
+            _ => Protocol::Unknown,
+        }
+    }
+}
+
+impl fmt::Display for Protocol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct TransportConfig {
+    pub transport_type: String, // tcp, udp, ws, grpc, http, httpupgrade
+    pub host: String,
+    pub path: String,
+    pub early_data_header_name: String,
+    pub max_early_data: i32,
+    pub service_name: String,
+    pub packet_encoding: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct TlsConfig {
+    pub enabled: bool,
+    pub server_name: String,
+    pub alpn: Vec<String>,
+    pub allow_insecure: bool,
+    pub disable_sni: bool,
+    pub reality_public_key: String,
+    pub reality_short_id: String,
+    pub certificates: String,
+    pub utls_fingerprint: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtraConfig {
+    pub congestion_control: String,
+    pub udp_relay_mode: String,
+    pub obfs_type: String,
+    pub obfs_password: String,
+    pub upload_mbps: i32,
+    pub download_mbps: i32,
+    pub mport: String,
+    pub auth_payload: String,
+    pub disable_chrome_parrot: bool,
+    pub bbr_profile: String,
+    pub hop_interval_max: i32,
+    pub obfs_min_packet_size: i32,
+    pub obfs_max_packet_size: i32,
+}
+
+impl Default for ExtraConfig {
+    fn default() -> Self {
+        Self {
+            congestion_control: String::new(),
+            udp_relay_mode: String::new(),
+            obfs_type: "salamander".to_string(),
+            obfs_password: String::new(),
+            upload_mbps: 0,
+            download_mbps: 0,
+            mport: String::new(),
+            auth_payload: String::new(),
+            disable_chrome_parrot: false,
+            bbr_profile: String::new(),
+            hop_interval_max: 0,
+            obfs_min_packet_size: 512,
+            obfs_max_packet_size: 1200,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CanonicalNode {
+    pub protocol: String,
+    pub server: String,
+    pub port: u16,
+    pub username: String,
+    pub password: String,
+    pub plugin: String,
+    pub name: String,
+    pub transport: Option<TransportConfig>,
+    pub tls: Option<TlsConfig>,
+    pub extra: Option<ExtraConfig>,
+}
+
+impl CanonicalNode {
+    pub fn new(
+        protocol: &str,
+        server: &str,
+        port: u16,
+        username: &str,
+        password: &str,
+        plugin: &str,
+        name: &str,
+    ) -> Self {
+        Self {
+            protocol: protocol.to_string(),
+            server: server.to_ascii_lowercase(),
+            port,
+            username: username.to_string(),
+            password: password.to_string(),
+            plugin: plugin.to_string(),
+            name: name.to_string(),
+            transport: None,
+            tls: None,
+            extra: None,
+        }
+    }
+
+    pub fn protocol_kind(&self) -> Protocol {
+        Protocol::from_str_loose(&self.protocol)
+    }
+
+    pub fn to_normalized(&self) -> Self {
+        let mut cloned = self.clone();
+        cloned.normalize();
+        cloned
+    }
+
+    pub fn normalize(&mut self) {
+        NormalizationEngine::normalize_node(self);
+    }
+}

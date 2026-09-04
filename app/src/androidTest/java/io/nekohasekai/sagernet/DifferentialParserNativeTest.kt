@@ -1,9 +1,13 @@
 package io.nekohasekai.sagernet
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import io.nekohasekai.sagernet.fmt.hysteria.parseHysteria1
+import io.nekohasekai.sagernet.fmt.hysteria.parseHysteria2
 import io.nekohasekai.sagernet.fmt.shadowsocks.parseShadowsocks
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
 import io.nekohasekai.sagernet.fmt.socks.parseSOCKS
+import io.nekohasekai.sagernet.fmt.trojan.parseTrojan
+import io.nekohasekai.sagernet.fmt.tuic.parseTuic
 import io.nekohasekai.sagernet.rust.CanonicalProxyResult
 import io.nekohasekai.sagernet.rust.RustBridge
 import org.junit.Assert.assertEquals
@@ -214,6 +218,64 @@ class DifferentialParserNativeTest {
         assertEquals("pass|word|with|many|pipes", rs.password)
         assertEquals("Node|Name|With|Pipes", rs.name)
         assertEquals("obfs-local;obfs=http|mode=pipe", rs.plugin)
+    }
+
+    @Test
+    fun testCandidateParsersDifferentialNative() {
+        // 1. Trojan
+        for (i in 1..10) {
+            val pass = "trojan_pass_$i"
+            val uri = "trojan://$pass@192.168.1.$i:443?sni=sni$i.com&allowInsecure=1#Trojan_$i"
+            val kt = parseTrojan(uri)
+            val rs = RustBridge.parseProxy(uri)
+            assertEquals("SUCCESS", rs.status)
+            assertEquals("trojan", rs.protocol)
+            assertEquals(kt.serverAddress, rs.server)
+            assertEquals(kt.serverPort, rs.port)
+            assertEquals(kt.password, rs.password)
+            assertEquals(kt.name ?: "", rs.name)
+            assertEquals(kt.sni ?: "", rs.sni)
+            assertEquals(kt.allowInsecure ?: false, rs.allowInsecure)
+        }
+
+        // 2. TUIC
+        for (i in 1..10) {
+            val uuid = "a3424107-160a-4286-9051-7d1c5a93b48$i"
+            val token = "tuic_token_$i"
+            val uri = "tuic://$uuid:$token@10.0.1.$i:8443?sni=tuic$i.org&allow_insecure=1#TUIC_$i"
+            val kt = parseTuic(uri)
+            val rs = RustBridge.parseProxy(uri)
+            assertEquals("SUCCESS", rs.status)
+            assertEquals("tuic", rs.protocol)
+            assertEquals(kt.serverAddress, rs.server)
+            assertEquals(kt.serverPort, rs.port)
+            assertEquals(kt.uuid ?: "", rs.username)
+            assertEquals(kt.token ?: "", rs.password)
+            assertEquals(kt.name ?: "", rs.name)
+            assertEquals(kt.sni ?: "", rs.sni)
+            assertEquals(kt.allowInsecure ?: false, rs.allowInsecure)
+        }
+
+        // 3. Hysteria 1 & 2
+        for (i in 1..10) {
+            val uri1 = "hysteria://hy1-$i.org:30000?auth=token$i&peer=sni$i.com&protocol=udp#Hy1_$i"
+            val kt1 = parseHysteria1(uri1)
+            val rs1 = RustBridge.parseProxy(uri1)
+            assertEquals("SUCCESS", rs1.status)
+            assertEquals("hysteria1", rs1.protocol)
+            assertEquals(kt1.serverAddress, rs1.server)
+            assertEquals(kt1.serverPort, rs1.port)
+            assertEquals(kt1.authPayload ?: "", rs1.password)
+
+            val uri2 = "hy2://user$i:pass$i@hy2-$i.org:443?sni=sni$i.com&obfs=salamander&obfs-password=pwd$i#Hy2_$i"
+            val kt2 = parseHysteria2(uri2)
+            val rs2 = RustBridge.parseProxy(uri2)
+            assertEquals("SUCCESS", rs2.status)
+            assertEquals("hysteria2", rs2.protocol)
+            assertEquals(kt2.serverAddress, rs2.server)
+            assertEquals(kt2.serverPort, rs2.port)
+            assertEquals(kt2.authPayload ?: "", rs2.authPayload)
+        }
     }
 
     @Test

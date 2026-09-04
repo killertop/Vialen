@@ -1,16 +1,8 @@
 use super::base64::decode_base64_url_safe;
 use super::url::{parse_url, percent_decode};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CanonicalProxy {
-    pub protocol: String,
-    pub server: String,
-    pub port: u16,
-    pub username: String,
-    pub password: String,
-    pub plugin: String,
-    pub name: String,
-}
+use crate::model::CanonicalNode;
+pub type CanonicalProxy = CanonicalNode;
 
 pub fn parse_shadowsocks(url: &str) -> Result<CanonicalProxy, &'static str> {
     if !url.starts_with("ss://") {
@@ -63,15 +55,15 @@ pub fn parse_shadowsocks(url: &str) -> Result<CanonicalProxy, &'static str> {
             }
         };
 
-        Ok(CanonicalProxy {
-            protocol: "shadowsocks".to_string(),
-            server: parsed.host.to_string(),
+        Ok(CanonicalNode::new(
+            "shadowsocks",
+            parsed.host,
             port,
-            username: method,
-            password,
-            plugin,
-            name: fragment,
-        })
+            &method,
+            &password,
+            &plugin,
+            &fragment,
+        ))
     } else {
         // Legacy v2rayN format: ss://[base64(method:password@host:port)]#name
         let b64_part = before_hash.strip_prefix("ss://").ok_or("missing prefix")?;
@@ -85,15 +77,15 @@ pub fn parse_shadowsocks(url: &str) -> Result<CanonicalProxy, &'static str> {
         let parsed = parse_url(&full_url).map_err(|_| "invalid decoded url")?;
         let port = parsed.port.ok_or("missing port")?;
 
-        Ok(CanonicalProxy {
-            protocol: "shadowsocks".to_string(),
-            server: parsed.host.to_string(),
+        Ok(CanonicalNode::new(
+            "shadowsocks",
+            parsed.host,
             port,
-            username: percent_decode(parsed.username),
-            password: percent_decode(parsed.password),
-            plugin: String::new(),
-            name: fragment,
-        })
+            &percent_decode(parsed.username),
+            &percent_decode(parsed.password),
+            "",
+            &fragment,
+        ))
     }
 }
 

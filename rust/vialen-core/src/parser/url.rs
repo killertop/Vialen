@@ -23,6 +23,7 @@ pub struct ParsedUrl<'a> {
     pub password: &'a str,
     pub host: &'a str,
     pub port: Option<u16>,
+    pub path: Option<&'a str>,
     pub query: Option<&'a str>,
     pub fragment: Option<&'a str>,
 }
@@ -43,9 +44,14 @@ pub fn parse_url(url: &str) -> Result<ParsedUrl<'_>, &'static str> {
         None => (before_frag, None),
     };
 
-    let (userinfo, host_port) = match before_query.rfind('@') {
+    let (userinfo, host_port_path) = match before_query.rfind('@') {
         Some(idx) => (Some(&before_query[..idx]), &before_query[idx + 1..]),
         None => (None, before_query),
+    };
+
+    let (host_port, path) = match host_port_path.find('/') {
+        Some(idx) => (&host_port_path[..idx], Some(&host_port_path[idx..])),
+        None => (host_port_path, None),
     };
 
     let (username, password) = match userinfo {
@@ -97,6 +103,7 @@ pub fn parse_url(url: &str) -> Result<ParsedUrl<'_>, &'static str> {
         password,
         host,
         port,
+        path,
         query,
         fragment,
     })

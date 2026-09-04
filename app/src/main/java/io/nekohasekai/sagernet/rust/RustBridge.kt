@@ -22,6 +22,33 @@ data class CanonicalProxyResult(
     val password: String = "",
     val plugin: String = "",
     val name: String = "",
+    val sni: String = "",
+    val alpn: String = "",
+    val allowInsecure: Boolean = false,
+    val disableSNI: Boolean = false,
+    val transportType: String = "",
+    val transportHost: String = "",
+    val transportPath: String = "",
+    val congestionControl: String = "",
+    val udpRelayMode: String = "",
+    val authPayload: String = "",
+    val serverPorts: String = "",
+    val obfsType: String = "",
+    val obfsPassword: String = "",
+    val uploadMbps: Int = 0,
+    val downloadMbps: Int = 0,
+    val certificates: String = "",
+    val utlsFingerprint: String = "",
+    val realityPubKey: String = "",
+    val realityShortId: String = "",
+    val earlyDataHeaderName: String = "",
+    val wsMaxEarlyData: Int = 0,
+    val packetEncoding: Int = 0,
+    val disableChromeParrot: Boolean = false,
+    val bbrProfile: String = "",
+    val hopIntervalMax: Int = 0,
+    val obfsMinPacketSize: Int = 512,
+    val obfsMaxPacketSize: Int = 1200,
     val error: String? = null,
 )
 
@@ -32,6 +59,8 @@ data class CanonicalSubscriptionResult(
 )
 
 object RustBridge {
+
+    const val CONTRACT_VERSION: Int = 1
     const val MAX_INPUT_BYTES: Int = 1024 * 1024
 
     fun probe(input: ByteArray): RustProbeResult = decodeResponse(RustNative.nativeProbe(input))
@@ -81,6 +110,33 @@ object RustBridge {
             password = fields[4],
             plugin = fields[5],
             name = fields[6],
+            sni = fields.getOrElse(7) { "" },
+            alpn = fields.getOrElse(8) { "" },
+            allowInsecure = fields.getOrElse(9) { "0" } == "1",
+            disableSNI = fields.getOrElse(10) { "0" } == "1",
+            transportType = fields.getOrElse(11) { "" },
+            transportHost = fields.getOrElse(12) { "" },
+            transportPath = fields.getOrElse(13) { "" },
+            congestionControl = fields.getOrElse(14) { "" },
+            udpRelayMode = fields.getOrElse(15) { "" },
+            authPayload = fields.getOrElse(16) { "" },
+            serverPorts = fields.getOrElse(17) { "" },
+            obfsType = fields.getOrElse(18) { "" },
+            obfsPassword = fields.getOrElse(19) { "" },
+            uploadMbps = fields.getOrElse(20) { "0" }.toIntOrNull() ?: 0,
+            downloadMbps = fields.getOrElse(21) { "0" }.toIntOrNull() ?: 0,
+            certificates = fields.getOrElse(22) { "" },
+            utlsFingerprint = fields.getOrElse(23) { "" },
+            realityPubKey = fields.getOrElse(24) { "" },
+            realityShortId = fields.getOrElse(25) { "" },
+            earlyDataHeaderName = fields.getOrElse(26) { "" },
+            wsMaxEarlyData = fields.getOrElse(27) { "0" }.toIntOrNull() ?: 0,
+            packetEncoding = fields.getOrElse(28) { "0" }.toIntOrNull() ?: 0,
+            disableChromeParrot = fields.getOrElse(29) { "0" } == "1",
+            bbrProfile = fields.getOrElse(30) { "" },
+            hopIntervalMax = fields.getOrElse(31) { "0" }.toIntOrNull() ?: 0,
+            obfsMinPacketSize = fields.getOrElse(32) { "512" }.toIntOrNull() ?: 512,
+            obfsMaxPacketSize = fields.getOrElse(33) { "1200" }.toIntOrNull() ?: 1200,
         )
     }
 

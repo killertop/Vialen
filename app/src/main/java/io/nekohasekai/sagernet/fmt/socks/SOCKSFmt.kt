@@ -10,30 +10,28 @@ import moe.matsuri.nb4a.utils.Util
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
+import io.nekohasekai.sagernet.rust.RustBridge
+
 fun parseSOCKS(link: String): SOCKSBean {
-    val url = ("http://" + link.substringAfter("://")).toHttpUrlOrNull()
-        ?: error("Not supported: $link")
+    if (!link.startsWith("socks://") && !link.startsWith("socks4://") && !link.startsWith("socks4a://") && !link.startsWith("socks5://")) {
+        error("Not supported: $link")
+    }
+    val res = RustBridge.parseProxy(link)
+    if (res.status != "SUCCESS") {
+        error("Not supported: $link: ${res.error ?: res.status}")
+    }
 
     return SOCKSBean().apply {
-        protocol = when {
-            link.startsWith("socks4://") -> SOCKSBean.PROTOCOL_SOCKS4
-            link.startsWith("socks4a://") -> SOCKSBean.PROTOCOL_SOCKS4A
+        protocol = when (res.protocol) {
+            "socks4" -> SOCKSBean.PROTOCOL_SOCKS4
+            "socks4a" -> SOCKSBean.PROTOCOL_SOCKS4A
             else -> SOCKSBean.PROTOCOL_SOCKS5
         }
-        name = url.fragment
-        serverAddress = url.host
-        serverPort = url.port
-        username = url.username
-        password = url.password
-        // v2rayN fmt
-        if (password.isNullOrBlank() && !username.isNullOrBlank()) {
-            try {
-                val n = username.decodeBase64UrlSafe()
-                username = n.substringBefore(":")
-                password = n.substringAfter(":")
-            } catch (_: Exception) {
-            }
-        }
+        name = res.name.ifEmpty { null }
+        serverAddress = res.server
+        serverPort = res.port
+        username = res.username
+        password = res.password
     }
 }
 
