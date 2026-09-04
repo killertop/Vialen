@@ -79,6 +79,53 @@ pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeProbe<
     .unwrap_or(ptr::null_mut())
 }
 
+pub mod parser;
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeParseProxy<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    uri: jni::objects::JString<'local>,
+) -> jni::sys::jstring {
+    catch_unwind(AssertUnwindSafe(|| {
+        let uri_str: String = match env.get_string(&uri) {
+            Ok(js) => js.into(),
+            Err(_) => return ptr::null_mut(),
+        };
+        let result = parser::parse_proxy_to_canonical(&uri_str);
+        match env.new_string(result) {
+            Ok(js) => js.into_raw(),
+            Err(_) => ptr::null_mut(),
+        }
+    }))
+    .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeDecodeSubscription<
+    'local,
+>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    text: jni::objects::JString<'local>,
+) -> jni::sys::jstring {
+    catch_unwind(AssertUnwindSafe(|| {
+        let text_str: String = match env.get_string(&text) {
+            Ok(js) => js.into(),
+            Err(_) => return ptr::null_mut(),
+        };
+        let lines = match parser::decode_subscription_lines(&text_str) {
+            Ok(l) => l.join("\n"),
+            Err(e) => format!("ERROR|{}", e),
+        };
+        match env.new_string(lines) {
+            Ok(js) => js.into_raw(),
+            Err(_) => ptr::null_mut(),
+        }
+    }))
+    .unwrap_or(ptr::null_mut())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
