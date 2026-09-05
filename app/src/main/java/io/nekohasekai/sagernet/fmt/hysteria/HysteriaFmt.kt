@@ -125,7 +125,7 @@ fun getFirstPort(portStr: String): Int {
     return portStr.substringBefore(":").substringBefore(",").toIntOrNull() ?: 443
 }
 
-fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean): SingBoxOptions.SingBoxOption {
+fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean, globalAllowInsecure: Boolean = DataStore.globalAllowInsecure): SingBoxOptions.SingBoxOption {
     return when (bean.protocolVersion) {
         1 -> {
             if (bean.protocol != null && bean.protocol != HysteriaBean.PROTOCOL_UDP) {
@@ -158,7 +158,7 @@ fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean): SingBoxOptions.SingBox
                     if (bean.caText.isNotBlank()) {
                         certificate = bean.caText
                     }
-                    insecure = bean.allowInsecure || DataStore.globalAllowInsecure
+                    insecure = bean.allowInsecure || globalAllowInsecure
                     enabled = true
                 }
             }
@@ -209,7 +209,7 @@ fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean): SingBoxOptions.SingBox
                 if (!bean.caText.isNullOrBlank()) {
                     certificate = bean.caText
                 }
-                insecure = bean.allowInsecure || DataStore.globalAllowInsecure
+                insecure = bean.allowInsecure || globalAllowInsecure
                 enabled = true
             }
         }

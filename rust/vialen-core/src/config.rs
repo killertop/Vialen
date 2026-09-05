@@ -1,4 +1,5 @@
 //! Versioned, pure single-outbound generation. No database, Android or Go calls.
+pub(crate) mod protocols;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -13,6 +14,12 @@ struct Request {
 #[derive(Deserialize)]
 #[serde(tag = "kind", deny_unknown_fields)]
 enum Profile {
+    Standard(Box<protocols::Standard>),
+    Hysteria(Box<protocols::Hysteria>),
+    WireGuard(Box<protocols::WireGuard>),
+    AnyTLS(Box<protocols::AnyTLS>),
+    Custom(Box<protocols::Custom>),
+
     Socks {
         server: String,
         port: i32,
@@ -46,13 +53,13 @@ enum Profile {
 
 // Kotlin Char.isWhitespace = Java isWhitespace || isSpaceChar. Rust's Unicode
 // predicate differs at U+0085 and U+001C..U+001F; preserve the existing contract.
-fn kotlin_space(c: char) -> bool {
+pub(crate) fn kotlin_space(c: char) -> bool {
     matches!(c, '\u{0009}'..='\u{000d}' | '\u{001c}'..='\u{0020}' |
         '\u{00a0}' | '\u{1680}' | '\u{2000}'..='\u{200a}' |
         '\u{2028}' | '\u{2029}' | '\u{202f}' | '\u{205f}' | '\u{3000}')
 }
 
-fn not_blank(s: &str) -> bool {
+pub(crate) fn not_blank(s: &str) -> bool {
     !s.chars().all(kotlin_space)
 }
 
@@ -61,6 +68,12 @@ fn build(request: Request) -> Result<Value, &'static str> {
         return Err("UNSUPPORTED_VERSION");
     }
     let outbound = match request.profile {
+        Profile::Standard(p) => protocols::standard(*p, request.global_allow_insecure)?,
+        Profile::Hysteria(p) => protocols::hysteria(*p, request.global_allow_insecure)?,
+        Profile::WireGuard(p) => protocols::wireguard(*p, request.global_allow_insecure)?,
+        Profile::AnyTLS(p) => protocols::anytls(*p, request.global_allow_insecure)?,
+        Profile::Custom(p) => protocols::custom(*p, request.global_allow_insecure)?,
+
         Profile::Socks {
             server,
             port,
@@ -149,6 +162,11 @@ pub fn generate(input: &[u8]) -> Vec<u8> {
     };
     // Value contains no non-finite numbers or non-string map keys.
     serde_json::to_vec(&response).expect("serializable config result")
+}
+
+pub(crate) fn generate_value(profile: Value, global: bool) -> Result<Value, &'static str> {
+    let input = json!({"version":1,"global_allow_insecure":global,"profile":profile});
+    build(serde_json::from_value(input).map_err(|_| "INVALID_OUTBOUND_SNAPSHOT")?)
 }
 
 #[cfg(test)]

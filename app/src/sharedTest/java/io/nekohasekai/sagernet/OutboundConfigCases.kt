@@ -77,7 +77,7 @@ abstract class OutboundConfigCases {
     }
 
     @Test fun unsupportedInputsUseExplicitLegacyBoundaryAndRemovedTuicStillRejects() {
-        assertNull(RustOutboundConfig.capture(TrojanBean().applyDefaultValues(), false))
+        assertNull(RustOutboundConfig.capture(io.nekohasekai.sagernet.fmt.internal.ChainBean().applyDefaultValues(), false))
         assertNull(RustOutboundConfig.capture(SOCKSBean(), false))
         val malformed = SOCKSBean().applyDefaultValues().apply { password = "\uD800" }
         assertNull(RustOutboundConfig.capture(malformed, false))

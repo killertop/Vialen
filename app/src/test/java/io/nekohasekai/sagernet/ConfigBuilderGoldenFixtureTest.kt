@@ -103,6 +103,7 @@ class ConfigBuilderGoldenFixtureTest {
             every { mockRuleDao.enabledRules() } returns listOf()
 
             mockkObject(SagerDatabase.Companion)
+            io.nekohasekai.sagernet.installConfigSnapshotTransactions()
             every { SagerDatabase.groupDao } returns mockGroupDao
             every { SagerDatabase.proxyDao } returns mockProxyDao
             every { SagerDatabase.rulesDao } returns mockRuleDao

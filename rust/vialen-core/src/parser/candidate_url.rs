@@ -1,8 +1,15 @@
-//! HTTPS-style URL normalization for the six candidate parsers only.
+//! HTTPS-style URL normalization for URI parsers and full-config DNS inputs.
 //! Keep the already-shipped SS/SOCKS parsing contract independent.
 use super::url::percent_decode;
 
 pub fn normalize(url: &str) -> Result<String, &'static str> {
+    normalize_with_path(url).map(|(url, _)| url)
+}
+
+/// Return the actual normalized path separately from the internal parser framing.
+/// Raw @ is escaped in the URL to keep the legacy authority parser unambiguous,
+/// while HTTP DNS paths must distinguish literal @ from an existing %40 escape.
+pub(crate) fn normalize_with_path(url: &str) -> Result<(String, String), &'static str> {
     let clean = url.trim_matches(|c: char| c <= ' ');
     let (scheme, rest) = clean.split_once("://").ok_or("missing scheme")?;
     let end = rest.find(['/', '\\', '?', '#']).unwrap_or(rest.len());
@@ -68,6 +75,7 @@ pub fn normalize(url: &str) -> Result<String, &'static str> {
         .collect();
     let path_end = tail.find(['?', '#']).unwrap_or(tail.len());
     let path = tail[..path_end].replace('\\', "/");
+    let mut normalized_path = String::new();
     if !path.is_empty() {
         let mut segments: Vec<&str> = Vec::new();
         let raw: Vec<&str> = path.strip_prefix('/').unwrap_or(&path).split('/').collect();
@@ -87,11 +95,11 @@ pub fn normalize(url: &str) -> Result<String, &'static str> {
                 _ => segments.push(segment),
             }
         }
-        out.push('/');
-        out.push_str(&segments.join("/").replace('@', "%40"));
+        normalized_path = format!("/{}", segments.join("/"));
+        out.push_str(&normalized_path.replace('@', "%40"));
     }
     out.push_str(&tail[path_end..]);
-    Ok(out)
+    Ok((out, normalized_path))
 }
 
 #[cfg(test)]

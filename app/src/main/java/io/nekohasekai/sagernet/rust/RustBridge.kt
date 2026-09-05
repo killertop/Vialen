@@ -80,6 +80,12 @@ data class SubscriptionDiffResult(
 )
 
 object RustBridge {
+    fun parseRawSubscription(input: ByteArray): ByteArray =
+        checkNotNull(RustNative.nativeParseRawSubscription(input)) { "Rust subscription parsing failed" }
+
+    fun generateConfig(input: ByteArray): ByteArray =
+        checkNotNull(RustNative.nativeGenerateConfig(input)) { "Rust configuration generation failed" }
+
     /** Versioned config wire; typed capture/decoding belongs to the fmt adapter. */
     fun generateOutbound(input: ByteArray): ByteArray =
         checkNotNull(RustNative.nativeGenerateOutbound(input)) { "Rust config generation failed" }
@@ -513,6 +519,10 @@ internal object RustNative {
 
     @JvmStatic
     external fun nativeGenerateOutbound(input: ByteArray): ByteArray?
+
+    @JvmStatic
+    external fun nativeGenerateConfig(input: ByteArray): ByteArray?
+    external fun nativeParseRawSubscription(input: ByteArray): ByteArray?
 
     @JvmStatic
     external fun nativePlanSubscription(oldNames: Array<CharArray>, oldContent: Array<ByteArray>, oldOrders: LongArray,

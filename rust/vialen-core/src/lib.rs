@@ -81,8 +81,44 @@ pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeProbe<
 
 pub mod config;
 pub mod engine;
+pub mod full_config;
 pub mod model;
 pub mod parser;
+pub mod raw_subscription;
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeParseRawSubscription(
+    env: JNIEnv,
+    _class: JClass,
+    input: JByteArray,
+) -> jbyteArray {
+    catch_unwind(AssertUnwindSafe(|| {
+        let result = (|| -> jni::errors::Result<_> {
+            let input = env.convert_byte_array(&input)?;
+            let output = raw_subscription::generate(&input);
+            Ok(env.byte_array_from_slice(&output)?.into_raw())
+        })();
+        result.unwrap_or(ptr::null_mut())
+    }))
+    .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeGenerateConfig(
+    env: JNIEnv,
+    _class: JClass,
+    input: JByteArray,
+) -> jbyteArray {
+    catch_unwind(AssertUnwindSafe(|| {
+        let result = (|| -> jni::errors::Result<_> {
+            let input = env.convert_byte_array(&input)?;
+            let output = full_config::generate(&input);
+            Ok(env.byte_array_from_slice(&output)?.into_raw())
+        })();
+        result.unwrap_or(ptr::null_mut())
+    }))
+    .unwrap_or(ptr::null_mut())
+}
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeGenerateOutbound(

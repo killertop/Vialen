@@ -12,6 +12,34 @@ import java.util.Base64
 
 @RunWith(AndroidJUnit4::class)
 class SubscriptionEndToEndNativeTest {
+    @Test fun completeFormatsReachRealHttpAndRoomPersistence() = runBlocking {
+        val db=SagerDatabase.instance
+        LoopbackHttpFixture().use { server ->
+            val sub=SubscriptionBean().apply {initializeDefaultValues();link="http://127.0.0.1:${server.port}/formats";deduplication=false;forceResolve=false}
+            val group=ProxyGroup(name="Rust-formats-${System.nanoTime()}",type=GroupType.SUBSCRIPTION,subscription=sub)
+            group.id=db.groupDao().createGroup(group)
+            try {
+                val formats=listOf(
+                    "proxies: [{type: http, name: HTTP, server: 127.0.0.1, port: 8080}, {type: anytls, name: AnyTLS, server: 127.0.0.1, port: 443, password: synthetic}]",
+                    """{"outbounds":[{"type":"socks","tag":"Custom","server":"127.0.0.1","server_port":1080}]}""",
+                    "[Interface]\nAddress=10.0.0.1/32\nPrivateKey=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nMTU=1420\n[Peer]\nEndpoint=127.0.0.1:51820\nPublicKey=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                    Base64.getEncoder().encodeToString("http://user:pass@127.0.0.1:8080#HTTP\nanytls://pass@127.0.0.1:443#AnyTLS".toByteArray())
+                )
+                for (text in formats) {
+                    val expected=io.nekohasekai.sagernet.oracle.LegacyRawUpdater.parseRaw(text)!!
+                    server.reply.set(LoopbackHttpFixture.Reply(body=text))
+                    RawUpdater.doUpdate(group,sub,null,false)
+                    val rows=db.proxyDao().getByGroup(group.id)
+                    assertEquals(expected.map {it.displayName()},rows.map {it.displayName()})
+                    assertEquals(expected.map {it.javaClass},rows.map {it.requireBean().javaClass})
+                    val ids=rows.map {it.id}
+                    RawUpdater.doUpdate(group,sub,null,false)
+                    assertEquals(ids,db.proxyDao().getByGroup(group.id).map {it.id})
+                }
+                assertEquals(formats.size*2,server.requests.get())
+            } finally {db.runInTransaction {db.proxyDao().deleteByGroup(group.id);db.groupDao().deleteById(group.id)}}
+        }
+    }
     @Test fun actualHttpFetchDecodeBatchDedupDiffAndRoomRecoverTogether() = runBlocking {
         val db = SagerDatabase.instance
         val originalGroups = db.groupDao().allGroups().map { it.id }.toSet()

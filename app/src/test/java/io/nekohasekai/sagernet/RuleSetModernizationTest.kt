@@ -72,6 +72,7 @@ class RuleSetModernizationTest {
 
             val mockProxyDao = mockk<ProxyEntity.Dao>(relaxed = true)
             mockkObject(SagerDatabase.Companion)
+            io.nekohasekai.sagernet.installConfigSnapshotTransactions()
             every { SagerDatabase.groupDao } returns mockGroupDao
             every { SagerDatabase.proxyDao } returns mockProxyDao
         }

@@ -153,12 +153,10 @@ dependencies {
     implementation("com.blacksquircle.ui:language-json:2.6.0")
 
     implementation("com.squareup.okhttp3:okhttp:5.0.0-alpha.3")
-    implementation("org.yaml:snakeyaml:1.30")
     implementation("com.github.daniel-stoneuk:material-about-library:3.2.0-rc01")
     implementation("com.jakewharton:process-phoenix:2.1.2")
     implementation("com.esotericsoftware:kryo:5.2.1")
     implementation("com.google.guava:guava:31.0.1-android")
-    implementation("org.ini4j:ini4j:0.5.4")
 
     implementation("com.simplecityapps:recyclerview-fastscroll:2.0.1") {
         exclude(group = "androidx.recyclerview")
@@ -173,6 +171,10 @@ dependencies {
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
 
+    testImplementation("org.yaml:snakeyaml:1.30")
+    androidTestImplementation("org.yaml:snakeyaml:1.30")
+    testImplementation("org.ini4j:ini4j:0.5.4")
+    androidTestImplementation("org.ini4j:ini4j:0.5.4")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.xerial:sqlite-jdbc:3.45.1.0")
     testImplementation("io.mockk:mockk:1.13.10")
