@@ -257,6 +257,11 @@ object RustBridge {
         val unchanged = unchangedRaw.map { decodeProxyResponse(it) }
         val reordered = reorderedRaw.map { decodeProxyResponse(it) }
 
+        if (sequenceOf(added, removed, unchanged, reordered).flatten().any { it.status != "SUCCESS" }
+            || updated.any { it.oldNode.status != "SUCCESS" || it.newNode.status != "SUCCESS" }) {
+            return SubscriptionDiffResult(error = "INTERNAL_ERROR: Invalid node in diff response")
+        }
+
         return SubscriptionDiffResult(
             added = added,
             updated = updated,
@@ -317,8 +322,9 @@ object RustBridge {
             if (!lenStr.all { it in '0'..'9' }) return null
             val len = lenStr.toIntOrNull() ?: return null
             val start = colon + 1
+            // Check remaining capacity before addition, which can overflow Int.
+            if (len > buffer.length - start) return null
             val end = start + len
-            if (end > buffer.length) return null
             list.add(buffer.substring(start, end))
             idx = end
         }

@@ -709,6 +709,8 @@ class BatchAndDiffTest {
     @Test
     fun testStrictFramingContract_LengthPrefixDecoderEdgeCases() {
         // [KOTLIN_FRAMING_PARITY] Strict ASCII length prefix decoder checks
+        assertEquals(null, RustBridge.decodeLengthPrefixedStrict("2147483647:x")) // addition overflow
+        assertEquals(null, RustBridge.decodeLengthPrefixedStrict("1:a2147483647:x"))
         assertEquals(null, RustBridge.decodeLengthPrefixedStrict("5:hello!")) // trailing garbage
         assertEquals(null, RustBridge.decodeLengthPrefixedStrict("+5:hello")) // non-digit sign
         assertEquals(null, RustBridge.decodeLengthPrefixedStrict("-5:hello")) // negative sign
@@ -759,6 +761,22 @@ class BatchAndDiffTest {
         val diffMalformed = RustBridge.parseDiffResponse(malformedSectionPayload)
         assertNotNull(diffMalformed.error)
         assertTrue("Malformed section must fail: ${diffMalformed.error}", diffMalformed.error!!.contains("Malformed added section"))
+    }
+
+    @Test
+    fun testDiffRejectsFailedOrMalformedNestedNodesWithoutPartialResults() {
+        for (section in 0..4) {
+            for (node in listOf("INVALID_INPUT\n3:bad", "SUCCESS\n1:x", "SUCCESS\n2147483647:x")) {
+                val sections = MutableList(5) { "" }
+                sections[section] = RustBridge.buildLengthPrefixed(
+                    if (section == 1) listOf(node, node) else listOf(node)
+                )
+                val result = RustBridge.parseDiffResponse(RustBridge.buildLengthPrefixed(sections))
+                assertNotNull("section=$section must fail", result.error)
+                assertTrue(result.added.isEmpty() && result.updated.isEmpty() && result.removed.isEmpty()
+                    && result.unchanged.isEmpty() && result.reordered.isEmpty())
+            }
+        }
     }
 
     @Test
