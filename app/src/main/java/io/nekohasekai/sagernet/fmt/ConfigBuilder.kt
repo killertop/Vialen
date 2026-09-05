@@ -79,6 +79,8 @@ fun buildConfig(
     val globalOutbounds = HashMap<Long, String>()
     val selectorNames = ArrayList<String>()
     val group = SagerDatabase.groupDao.getById(proxy.groupId)
+    // The migrated generators receive one build-level policy snapshot.
+    val outboundGlobalAllowInsecure = DataStore.globalAllowInsecure
 
     fun ProxyEntity.resolveChainInternal(): MutableList<ProxyEntity> {
         val bean = requireBean()
@@ -298,7 +300,8 @@ fun buildConfig(
                     globalOutbounds[proxyEntity.id] = tagOut
                 }
 
-                currentOutbound = when (bean) {
+                currentOutbound = RustOutboundConfig.capture(bean, outboundGlobalAllowInsecure)
+                    ?.generate() ?: when (bean) {
                     is ConfigBean -> CustomSingBoxOption(bean.config)
 
                     is ShadowTLSBean -> // before StandardV2RayBean
@@ -311,7 +314,7 @@ fun buildConfig(
                         buildSingBoxOutboundHysteriaBean(bean)
 
                     is TuicBean ->
-                        buildSingBoxOutboundTuicBean(bean)
+                        buildSingBoxOutboundTuicBean(bean, outboundGlobalAllowInsecure)
 
                     is SOCKSBean ->
                         buildSingBoxOutboundSocksBean(bean)

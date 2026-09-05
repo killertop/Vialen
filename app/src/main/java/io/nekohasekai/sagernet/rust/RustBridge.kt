@@ -80,6 +80,10 @@ data class SubscriptionDiffResult(
 )
 
 object RustBridge {
+    /** Versioned config wire; typed capture/decoding belongs to the fmt adapter. */
+    fun generateOutbound(input: ByteArray): ByteArray =
+        checkNotNull(RustNative.nativeGenerateOutbound(input)) { "Rust config generation failed" }
+
 
     data class PersistencePlan(val oldIndices: IntArray, val flags: IntArray, val removedIndices: IntArray)
 
@@ -506,6 +510,9 @@ internal object RustNative {
     init {
         System.loadLibrary("vialen_core")
     }
+
+    @JvmStatic
+    external fun nativeGenerateOutbound(input: ByteArray): ByteArray?
 
     @JvmStatic
     external fun nativePlanSubscription(oldNames: Array<CharArray>, oldContent: Array<ByteArray>, oldOrders: LongArray,

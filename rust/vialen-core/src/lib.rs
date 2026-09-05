@@ -79,9 +79,27 @@ pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeProbe<
     .unwrap_or(ptr::null_mut())
 }
 
+pub mod config;
 pub mod engine;
 pub mod model;
 pub mod parser;
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeGenerateOutbound(
+    env: JNIEnv,
+    _class: JClass,
+    input: JByteArray,
+) -> jbyteArray {
+    catch_unwind(AssertUnwindSafe(|| {
+        let result = (|| -> jni::errors::Result<_> {
+            let input = env.convert_byte_array(&input)?;
+            let output = config::generate(&input);
+            Ok(env.byte_array_from_slice(&output)?.into_raw())
+        })();
+        result.unwrap_or(ptr::null_mut())
+    }))
+    .unwrap_or(ptr::null_mut())
+}
 
 fn read_utf16_matrix(
     env: &mut JNIEnv<'_>,
