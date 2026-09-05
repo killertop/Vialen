@@ -2,6 +2,7 @@ package io.nekohasekai.sagernet.rust
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RustBridgeContractTest {
@@ -30,10 +31,33 @@ class RustBridgeContractTest {
         assertNull(result.checksumHex)
     }
 
+    private fun build38FieldsPayload(vararg overrides: Pair<Int, String>): String {
+        val fields = MutableList(38) { "" }
+        for ((idx, value) in overrides) {
+            fields[idx] = value
+        }
+        val sb = StringBuilder("SUCCESS\n")
+        for (f in fields) {
+            sb.append(f.length).append(':').append(f)
+        }
+        return sb.toString()
+    }
+
     @Test
     fun decodesProxySuccessWithoutLoadingNativeLibrary() {
-        // SUCCESS\n11:shadowsocks7:1.2.3.44:838811:aes-256-gcm6:secret20:obfs-local;obfs=http8:TestNode
-        val payload = "SUCCESS\n11:shadowsocks7:1.2.3.44:838811:aes-256-gcm6:secret20:obfs-local;obfs=http8:TestNode"
+        val payload = build38FieldsPayload(
+            0 to "shadowsocks",
+            1 to "1.2.3.4",
+            2 to "8388",
+            3 to "aes-256-gcm",
+            4 to "secret",
+            5 to "obfs-local;obfs=http",
+            6 to "TestNode",
+            34 to "1",
+            35 to "GunService",
+            36 to "16",
+            37 to "auto",
+        )
         val result = RustBridge.decodeProxyResponse(payload)
         assertEquals("SUCCESS", result.status)
         assertEquals("shadowsocks", result.protocol)
@@ -43,6 +67,25 @@ class RustBridgeContractTest {
         assertEquals("secret", result.password)
         assertEquals("obfs-local;obfs=http", result.plugin)
         assertEquals("TestNode", result.name)
+        assertEquals(true, result.tlsEnabled)
+        assertEquals("GunService", result.serviceName)
+        assertEquals(16, result.alterId)
+        assertEquals("auto", result.encryption)
+    }
+
+    @Test
+    fun testRejectsProxySuccessWithInvalidFieldCount() {
+        // Less than 38 fields (e.g. 7 fields)
+        val shortPayload = "SUCCESS\n11:shadowsocks7:1.2.3.44:838811:aes-256-gcm6:secret20:obfs-local;obfs=http8:TestNode"
+        val resultShort = RustBridge.decodeProxyResponse(shortPayload)
+        assertEquals("INTERNAL_ERROR", resultShort.status)
+        assertTrue(resultShort.error!!.contains("Expected exactly 38 fields"))
+
+        // More than 38 fields (39 fields)
+        val longPayload = "SUCCESS\n" + "0:".repeat(39)
+        val resultLong = RustBridge.decodeProxyResponse(longPayload)
+        assertEquals("INTERNAL_ERROR", resultLong.status)
+        assertTrue(resultLong.error!!.contains("Expected exactly 38 fields"))
     }
 
     @Test
@@ -55,14 +98,15 @@ class RustBridgeContractTest {
         val pass = "pass|with|pipes|and:colons"
         val plugin = "obfs|opt=1;opt=2"
         val name = "Name|With|Pipes"
-        val payload = "SUCCESS\n" +
-                "${proto.length}:$proto" +
-                "${server.length}:$server" +
-                "${port.length}:$port" +
-                "${user.length}:$user" +
-                "${pass.length}:$pass" +
-                "${plugin.length}:$plugin" +
-                "${name.length}:$name"
+        val payload = build38FieldsPayload(
+            0 to proto,
+            1 to server,
+            2 to port,
+            3 to user,
+            4 to pass,
+            5 to plugin,
+            6 to name,
+        )
 
         val result = RustBridge.decodeProxyResponse(payload)
         assertEquals("SUCCESS", result.status)

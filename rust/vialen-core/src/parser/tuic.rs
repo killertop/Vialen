@@ -6,8 +6,9 @@ pub fn parse_tuic(url: &str) -> Result<CanonicalNode, &'static str> {
         return Err("invalid scheme");
     }
 
-    let parsed = parse_url(url)?;
-    let port = parsed.port.ok_or("invalid port")?;
+    let normalized = super::candidate_url::normalize(url)?;
+    let parsed = parse_url(&normalized)?;
+    let port = parsed.port.unwrap_or(443);
     let fragment = parsed.fragment.map(percent_decode).unwrap_or_default();
 
     let raw_user = percent_decode(parsed.username);
@@ -21,26 +22,23 @@ pub fn parse_tuic(url: &str) -> Result<CanonicalNode, &'static str> {
     };
 
     let mut sni = String::new();
-    let mut congestion_control = String::new();
-    let mut udp_relay_mode = String::new();
+    // RawUpdater initializes TuicBean defaults after parsing. Explicit query
+    // values, including empty strings, must still override these defaults.
+    let mut congestion_control = "cubic".to_string();
+    let mut udp_relay_mode = "native".to_string();
     let mut alpn = Vec::new();
     let mut allow_insecure = false;
     let mut disable_sni = false;
 
     if let Some(query) = parsed.query {
-        for param in query.split('&') {
-            if let Some((k, v)) = param.split_once('=') {
-                let decoded_v = percent_decode(v);
-                match k {
+        for (k, value) in super::url::first_query_parameters(query) {
+            if let Some(decoded_v) = value {
+                match k.as_str() {
                     "sni" => sni = decoded_v,
                     "congestion_control" => congestion_control = decoded_v,
                     "udp_relay_mode" => udp_relay_mode = decoded_v,
                     "alpn" => {
-                        alpn = decoded_v
-                            .split(',')
-                            .map(|s| s.trim().to_string())
-                            .filter(|s| !s.is_empty())
-                            .collect();
+                        alpn = decoded_v.split(',').map(str::to_string).collect();
                     }
                     "allow_insecure" => {
                         allow_insecure = decoded_v == "1";

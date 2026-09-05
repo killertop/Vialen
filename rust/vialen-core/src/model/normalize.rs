@@ -24,7 +24,7 @@ impl NormalizationEngine {
 
     pub fn normalize_plugin(raw_plugin: &str) -> String {
         let trimmed = raw_plugin.trim();
-        if trimmed.starts_with("simple-obfs") {
+        if trimmed == "simple-obfs" || trimmed.starts_with("simple-obfs;") {
             trimmed.replacen("simple-obfs", "obfs-local", 1)
         } else {
             trimmed.to_string()
@@ -70,6 +70,14 @@ mod tests {
     #[test]
     fn test_normalize_plugin() {
         assert_eq!(
+            NormalizationEngine::normalize_plugin("simple-obfs"),
+            "obfs-local"
+        );
+        assert_eq!(
+            NormalizationEngine::normalize_plugin(" simple-obfs-custom;mode=tls "),
+            "simple-obfs-custom;mode=tls"
+        );
+        assert_eq!(
             NormalizationEngine::normalize_plugin("simple-obfs;obfs=http"),
             "obfs-local;obfs=http"
         );
@@ -77,5 +85,40 @@ mod tests {
             NormalizationEngine::normalize_plugin("obfs-local;obfs=tls"),
             "obfs-local;obfs=tls"
         );
+    }
+
+    #[test]
+    fn test_normalized_content_equivalence_and_idempotence() {
+        for (left, right) in [
+            (" EXAMPLE.COM ", "example.com"),
+            ("[2001:0DB8:0:0:0:0:0:1]", "2001:db8::1"),
+        ] {
+            let mut a = CanonicalNode::new(
+                "ss",
+                left,
+                443,
+                "",
+                "secret",
+                " simple-obfs;obfs=tls ",
+                " Node ",
+            );
+            let mut b = CanonicalNode::new(
+                "ss",
+                right,
+                443,
+                "",
+                "secret",
+                "obfs-local;obfs=tls",
+                "Node",
+            );
+            assert_ne!(a.content_key(), b.content_key());
+            NormalizationEngine::normalize_node(&mut a);
+            NormalizationEngine::normalize_node(&mut b);
+            assert_eq!(a.content_key(), b.content_key());
+            assert_eq!(a.fingerprint(), b.fingerprint());
+            let once = a.clone();
+            NormalizationEngine::normalize_node(&mut a);
+            assert_eq!(a, once);
+        }
     }
 }

@@ -42,7 +42,7 @@ pub fn parse_socks(url: &str) -> Result<CanonicalNode, &'static str> {
 
     Ok(CanonicalNode::new(
         protocol,
-        parsed.host,
+        &parsed.host.to_ascii_lowercase(),
         port,
         &username,
         &password,

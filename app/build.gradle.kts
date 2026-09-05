@@ -41,6 +41,8 @@ android {
     }
     sourceSets {
         getByName("test").assets.srcDir("$projectDir/schemas")
+        getByName("test").java.srcDir("src/sharedTest/java")
+        getByName("androidTest").java.srcDir("src/sharedTest/java")
     }
     testOptions {
         unitTests.isIncludeAndroidResources = true
@@ -51,6 +53,10 @@ android {
 tasks.withType<Test>().configureEach {
     maxHeapSize = "2048m"
     dependsOn("buildRustHost")
+    // Native implementation changes must invalidate JVM test results too.
+    inputs.file(rootProject.file("rust/vialen-core/target/release/libvialen_core.dylib"))
+        .withPropertyName("rustHostLibrary")
+        .withPathSensitivity(PathSensitivity.NONE)
     systemProperty(
         "java.library.path",
         "${rootProject.file("rust/vialen-core/target/release")}:${rootProject.file("rust/vialen-core/target/debug")}"

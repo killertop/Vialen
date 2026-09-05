@@ -8,6 +8,9 @@ import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
 import io.nekohasekai.sagernet.fmt.socks.parseSOCKS
 import io.nekohasekai.sagernet.fmt.trojan.parseTrojan
 import io.nekohasekai.sagernet.fmt.tuic.parseTuic
+import io.nekohasekai.sagernet.fmt.v2ray.VMessBean
+import io.nekohasekai.sagernet.fmt.v2ray.isTLS
+import io.nekohasekai.sagernet.fmt.v2ray.parseV2Ray
 import io.nekohasekai.sagernet.rust.CanonicalProxyResult
 import io.nekohasekai.sagernet.rust.RustBridge
 import org.junit.Assert.assertEquals
@@ -275,6 +278,159 @@ class DifferentialParserNativeTest {
             assertEquals(kt2.serverAddress, rs2.server)
             assertEquals(kt2.serverPort, rs2.port)
             assertEquals(kt2.authPayload ?: "", rs2.authPayload)
+        }
+
+        // 4. VLESS
+        for (i in 1..10) {
+            val uuid = "b5424107-160a-4286-9051-7d1c5a93b48$i"
+            val host = "vless-native-$i.example.com"
+            val port = 5000 + i
+            val name = "VLESS_Native_$i"
+            val encodedName = URLEncoder.encode(name, "UTF-8")
+            val uri = "vless://$uuid@$host:$port?type=ws&host=wshost$i.com&path=/vlesspath$i&security=reality&pbk=pubkey$i&sid=shortid$i&fp=chrome&packetEncoding=packet&flow=xtls-rprx-vision#$encodedName"
+            val kt = parseV2Ray(uri) as VMessBean
+            val rs = RustBridge.parseProxy(uri)
+            assertEquals("SUCCESS", rs.status)
+            assertEquals("vless", rs.protocol)
+            assertEquals(kt.serverAddress, rs.server)
+            assertEquals(kt.serverPort, rs.port)
+            assertEquals(kt.uuid ?: "", rs.username)
+            assertEquals(kt.name ?: "", rs.name)
+            assertEquals(kt.sni ?: "", rs.sni)
+            assertEquals(kt.type ?: "tcp", rs.transportType)
+            assertEquals(kt.host ?: "", rs.transportHost)
+            assertEquals(kt.path ?: "", rs.transportPath)
+            assertEquals(kt.realityPubKey ?: "", rs.realityPubKey)
+            assertEquals(kt.realityShortId ?: "", rs.realityShortId)
+            assertEquals(kt.utlsFingerprint ?: "", rs.utlsFingerprint)
+            assertEquals(kt.packetEncoding ?: 0, rs.packetEncoding)
+            assertEquals(-1, rs.alterId)
+            assertEquals(kt.encryption ?: "", rs.encryption)
+            assertEquals(kt.isTLS(), rs.tlsEnabled)
+        }
+
+        // 5. VMess
+        val ciphers = listOf("auto", "aes-128-gcm", "chacha20-poly1305")
+        for (i in 1..10) {
+            val uuid = "c6424107-160a-4286-9051-7d1c5a93b49$i"
+            val host = "vmess-native-$i.example.com"
+            val port = 6000 + i
+            val name = "VMess_Native_$i"
+            val cipher = ciphers[i % ciphers.size]
+            val aid = if (i % 2 == 0) 0 else 16
+            val json = """
+                {
+                    "v": "2",
+                    "ps": "$name",
+                    "add": "$host",
+                    "port": "$port",
+                    "id": "$uuid",
+                    "aid": "$aid",
+                    "scy": "$cipher",
+                    "net": "ws",
+                    "host": "wshost$i.com",
+                    "path": "/path$i",
+                    "tls": "tls",
+                    "sni": "sni$i.com"
+                }
+            """.trimIndent()
+            val b64 = Base64.getUrlEncoder().withoutPadding().encodeToString(json.toByteArray())
+            val uri = "vmess://$b64"
+            val kt = parseV2Ray(uri) as VMessBean
+            val rs = RustBridge.parseProxy(uri)
+            assertEquals("SUCCESS", rs.status)
+            assertEquals("vmess", rs.protocol)
+            assertEquals(kt.serverAddress, rs.server)
+            assertEquals(kt.serverPort, rs.port)
+            assertEquals(kt.uuid ?: "", rs.username)
+            assertEquals(kt.name ?: "", rs.name)
+            assertEquals(kt.sni ?: "", rs.sni)
+            assertEquals(kt.alterId ?: 0, rs.alterId)
+            assertEquals(kt.encryption ?: "auto", rs.encryption)
+            assertEquals(kt.isTLS(), rs.tlsEnabled)
+        }
+
+        // 6. Legacy VMess CSV
+        val csvCases = listOf(
+            """remarks = vmess,1.2.3.4,443,auto,"b831381d-6324-4d53-ad4f-8cda48b30811",over-tls=true,tls-host=example.com,obfs=websocket,obfs-path="/path"obfs Host:example.com[""",
+            """test = vmess,192.168.1.1,10086,aes-128-gcm,"11111111-2222-3333-4444-555555555555",obfs=http,obfs-path="/api"obfs Host:myhost.net[""",
+            """my_node = vmess,node.example.org,8443,chacha20-poly1305,"22222222-3333-4444-5555-666666666666",over-tls=true,tls-host=sni.example.org,obfs=custom-obfs"""
+        )
+        for (csv in csvCases) {
+            val b64 = Base64.getUrlEncoder().withoutPadding().encodeToString(csv.toByteArray())
+            val uri = "vmess://$b64"
+            val kt = parseV2Ray(uri) as VMessBean
+            val rs = RustBridge.parseProxy(uri)
+            assertEquals("SUCCESS", rs.status)
+            assertEquals("vmess", rs.protocol)
+            assertEquals(kt.serverAddress, rs.server)
+            assertEquals(kt.serverPort, rs.port)
+            assertEquals(kt.uuid ?: "", rs.username)
+            assertEquals(kt.encryption ?: "", rs.encryption)
+            assertEquals(kt.type ?: "tcp", rs.transportType)
+            assertEquals(kt.isTLS(), rs.tlsEnabled)
+            assertEquals(kt.path ?: "", rs.transportPath)
+            assertEquals(kt.host ?: "", rs.transportHost)
+        }
+
+        // 7. Legacy VMess Kitsunebi
+        val kitsunebiCases = listOf(
+            "auto:5af5d0ec-6ea0-3c43-93db-ca3008503bdb@183.232.56.161:1202" to
+                "remarks=*🇯🇵JP%20-355&alterId=0&path=/v2ray&obfs=websocket&tls=1&obfsParam=%7B%22Host%22:%22183.232.56.161%22%7D",
+            "aes-128-gcm:b831381d-6324-4d53-ad4f-8cda48b30811@example.com:443" to
+                "remarks=FastNode&alterId=4&path=/ws&obfs=websocket&tls=1&obfsParam=sni.example.com",
+            "chacha20-poly1305:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee@10.0.0.1:8080" to
+                "remarks=PlainTCP&alterId=16&path=/&obfs=none&allowInsecure=1",
+            "aes-128-gcm:b831381d-6324-4d53-ad4f-8cda48b30811@node.net:443" to
+                "remarks=Hello+World%20Test&alterId=0&path=/test&obfs=websocket&tls=nonstandard",
+            "aes-128-gcm:b831381d-6324-4d53-ad4f-8cda48b30811@node.net:443" to
+                "remarks=NoHostJSON&alterId=0&path=/test&obfs=websocket&tls=1&obfsParam=%7B%22Other%22:%22123%22%7D",
+            "chacha20-poly1305:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee@node.net:443" to
+                "remarks=AllowInsecureTrue&alterId=8&path=/allow&obfs=none&allowInsecure=true&tls=",
+            "none:11111111-2222-3333-4444-555555555555@CapitalHost.Net:8080" to null
+        )
+        for ((creds, query) in kitsunebiCases) {
+            val b64 = Base64.getUrlEncoder().withoutPadding().encodeToString(creds.toByteArray())
+            val uri = if (query != null) "vmess://$b64?$query" else "vmess://$b64"
+            val kt = parseV2Ray(uri) as VMessBean
+            val rs = RustBridge.parseProxy(uri)
+            assertEquals("SUCCESS", rs.status)
+            assertEquals("vmess", rs.protocol)
+            assertEquals(kt.serverAddress, rs.server)
+            assertEquals(kt.serverPort, rs.port)
+            assertEquals(kt.uuid ?: "", rs.username)
+            assertEquals(kt.name ?: "", rs.name)
+            assertEquals(kt.encryption ?: "", rs.encryption)
+            assertEquals(kt.alterId ?: 0, rs.alterId)
+            assertEquals(kt.type ?: "tcp", rs.transportType)
+            assertEquals(kt.isTLS(), rs.tlsEnabled)
+            assertEquals(kt.allowInsecure == true, rs.allowInsecure)
+            assertEquals(kt.path ?: "", rs.transportPath)
+            assertEquals(kt.host ?: "", rs.transportHost)
+            assertEquals(kt.sni ?: "", rs.sni)
+        }
+
+        // 8. Legacy VMess v2fly (issue 26)
+        val v2flyCases = listOf(
+            "vmess://ws+tls:b831381d-6324-4d53-ad4f-8cda48b30811-16@example.com:443/?path=/ws&host=example.com&tlsServerName=sni.example.com#V2FlyWS",
+            "vmess://grpc+tls:b831381d-6324-4d53-ad4f-8cda48b30811-0@grpc.example.com:443/?serviceName=myService&tlsServerName=grpc.example.com#V2FlyGRPC",
+            "vmess://http:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee-64@10.0.0.1:8080/?path=/http&host=h1.com|h2.com#V2FlyHTTP"
+        )
+        for (uri in v2flyCases) {
+            val kt = parseV2Ray(uri) as VMessBean
+            val rs = RustBridge.parseProxy(uri)
+            assertEquals("SUCCESS", rs.status)
+            assertEquals("vmess", rs.protocol)
+            assertEquals(kt.serverAddress, rs.server)
+            assertEquals(kt.serverPort, rs.port)
+            assertEquals(kt.uuid ?: "", rs.username)
+            assertEquals(kt.name ?: "", rs.name)
+            assertEquals(kt.alterId ?: 0, rs.alterId)
+            assertEquals(kt.type ?: "tcp", rs.transportType)
+            assertEquals(kt.isTLS(), rs.tlsEnabled)
+            assertEquals(kt.path ?: "", rs.transportPath)
+            assertEquals(kt.host ?: "", rs.transportHost)
+            assertEquals(kt.sni ?: "", rs.sni)
         }
     }
 

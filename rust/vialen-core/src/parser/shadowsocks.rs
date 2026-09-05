@@ -57,7 +57,7 @@ pub fn parse_shadowsocks(url: &str) -> Result<CanonicalProxy, &'static str> {
 
         Ok(CanonicalNode::new(
             "shadowsocks",
-            parsed.host,
+            &parsed.host.to_ascii_lowercase(),
             port,
             &method,
             &password,
@@ -79,7 +79,7 @@ pub fn parse_shadowsocks(url: &str) -> Result<CanonicalProxy, &'static str> {
 
         Ok(CanonicalNode::new(
             "shadowsocks",
-            parsed.host,
+            &parsed.host.to_ascii_lowercase(),
             port,
             &percent_decode(parsed.username),
             &percent_decode(parsed.password),

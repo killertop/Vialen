@@ -79,6 +79,7 @@ pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeProbe<
     .unwrap_or(ptr::null_mut())
 }
 
+pub mod engine;
 pub mod model;
 pub mod parser;
 
@@ -94,6 +95,53 @@ pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeParseP
             Err(_) => return ptr::null_mut(),
         };
         let result = parser::parse_proxy_to_canonical(&uri_str);
+        match env.new_string(result) {
+            Ok(js) => js.into_raw(),
+            Err(_) => ptr::null_mut(),
+        }
+    }))
+    .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeRankDedupKeys<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    keys: jni::objects::JObjectArray<'local>,
+) -> jni::sys::jintArray {
+    catch_unwind(AssertUnwindSafe(|| {
+        let result = (|| -> jni::errors::Result<_> {
+            let count = env.get_array_length(&keys)?;
+            let ranks = engine::dedup::DedupEngine::rank_keys((0..count).map(|index| {
+                let object = env.get_object_array_element(&keys, index)?;
+                let array = env.auto_local(jni::objects::JCharArray::from(object));
+                let mut units = vec![0; env.get_array_length(&*array)? as usize];
+                env.get_char_array_region(&*array, 0, &mut units)?;
+                Ok::<_, jni::errors::Error>(units)
+            }))?;
+            let result = env.new_int_array(count)?;
+            env.set_int_array_region(&result, 0, &ranks)?;
+            Ok(result.into_raw())
+        })();
+        result.unwrap_or(ptr::null_mut())
+    }))
+    .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeParseProxyBatch<
+    'local,
+>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    payload: jni::objects::JString<'local>,
+) -> jni::sys::jstring {
+    catch_unwind(AssertUnwindSafe(|| {
+        let payload_str: String = match env.get_string(&payload) {
+            Ok(js) => js.into(),
+            Err(_) => return ptr::null_mut(),
+        };
+        let result = engine::batch::BatchParser::parse_batch_raw(&payload_str);
         match env.new_string(result) {
             Ok(js) => js.into_raw(),
             Err(_) => ptr::null_mut(),
@@ -120,6 +168,148 @@ pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeDecode
             Err(e) => format!("ERROR|{}", e),
         };
         match env.new_string(lines) {
+            Ok(js) => js.into_raw(),
+            Err(_) => ptr::null_mut(),
+        }
+    }))
+    .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeDiffSubscription<
+    'local,
+>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    old_payload: jni::objects::JString<'local>,
+    new_payload: jni::objects::JString<'local>,
+) -> jni::sys::jstring {
+    catch_unwind(AssertUnwindSafe(|| {
+        let old_str: String = match env.get_string(&old_payload) {
+            Ok(js) => js.into(),
+            Err(_) => return ptr::null_mut(),
+        };
+        let new_str: String = match env.get_string(&new_payload) {
+            Ok(js) => js.into(),
+            Err(_) => return ptr::null_mut(),
+        };
+        let result = engine::diff::SubscriptionDiffEngine::diff_raw(&old_str, &new_str);
+        match env.new_string(result) {
+            Ok(js) => js.into_raw(),
+            Err(_) => ptr::null_mut(),
+        }
+    }))
+    .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeDiffSubscriptionPipeline<
+    'local,
+>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    old_payload: jni::objects::JString<'local>,
+    new_payload: jni::objects::JString<'local>,
+    deduplicate: jni::sys::jboolean,
+) -> jni::sys::jstring {
+    catch_unwind(AssertUnwindSafe(|| {
+        let old_str: String = match env.get_string(&old_payload) {
+            Ok(js) => js.into(),
+            Err(_) => return ptr::null_mut(),
+        };
+        let new_str: String = match env.get_string(&new_payload) {
+            Ok(js) => js.into(),
+            Err(_) => return ptr::null_mut(),
+        };
+        let result = engine::diff::SubscriptionDiffEngine::diff_raw_pipeline(
+            &old_str,
+            &new_str,
+            deduplicate != 0,
+        );
+        match env.new_string(result) {
+            Ok(js) => js.into_raw(),
+            Err(_) => ptr::null_mut(),
+        }
+    }))
+    .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeDisambiguateNames<
+    'local,
+>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    payload: jni::objects::JString<'local>,
+) -> jni::sys::jstring {
+    catch_unwind(AssertUnwindSafe(|| {
+        let payload_str: String = match env.get_string(&payload) {
+            Ok(js) => js.into(),
+            Err(_) => return ptr::null_mut(),
+        };
+        let result = engine::dedup::DedupEngine::disambiguate_names_raw(&payload_str);
+        match env.new_string(result) {
+            Ok(js) => js.into_raw(),
+            Err(_) => ptr::null_mut(),
+        }
+    }))
+    .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeDedupByEndpoint<
+    'local,
+>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    payload: jni::objects::JString<'local>,
+) -> jni::sys::jstring {
+    catch_unwind(AssertUnwindSafe(|| {
+        let payload_str: String = match env.get_string(&payload) {
+            Ok(js) => js.into(),
+            Err(_) => return ptr::null_mut(),
+        };
+        let result = engine::dedup::DedupEngine::dedup_by_endpoint_raw(&payload_str);
+        match env.new_string(result) {
+            Ok(js) => js.into_raw(),
+            Err(_) => ptr::null_mut(),
+        }
+    }))
+    .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeGetDisplayName<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    protocol: jni::objects::JString<'local>,
+    server: jni::objects::JString<'local>,
+    port: jni::sys::jint,
+    name: jni::objects::JString<'local>,
+) -> jni::sys::jstring {
+    catch_unwind(AssertUnwindSafe(|| {
+        let proto_str: String = match env.get_string(&protocol) {
+            Ok(js) => js.into(),
+            Err(_) => return ptr::null_mut(),
+        };
+        let server_str: String = match env.get_string(&server) {
+            Ok(js) => js.into(),
+            Err(_) => return ptr::null_mut(),
+        };
+        let name_str: String = match env.get_string(&name) {
+            Ok(js) => js.into(),
+            Err(_) => return ptr::null_mut(),
+        };
+        let node = model::node::CanonicalNode::new(
+            &proto_str,
+            &server_str,
+            port as u16,
+            "",
+            "",
+            "",
+            &name_str,
+        );
+        match env.new_string(node.display_name()) {
             Ok(js) => js.into_raw(),
             Err(_) => ptr::null_mut(),
         }

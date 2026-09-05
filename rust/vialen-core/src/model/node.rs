@@ -95,6 +95,8 @@ pub struct ExtraConfig {
     pub hop_interval_max: i32,
     pub obfs_min_packet_size: i32,
     pub obfs_max_packet_size: i32,
+    pub alter_id: i32,
+    pub encryption: String,
 }
 
 impl Default for ExtraConfig {
@@ -113,6 +115,8 @@ impl Default for ExtraConfig {
             hop_interval_max: 0,
             obfs_min_packet_size: 512,
             obfs_max_packet_size: 1200,
+            alter_id: 0,
+            encryption: String::new(),
         }
     }
 }
@@ -143,7 +147,7 @@ impl CanonicalNode {
     ) -> Self {
         Self {
             protocol: protocol.to_string(),
-            server: server.to_ascii_lowercase(),
+            server: server.to_string(),
             port,
             username: username.to_string(),
             password: password.to_string(),
@@ -167,5 +171,125 @@ impl CanonicalNode {
 
     pub fn normalize(&mut self) {
         NormalizationEngine::normalize_node(self);
+    }
+
+    pub fn display_name(&self) -> String {
+        if is_not_blank(&self.name) {
+            self.name.clone()
+        } else {
+            format!("{}:{}", wrap_ipv6_host(&self.server), self.port)
+        }
+    }
+
+    pub fn identity_key(&self) -> super::key::CanonicalIdentityKey {
+        super::key::CanonicalIdentityKey::from_display_name(self)
+    }
+
+    pub fn content_key(&self) -> super::key::CanonicalContentKey {
+        super::key::CanonicalContentKey::from_node(self)
+    }
+
+    pub fn fingerprint(&self) -> super::key::Fingerprint {
+        self.content_key().fingerprint()
+    }
+
+    /// Maps a node's protocol to its production bean-family:
+    /// - Shadowsocks: "shadowsocks"
+    /// - SOCKS (socks, socks4, socks4a, socks5): "socks"
+    /// - Trojan: "trojan"
+    /// - TUIC: "tuic"
+    /// - Hysteria (hysteria, hysteria1, hysteria2, hy, hy2): "hysteria"
+    /// - V2Ray / VMess / VLESS (both instantiate VMessBean): "vmess"
+    pub fn bean_family(&self) -> &str {
+        match self.protocol.to_ascii_lowercase().as_str() {
+            "shadowsocks" | "ss" => "shadowsocks",
+            "socks" | "socks4" | "socks4a" | "socks5" => "socks",
+            "trojan" => "trojan",
+            "tuic" => "tuic",
+            "hysteria" | "hysteria1" | "hysteria2" | "hy" | "hy2" => "hysteria",
+            "wireguard" | "wg" => "wireguard",
+            "http" | "https" => "http",
+            "vmess" | "vless" => "vmess",
+            _ => &self.protocol,
+        }
+    }
+}
+
+pub fn unwrap_ipv6_host(s: &str) -> &str {
+    let mut cur = s;
+    while cur.starts_with('[') && cur.ends_with(']') && cur.len() >= 2 {
+        cur = &cur[1..cur.len() - 1];
+    }
+    cur
+}
+
+pub fn wrap_ipv6_host(s: &str) -> String {
+    let unwrapped = unwrap_ipv6_host(s);
+    if unwrapped.parse::<std::net::Ipv6Addr>().is_ok() {
+        format!("[{}]", unwrapped)
+    } else {
+        s.to_string()
+    }
+}
+
+pub fn is_not_blank(s: &str) -> bool {
+    s.chars().any(|c| !c.is_whitespace())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_not_blank_semantics() {
+        assert!(!is_not_blank(""));
+        assert!(!is_not_blank("   "));
+        assert!(!is_not_blank("\t\n\r "));
+        assert!(!is_not_blank("\u{00A0}")); // NBSP
+        assert!(!is_not_blank("\u{3000}")); // Ideographic space
+        assert!(!is_not_blank(" \u{00A0} \u{3000} \t "));
+
+        assert!(is_not_blank("a"));
+        assert!(is_not_blank("  a  "));
+        assert!(is_not_blank("东京 01"));
+        assert!(is_not_blank("Tokyo 🔥 Server"));
+    }
+
+    #[test]
+    fn test_display_name_whitespace_and_ipv6_parity() {
+        // Non-blank name preserves whitespace
+        let node1 = CanonicalNode::new("ss", "1.1.1.1", 8388, "", "", "", "  My Node  ");
+        assert_eq!(node1.display_name(), "  My Node  ");
+
+        // Blank names fallback to endpoint
+        let blank_cases = ["", "  ", "\t\n", "\u{00A0}", "\u{3000}"];
+        for b in blank_cases {
+            let n = CanonicalNode::new("ss", "1.1.1.1", 8388, "", "", "", b);
+            assert_eq!(n.display_name(), "1.1.1.1:8388");
+        }
+
+        // IPv4
+        let n_v4 = CanonicalNode::new("ss", "192.168.1.1", 1080, "", "", "", "");
+        assert_eq!(n_v4.display_name(), "192.168.1.1:1080");
+
+        // Valid unbracketed IPv6
+        let n_v6 = CanonicalNode::new("ss", "2001:db8::1", 8388, "", "", "", "");
+        assert_eq!(n_v6.display_name(), "[2001:db8::1]:8388");
+
+        // Valid bracketed IPv6
+        let n_v6_b = CanonicalNode::new("ss", "[2001:db8::1]", 8388, "", "", "", "");
+        assert_eq!(n_v6_b.display_name(), "[2001:db8::1]:8388");
+
+        // Valid loopback IPv6
+        let n_v6_loop = CanonicalNode::new("ss", "::1", 8388, "", "", "", "");
+        assert_eq!(n_v6_loop.display_name(), "[::1]:8388");
+
+        // Invalid host containing colon (abc:def) must NOT be bracketed
+        let n_invalid = CanonicalNode::new("ss", "abc:def", 8388, "", "", "", "");
+        assert_eq!(n_invalid.display_name(), "abc:def:8388");
+
+        // Domain name
+        let n_dom = CanonicalNode::new("ss", "example.com", 443, "", "", "", "");
+        assert_eq!(n_dom.display_name(), "example.com:443");
     }
 }
