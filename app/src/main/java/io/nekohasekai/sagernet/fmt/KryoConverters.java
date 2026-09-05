@@ -41,6 +41,20 @@ public class KryoConverters {
         return out.toByteArray();
     }
 
+    /** Class-tagged production content, excluding name and locally retained JSON overrides.
+     * Uses the same virtual serialize implementation as AbstractBean.equals, without
+     * changing either Bean or its transient equality flags. Not a persisted schema.
+     */
+    public static byte[] subscriptionContent(AbstractBean bean) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteBufferOutput buffer = KryosKt.byteBuffer(out);
+        buffer.writeString(bean.getClass().getName());
+        bean.serialize(buffer);
+        buffer.flush();
+        buffer.close();
+        return out.toByteArray();
+    }
+
     public static <T extends Serializable> T deserialize(T bean, byte[] bytes) {
         if (bytes == null) return bean;
         ByteArrayInputStream input = new ByteArrayInputStream(bytes);

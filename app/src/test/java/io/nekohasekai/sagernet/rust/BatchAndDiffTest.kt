@@ -8,7 +8,7 @@ import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
 import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
-import io.nekohasekai.sagernet.fmt.trojan.parseTrojan
+import io.nekohasekai.sagernet.oracle.parseTrojan
 import moe.matsuri.nb4a.Protocols
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -488,13 +488,13 @@ class BatchAndDiffTest {
         data class Case(val baseline: String, val parse: (String) -> AbstractBean, val queries: List<String>)
         val cases = listOf(
             Case("tuic://user:secret@example.com:443?alpn=h3#Same",
-                { io.nekohasekai.sagernet.fmt.tuic.parseTuic(it) },
+                { io.nekohasekai.sagernet.oracle.parseTuic(it) },
                 listOf("", "sni=changed.example", "congestion_control=cubic", "congestion_control=", "udp_relay_mode=native", "udp_relay_mode=", "udp_relay_mode=quic", "allow_insecure=1", "disable_sni=1")),
             Case("hysteria://example.com:443?auth=secret#Same",
-                { io.nekohasekai.sagernet.fmt.hysteria.parseHysteria1(it) },
+                { io.nekohasekai.sagernet.oracle.parseHysteria1(it) },
                 listOf("", "peer=changed.example", "upmbps=42", "downmbps=84", "alpn=h3", "obfsParam=changed", "insecure=1", "mport=443,8443")),
             Case("hysteria2://secret@example.com:443?obfs=salamander#Same",
-                { io.nekohasekai.sagernet.fmt.hysteria.parseHysteria2(it) },
+                { io.nekohasekai.sagernet.oracle.parseHysteria2(it) },
                 listOf("", "sni=changed.example", "obfs-password=changed", "insecure=1", "mport=443,8443")),
         )
         cases.forEach { case ->
@@ -628,8 +628,8 @@ class BatchAndDiffTest {
         val vmessUri = "vmess://eyJ2IjoiMiIsInBzIjoiVm1lc3NOb2RlIiwiYWRkIjoiMi4yLjIuMiIsInBvcnQiOjQ0MywiaWQiOiJiODMxMzgxZC02MzI0LTRkNTMtYWQ0Zi04Y2RhNDhiMzA4MTEiLCJhaWQiOjAsInNjeSI6ImF1dG8iLCJuZXQiOiJ0Y3AifQ=="
 
         // 1. Kotlin Ground Truth
-        val vlessBean = io.nekohasekai.sagernet.fmt.v2ray.parseV2Ray(vlessUri)
-        val vmessBean = io.nekohasekai.sagernet.fmt.v2ray.parseV2Ray(vmessUri)
+        val vlessBean = io.nekohasekai.sagernet.oracle.parseV2Ray(vlessUri)
+        val vmessBean = io.nekohasekai.sagernet.oracle.parseV2Ray(vmessUri)
         val vlessDedup = Protocols.Deduplication(vlessBean, vlessBean.javaClass.toString())
         val vmessDedup = Protocols.Deduplication(vmessBean, vmessBean.javaClass.toString())
         assertEquals("Kotlin: VLESS and VMess have same VMessBean class and must match in Deduplication", vlessDedup, vmessDedup)
@@ -882,7 +882,7 @@ class BatchAndDiffTest {
         println("CURRENT_KOTLIN_SHADOWSOCKS_BENCHMARK = UNAVAILABLE_AFTER_F1_RUST_CUTOVER")
         println("  Reason: parseShadowsocks was cut over to RustBridge in Phase F1 (commit 65d9b0614ee3426bc749485b6a6ae23f3c4ff51e).")
         println("  No hand-written comparator is fabricated.")
-        println("Active Production Kotlin Comparator: Trojan (io.nekohasekai.sagernet.fmt.trojan.parseTrojan)")
+        println("Active Production Kotlin Comparator: Trojan (io.nekohasekai.sagernet.oracle.parseTrojan)")
         println("==========================================================================================")
 
         for (size in sizes) {

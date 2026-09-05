@@ -1,8 +1,8 @@
 package io.nekohasekai.sagernet
 
-import io.nekohasekai.sagernet.fmt.trojan.parseTrojan
+import io.nekohasekai.sagernet.oracle.parseTrojan
 import io.nekohasekai.sagernet.fmt.v2ray.isTLS
-import io.nekohasekai.sagernet.fmt.v2ray.parseV2Ray
+import io.nekohasekai.sagernet.oracle.parseV2Ray
 import io.nekohasekai.sagernet.rust.RustBridge
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -47,6 +47,17 @@ abstract class ProtocolAcceptanceCases {
                 check("alterId", bean.alterId ?: 0, rs.alterId)
                 check("encryption", bean.encryption ?: "", rs.encryption)
             }
+            val production = when {
+                uri.startsWith("trojan:") -> io.nekohasekai.sagernet.fmt.trojan.parseTrojan(uri)
+                else -> io.nekohasekai.sagernet.fmt.v2ray.parseV2Ray(uri)
+            }
+            // Canonical TLS explicitly normalizes every inactive security value to none.
+            val originalSecurity = bean.security
+            bean.security = if (bean.isTLS()) "tls" else "none"
+            bean.initializeDefaultValues()
+            check("production Bean", true, bean == production)
+            check("production name", bean.name, production.name)
+            bean.security = originalSecurity
         }
         assertTrue("${failures.size} differences across ${uris.size} cases:\n${failures.take(100).joinToString("\n")}", failures.isEmpty())
     }
@@ -112,9 +123,9 @@ abstract class ProtocolAcceptanceCases {
                     count++
                     val result = runCatching {
                         when (scheme) {
-                            "tuic" -> io.nekohasekai.sagernet.fmt.tuic.parseTuic(uri)
-                            "hysteria" -> io.nekohasekai.sagernet.fmt.hysteria.parseHysteria1(uri)
-                            else -> io.nekohasekai.sagernet.fmt.hysteria.parseHysteria2(uri)
+                            "tuic" -> io.nekohasekai.sagernet.oracle.parseTuic(uri)
+                            "hysteria" -> io.nekohasekai.sagernet.oracle.parseHysteria1(uri)
+                            else -> io.nekohasekai.sagernet.oracle.parseHysteria2(uri)
                         }
                     }
                     val rs = RustBridge.parseProxy(uri)
@@ -145,6 +156,14 @@ abstract class ProtocolAcceptanceCases {
                         check("obfs", kt.obfsType, rs.obfsType)
                         check("password", kt.obfuscation, rs.obfsPassword)
                     }
+                    val production = when (scheme) {
+                        "tuic" -> io.nekohasekai.sagernet.fmt.tuic.parseTuic(uri)
+                        "hysteria" -> io.nekohasekai.sagernet.fmt.hysteria.parseHysteria1(uri)
+                        else -> io.nekohasekai.sagernet.fmt.hysteria.parseHysteria2(uri)
+                    }
+                    kt.initializeDefaultValues()
+                    check("production Bean", true, kt == production)
+                    check("production name", kt.name, production.name)
                 }
             }
         }

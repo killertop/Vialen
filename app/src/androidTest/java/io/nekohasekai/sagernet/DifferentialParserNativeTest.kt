@@ -1,16 +1,16 @@
 package io.nekohasekai.sagernet
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import io.nekohasekai.sagernet.fmt.hysteria.parseHysteria1
-import io.nekohasekai.sagernet.fmt.hysteria.parseHysteria2
+import io.nekohasekai.sagernet.oracle.parseHysteria1
+import io.nekohasekai.sagernet.oracle.parseHysteria2
 import io.nekohasekai.sagernet.fmt.shadowsocks.parseShadowsocks
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
 import io.nekohasekai.sagernet.fmt.socks.parseSOCKS
-import io.nekohasekai.sagernet.fmt.trojan.parseTrojan
-import io.nekohasekai.sagernet.fmt.tuic.parseTuic
+import io.nekohasekai.sagernet.oracle.parseTrojan
+import io.nekohasekai.sagernet.oracle.parseTuic
 import io.nekohasekai.sagernet.fmt.v2ray.VMessBean
 import io.nekohasekai.sagernet.fmt.v2ray.isTLS
-import io.nekohasekai.sagernet.fmt.v2ray.parseV2Ray
+import io.nekohasekai.sagernet.oracle.parseV2Ray
 import io.nekohasekai.sagernet.rust.CanonicalProxyResult
 import io.nekohasekai.sagernet.rust.RustBridge
 import org.junit.Assert.assertEquals

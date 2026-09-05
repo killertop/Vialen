@@ -4,14 +4,7 @@ import com.google.gson.JsonParser
 import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.fmt.Serializable
 import io.nekohasekai.sagernet.fmt.http.parseHttp
-import io.nekohasekai.sagernet.fmt.hysteria.parseHysteria1
-import io.nekohasekai.sagernet.fmt.hysteria.parseHysteria2
 import io.nekohasekai.sagernet.fmt.parseUniversal
-import io.nekohasekai.sagernet.fmt.shadowsocks.parseShadowsocks
-import io.nekohasekai.sagernet.fmt.socks.parseSOCKS
-import io.nekohasekai.sagernet.fmt.trojan.parseTrojan
-import io.nekohasekai.sagernet.fmt.tuic.parseTuic
-import io.nekohasekai.sagernet.fmt.v2ray.parseV2Ray
 import moe.matsuri.nb4a.proxy.anytls.parseAnytls
 import moe.matsuri.nb4a.utils.JavaUtil.gson
 import moe.matsuri.nb4a.utils.Util
@@ -108,6 +101,13 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
     val entities = ArrayList<AbstractBean>()
     val entitiesByLine = ArrayList<AbstractBean>()
 
+    // Parse both historical tokenization views through one native batch. Keep
+    // independent Bean instances for repeated inputs so name disambiguation is safe.
+    val sameView = links == linksByLine
+    val views = if (sameView) links else links + linksByLine
+    val nativeInputs = views.filter(io.nekohasekai.sagernet.fmt.RustProxyParser::supports)
+    val nativeResults = io.nekohasekai.sagernet.fmt.RustProxyParser.parseBatch(nativeInputs).items.iterator()
+
     fun String.parseLink(entities: ArrayList<AbstractBean>) {
         if (startsWith("clash://install-config?") || startsWith("sn://subscription?")) {
             throw SubscriptionFoundException(this)
@@ -120,16 +120,8 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
             }.onFailure {
                 Logs.w(it)
             }
-        } else if (startsWith("socks://") || startsWith("socks4://") || startsWith("socks4a://") || startsWith(
-                "socks5://"
-            )
-        ) {
-            Logs.d("Try parse socks link: $this")
-            runCatching {
-                entities.add(parseSOCKS(this))
-            }.onFailure {
-                Logs.w(it)
-            }
+        } else if (io.nekohasekai.sagernet.fmt.RustProxyParser.supports(this)) {
+            nativeResults.next().onSuccess(entities::add).onFailure { Logs.w(it) }
         } else if (matches("(http|https)://.*".toRegex())) {
             Logs.d("Try parse http link: $this")
             runCatching {
@@ -145,55 +137,6 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
                     .replaceFirst("https://", "clash://")
                 throw (SubscriptionFoundException(clashUrl))
             }
-        } else if (startsWith("vmess://")) {
-            Logs.d("Try parse v2ray link: $this")
-            runCatching {
-                entities.add(parseV2Ray(this))
-            }.onFailure {
-                Logs.w(it)
-            }
-        } else if (startsWith("vless://")) {
-            Logs.d("Try parse vless link: $this")
-            runCatching {
-                entities.add(parseV2Ray(this))
-            }.onFailure {
-                Logs.w(it)
-            }
-        } else if (startsWith("trojan://")) {
-            Logs.d("Try parse trojan link: $this")
-            runCatching {
-                entities.add(parseTrojan(this))
-            }.onFailure {
-                Logs.w(it)
-            }
-        } else if (startsWith("ss://")) {
-            Logs.d("Try parse shadowsocks link: $this")
-            runCatching {
-                entities.add(parseShadowsocks(this))
-            }.onFailure {
-                Logs.w(it)
-            }
-        } else if (startsWith("hysteria://")) {
-            Logs.d("Try parse hysteria1 link: $this")
-            runCatching {
-                entities.add(parseHysteria1(this))
-            }.onFailure {
-                Logs.w(it)
-            }
-        } else if (startsWith("hysteria2://") || startsWith("hy2://")) {
-            Logs.d("Try parse hysteria2 link: $this")
-            runCatching {
-                entities.add(parseHysteria2(this))
-            }.onFailure {
-                Logs.w(it)
-            }
-        } else if (startsWith("tuic://")) {
-            Logs.d("Try parse TUIC link: $this")
-            runCatching {
-                entities.add(parseTuic(this))
-            }.onFailure {
-                Logs.w(it)
-            }
         } else if (startsWith("anytls://")) {
             Logs.d("Try parse anytls link: $this")
             runCatching {
@@ -207,19 +150,12 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
     for (link in links) {
         link.parseLink(entities)
     }
+    if (sameView) return entities.onEach { it.initializeDefaultValues() }
     for (link in linksByLine) {
         link.parseLink(entitiesByLine)
     }
-//    var isBadLink = false
-    if (entities.onEach { it.initializeDefaultValues() }.size == entitiesByLine.onEach { it.initializeDefaultValues() }.size) run test@{
-        entities.forEachIndexed { index, bean ->
-            val lineBean = entitiesByLine[index]
-            if (bean == lineBean && bean.displayName() != lineBean.displayName()) {
-//                isBadLink = true
-                return@test
-            }
-        }
-    }
+    entities.forEach { it.initializeDefaultValues() }
+    entitiesByLine.forEach { it.initializeDefaultValues() }
     return if (entities.size > entitiesByLine.size) entities else entitiesByLine
 }
 

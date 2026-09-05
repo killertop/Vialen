@@ -83,6 +83,76 @@ pub mod engine;
 pub mod model;
 pub mod parser;
 
+fn read_utf16_matrix(
+    env: &mut JNIEnv<'_>,
+    input: &jni::objects::JObjectArray<'_>,
+) -> jni::errors::Result<Vec<Vec<u16>>> {
+    let count = env.get_array_length(input)?;
+    (0..count)
+        .map(|i| {
+            let object = env.get_object_array_element(input, i)?;
+            let array = env.auto_local(jni::objects::JCharArray::from(object));
+            let mut units = vec![0; env.get_array_length(&*array)? as usize];
+            env.get_char_array_region(&*array, 0, &mut units)?;
+            Ok(units)
+        })
+        .collect()
+}
+
+fn read_byte_matrix(
+    env: &mut JNIEnv<'_>,
+    input: &jni::objects::JObjectArray<'_>,
+) -> jni::errors::Result<Vec<Vec<u8>>> {
+    let count = env.get_array_length(input)?;
+    (0..count)
+        .map(|i| {
+            let object = env.get_object_array_element(input, i)?;
+            let array = env.auto_local(jni::objects::JByteArray::from(object));
+            env.convert_byte_array(&*array)
+        })
+        .collect()
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativePlanSubscription<
+    'local,
+>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    old_names: jni::objects::JObjectArray<'local>,
+    old_content: jni::objects::JObjectArray<'local>,
+    old_orders: jni::objects::JLongArray<'local>,
+    new_names: jni::objects::JObjectArray<'local>,
+    new_content: jni::objects::JObjectArray<'local>,
+) -> jni::sys::jintArray {
+    catch_unwind(AssertUnwindSafe(|| {
+        let result = (|| -> jni::errors::Result<_> {
+            let old_names = read_utf16_matrix(&mut env, &old_names)?;
+            let old_content = read_byte_matrix(&mut env, &old_content)?;
+            let mut orders = vec![0; env.get_array_length(&old_orders)? as usize];
+            env.get_long_array_region(&old_orders, 0, &mut orders)?;
+            let new_names = read_utf16_matrix(&mut env, &new_names)?;
+            let new_content = read_byte_matrix(&mut env, &new_content)?;
+            let Some(plan) = engine::persistence::plan(
+                &old_names,
+                &old_content,
+                &orders,
+                &new_names,
+                &new_content,
+            )
+            .ok()
+            .and_then(|p| p.encode().ok()) else {
+                return Ok(ptr::null_mut());
+            };
+            let array = env.new_int_array(plan.len() as i32)?;
+            env.set_int_array_region(&array, 0, &plan)?;
+            Ok(array.into_raw())
+        })();
+        result.unwrap_or(ptr::null_mut())
+    }))
+    .unwrap_or(ptr::null_mut())
+}
+
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_io_nekohasekai_sagernet_rust_RustNative_nativeParseProxy<'local>(
     mut env: JNIEnv<'local>,

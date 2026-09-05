@@ -81,6 +81,45 @@ data class SubscriptionDiffResult(
 
 object RustBridge {
 
+    data class PersistencePlan(val oldIndices: IntArray, val flags: IntArray, val removedIndices: IntArray)
+
+    /** One JNI call over exact Bean projections; no URI conversion or candidate wire limits. */
+    fun planSubscription(oldNames: List<String>, oldContent: Array<ByteArray>, oldOrders: LongArray,
+                         newNames: List<String>, newContent: Array<ByteArray>): PersistencePlan {
+        require(oldNames.size == oldContent.size && oldNames.size == oldOrders.size && newNames.size == newContent.size)
+        val raw = checkNotNull(RustNative.nativePlanSubscription(
+            Array(oldNames.size) { oldNames[it].toCharArray() }, oldContent, oldOrders,
+            Array(newNames.size) { newNames[it].toCharArray() }, newContent
+        )) { "Native subscription planning failed" }
+        return decodePersistencePlan(raw, oldNames.size, newNames.size)
+    }
+
+    internal fun decodePersistencePlan(raw: IntArray, oldCount: Int, newCount: Int): PersistencePlan {
+        check(raw.size >= 2 && raw[0] == newCount && raw[1] in 0..oldCount) { "Invalid plan header" }
+        check(raw.size.toLong() == 2L + newCount.toLong() * 2 + raw[1]) { "Invalid plan size" }
+        val oldIndices = IntArray(newCount)
+        val flags = IntArray(newCount)
+        val visited = BooleanArray(oldCount)
+        for (i in 0 until newCount) {
+            val old = raw[2 + i * 2]
+            val change = raw[3 + i * 2]
+            check(old in -1 until oldCount && change in 0..3 && (old != -1 || change == 1)) { "Invalid plan change" }
+            if (old >= 0) {
+                check(!visited[old]) { "Repeated plan match" }
+                visited[old] = true
+            }
+            oldIndices[i] = old
+            flags[i] = change
+        }
+        val removed = raw.copyOfRange(2 + newCount * 2, raw.size)
+        for (old in removed) {
+            check(old in 0 until oldCount && !visited[old]) { "Invalid removed index" }
+            visited[old] = true
+        }
+        check(visited.all { it }) { "Plan omitted existing rows" }
+        return PersistencePlan(oldIndices, flags, removed)
+    }
+
     /** Fail closed before any persistence when the native key contract is invalid. */
     fun rankDedupKeys(keys: List<String>): List<Int> {
         if (keys.isEmpty()) return emptyList()
@@ -105,16 +144,32 @@ object RustBridge {
 
     fun probe(input: ByteArray): RustProbeResult = decodeResponse(RustNative.nativeProbe(input))
 
-    fun parseProxy(uri: String): CanonicalProxyResult = decodeProxyResponse(RustNative.nativeParseProxy(uri))
+    private fun validUtf16(value: String): Boolean {
+        var index = 0
+        while (index < value.length) {
+            val c = value[index++]
+            if (c.isHighSurrogate()) {
+                if (index == value.length || !value[index++].isLowSurrogate()) return false
+            } else if (c.isLowSurrogate()) return false
+        }
+        return true
+    }
+
+    fun parseProxy(uri: String): CanonicalProxyResult = if (!validUtf16(uri))
+        CanonicalProxyResult(status = "INVALID_INPUT", error = "Malformed UTF-16 in proxy URI")
+    else decodeProxyResponse(RustNative.nativeParseProxy(uri))
 
     fun decodeSubscription(text: String): CanonicalSubscriptionResult = decodeSubscriptionResponse(RustNative.nativeDecodeSubscription(text))
 
-    internal fun framedPayloadExceedsLimit(items: List<String>, header: Boolean = false, limit: Int = MAX_PAYLOAD_BYTES): Boolean {
+    internal fun framedPayloadExceedsLimit(items: List<String>, header: Boolean = false, limit: Int = MAX_PAYLOAD_BYTES): Boolean =
+        framedPayloadByteCount(items, header, limit.toLong()) > limit
+
+    internal fun framedPayloadByteCount(items: List<String>, header: Boolean = false, limit: Long = Long.MAX_VALUE): Long {
         var bytes = if (header) items.size.toString().length.toLong() + 1 else 0L
-        if (bytes > limit) return true
+        if (bytes > limit) return bytes
         for (item in items) {
             bytes += item.length.toString().length + 1
-            if (bytes > limit) return true
+            if (bytes > limit) return bytes
             var i = 0
             while (i < item.length) {
                 val c = item[i++]
@@ -125,10 +180,10 @@ object RustBridge {
                     c.isSurrogate() -> 1 // JVM UTF-8 encoder replacement for malformed UTF-16.
                     else -> 3
                 }
-                if (bytes > limit) return true
+                if (bytes > limit) return bytes
             }
         }
-        return false
+        return bytes
     }
 
     fun buildLengthPrefixed(items: List<String>): String {
@@ -155,12 +210,18 @@ object RustBridge {
                 CanonicalProxyResult(status = "INVALID_INPUT", error = "Batch size exceeds limit: ${uris.size} > $MAX_BATCH_ITEMS")
             }
         }
-        if (framedPayloadExceedsLimit(uris, header = true)) {
+        // JNI string conversion cannot preserve isolated UTF-16 surrogate units.
+        // Replace only those entries with a safe invalid frame, retaining count/order.
+        val malformed = BooleanArray(uris.size)
+        val safeUris = uris.mapIndexed { index, uri ->
+            if (validUtf16(uri)) uri else { malformed[index] = true; "" }
+        }
+        if (framedPayloadExceedsLimit(safeUris, header = true)) {
             return List(uris.size) {
                 CanonicalProxyResult(status = "INVALID_INPUT", error = "Batch payload exceeds byte limit: $MAX_PAYLOAD_BYTES")
             }
         }
-        val payload = buildFramedBatch(uris)
+        val payload = buildFramedBatch(safeUris)
 
         val response = RustNative.nativeParseProxyBatch(payload)
         if (response.startsWith("ERROR|")) {
@@ -187,7 +248,10 @@ object RustBridge {
                 CanonicalProxyResult(status = "INTERNAL_ERROR", error = "Malformed batch response framing")
             }
         }
-        return items.map { decodeProxyResponse(it) }
+        return items.mapIndexed { index, item ->
+            if (malformed[index]) CanonicalProxyResult(status = "INVALID_INPUT", error = "Malformed UTF-16 in proxy URI")
+            else decodeProxyResponse(item)
+        }
     }
 
     fun diffSubscriptionPipeline(oldUris: List<String>, newUris: List<String>, deduplicate: Boolean): SubscriptionDiffResult {
@@ -442,6 +506,10 @@ internal object RustNative {
     init {
         System.loadLibrary("vialen_core")
     }
+
+    @JvmStatic
+    external fun nativePlanSubscription(oldNames: Array<CharArray>, oldContent: Array<ByteArray>, oldOrders: LongArray,
+                                        newNames: Array<CharArray>, newContent: Array<ByteArray>): IntArray?
 
     @JvmStatic
     external fun nativeRankDedupKeys(keys: Array<CharArray>): IntArray?

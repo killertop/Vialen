@@ -3,7 +3,7 @@ package io.nekohasekai.sagernet
 import io.mockk.every
 import io.mockk.mockkObject
 import io.nekohasekai.sagernet.fmt.v2ray.isTLS
-import io.nekohasekai.sagernet.fmt.v2ray.parseV2Ray
+import io.nekohasekai.sagernet.oracle.parseV2Ray
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.getStr
 import io.nekohasekai.sagernet.rust.RustBridge

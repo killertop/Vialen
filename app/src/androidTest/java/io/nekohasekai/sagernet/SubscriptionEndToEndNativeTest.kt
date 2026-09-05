@@ -1,0 +1,79 @@
+package io.nekohasekai.sagernet
+
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import io.nekohasekai.sagernet.database.*
+import io.nekohasekai.sagernet.group.RawUpdater
+import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.*
+import org.junit.Test
+import org.junit.runner.RunWith
+import java.util.Base64
+
+@RunWith(AndroidJUnit4::class)
+class SubscriptionEndToEndNativeTest {
+    @Test fun actualHttpFetchDecodeBatchDedupDiffAndRoomRecoverTogether() = runBlocking {
+        val db = SagerDatabase.instance
+        val originalGroups = db.groupDao().allGroups().map { it.id }.toSet()
+        LoopbackHttpFixture().use { server ->
+            val sub = SubscriptionBean().apply { initializeDefaultValues(); link = "http://127.0.0.1:${server.port}/subscription"; deduplication = true; forceResolve = false }
+            val group = ProxyGroup(name = "Rust-E2E-${System.nanoTime()}", type = GroupType.SUBSCRIPTION, subscription = sub)
+            group.id = db.groupDao().createGroup(group)
+            var expectedNames = listOf("A", "B", "C", "D", "E", "F")
+            var successes = 0
+            val ui = object : GroupManager.Interface {
+                override suspend fun confirm(message: String) = error("Unexpected confirmation")
+                override suspend fun alert(message: String) = error("Unexpected alert")
+                override suspend fun onUpdateFailure(group: ProxyGroup, message: String) = error(message)
+                override suspend fun onUpdateSuccess(group: ProxyGroup, changed: Int, added: List<String>, updated: Map<String,String>, deleted: List<String>, duplicate: List<String>, byUser: Boolean) {
+                    // Notification must observe the already committed transaction.
+                    assertEquals(expectedNames, db.proxyDao().getByGroup(group.id).map { it.displayName() })
+                    successes++
+                }
+            }
+            fun publish(links: List<String>) {
+                server.reply.set(LoopbackHttpFixture.Reply(body = Base64.getEncoder().encodeToString(links.joinToString("\n").toByteArray())))
+            }
+            try {
+                val initial = listOf("trojan://pw@a.example:443#A", "tuic://user:pw@b.example:443#B",
+                    "hysteria://c.example:443?auth=pw#C", "hy2://pw@d.example:443#D",
+                    "vless://user@e.example:443?security=tls#E", "vmess://user@f.example:443?type=ws#F",
+                    "trojan://other@a.example:443#duplicate")
+                publish(initial)
+                RawUpdater.doUpdate(group, sub, ui, false)
+                val oldRows = db.proxyDao().getByGroup(group.id)
+                val oldIds = oldRows.associate { it.displayName() to it.id }
+                oldRows[0].requireBean().apply { customOutboundJson = "{\"local\":true}"; customConfigJson = "retained-config" }
+                db.proxyDao().updateProxy(oldRows[0])
+                expectedNames = listOf("F", "A", "new")
+                publish(listOf(initial[5], "trojan://changed@changed.example:443#A", "socks5://new.example:1080#new"))
+                RawUpdater.doUpdate(group, sub, ui, false)
+                val rows = db.proxyDao().getByGroup(group.id)
+                assertEquals(oldIds["F"], rows[0].id)
+                assertEquals(oldIds["A"], rows[1].id)
+                assertEquals(listOf(1L,2L,3L), rows.map { it.userOrder })
+                assertEquals("changed", (rows[1].requireBean() as TrojanBean).password)
+                assertEquals("{\"local\":true}", rows[1].requireBean().customOutboundJson)
+                assertEquals("retained-config", rows[1].requireBean().customConfigJson)
+                RawUpdater.doUpdate(group, sub, ui, false)
+                assertEquals(rows.map { it.id }, db.proxyDao().getByGroup(group.id).map { it.id })
+                val lastUpdated = db.groupDao().getById(group.id)!!.subscription!!.lastUpdated
+                server.reply.set(LoopbackHttpFixture.Reply(503, "invalid subscription"))
+                assertTrue(runCatching { RawUpdater.doUpdate(group, sub, ui, false) }.isFailure)
+                assertEquals(3, successes)
+                assertEquals(lastUpdated, db.groupDao().getById(group.id)!!.subscription!!.lastUpdated)
+                assertEquals(rows.map { it.id }, db.proxyDao().getByGroup(group.id).map { it.id })
+                // A deliberately empty JSON subscription clears this group only.
+                expectedNames = emptyList()
+                server.reply.set(LoopbackHttpFixture.Reply(body = "[]"))
+                RawUpdater.doUpdate(group, sub, ui, false)
+                assertTrue(db.proxyDao().getByGroup(group.id).isEmpty())
+                assertEquals(4, successes)
+                assertEquals(5, server.requests.get())
+            } finally {
+                db.runInTransaction { db.proxyDao().deleteByGroup(group.id); db.groupDao().deleteById(group.id) }
+            }
+        }
+        assertEquals(originalGroups, db.groupDao().allGroups().map { it.id }.toSet())
+    }
+}

@@ -54,7 +54,7 @@ class RemovedProtocolNegativeTest {
             parseHysteria1(link)
             fail("Should throw IllegalArgumentException on faketcp")
         } catch (e: IllegalArgumentException) {
-            assertTrue(e.message?.contains("external plugin mode has been removed") == true)
+            assertTrue(e.message?.contains("unsupported hysteria1 protocol") == true)
         }
     }
 
@@ -65,7 +65,7 @@ class RemovedProtocolNegativeTest {
             parseHysteria1(link)
             fail("Should throw IllegalArgumentException on wechat-video")
         } catch (e: IllegalArgumentException) {
-            assertTrue(e.message?.contains("external plugin mode has been removed") == true)
+            assertTrue(e.message?.contains("unsupported hysteria1 protocol") == true)
         }
     }
 
