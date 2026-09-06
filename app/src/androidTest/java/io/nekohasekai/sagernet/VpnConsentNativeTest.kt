@@ -18,6 +18,9 @@ import org.junit.runner.RunWith
 /** Reject/cancel consent must not arm an unfulfilled foreground-service deadline. */
 @RunWith(AndroidJUnit4::class)
 class VpnConsentNativeTest {
+    @get:org.junit.Rule
+    val profileState = ProfileSelectionStateRule()
+
     @Test fun unpreparedStartKeepsBoundServiceAliveWithoutStartingForegroundService() = runBlocking {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val app = instrumentation.targetContext.applicationContext as SagerNet
@@ -28,7 +31,7 @@ class VpnConsentNativeTest {
         val oldAppOp = shell("cmd appops get ${app.packageName} ACTIVATE_VPN")
             .substringAfter("ACTIVATE_VPN: ", "default").substringBefore(';').trim()
         val connection = SagerConnection(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND)
-        try {
+        profileState.preservingFailure({
             VpnConsentTestUi.assertClean()
             DataStore.serviceMode = Key.MODE_VPN
             shell("cmd appops set ${app.packageName} ACTIVATE_VPN deny")
@@ -61,11 +64,17 @@ class VpnConsentNativeTest {
                 after.contains("startRequested=true") || after.contains("fgRequired=true"))
             println("VPN_CANCEL_SERVICE_DUMP\n$after")
             println("VPN_CONSENT denied=true foreground_start=false binder_survived=true")
-        } finally {
-            VpnConsentTestUi.cleanup()
-            connection.disconnect(app)
-            DataStore.serviceMode = oldMode
-            shell("cmd appops set ${app.packageName} ACTIVATE_VPN $oldAppOp")
-        }
+        }, {
+            profileState.cleanupSteps({
+                VpnConsentTestUi.cleanup()
+            }, {
+                profileState.stopAndAwait(connection)
+            }, {
+                connection.disconnect(app)
+            }, {
+                DataStore.serviceMode = oldMode
+                shell("cmd appops set ${app.packageName} ACTIVATE_VPN $oldAppOp")
+            })
+        })
     }
 }

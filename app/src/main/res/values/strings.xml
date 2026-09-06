@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">NekoBox</string>
-    <string name="app_name_long" translatable="false">NekoBox for Android</string>
+    <string name="app_name" translatable="false">Vialen</string>
+    <string name="app_name_long" translatable="false">Vialen for Android</string>
     <string name="app_desc">The universal proxy toolchain for Android, written in Kotlin.</string>
     <string name="project">Project</string>
     <string name="github">Source code</string>
@@ -587,4 +587,10 @@
     <string name="hysteria_obfs_type">Obfuscation Type</string>
     <string name="obfs_min_packet_size">Min Packet Size (Gecko)</string>
     <string name="obfs_max_packet_size">Max Packet Size (Gecko)</string>
+    <string name="vialen_release_unconfigured">Vialen release channel is not configured.</string>
+    <string name="vialen_upstream_project">Upstream project</string>
+    <string name="vialen_upstream_repository">NekoBox for Android (upstream)</string>
+    <string name="vialen_upstream_community">Upstream community</string>
+    <string name="vialen_upstream_donate">Support upstream NekoBox</string>
+    <string name="vialen_upstream_donate_info">This link supports the upstream project.</string>
 </resources>

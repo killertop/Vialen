@@ -499,4 +499,10 @@
     <string name="minimize">最小化</string>
     <string name="app_list_permission_denied">无法读取已安装的应用。\n这通常是由于系统限制了应用的读取权限（例如某些中国厂商系统）。\n请在系统设置中授予权限。</string>
     <string name="open_app_settings">打开系统设置</string>
+    <string name="vialen_release_unconfigured">尚未配置 Vialen 发布渠道。</string>
+    <string name="vialen_upstream_project">上游项目</string>
+    <string name="vialen_upstream_repository">NekoBox for Android（上游）</string>
+    <string name="vialen_upstream_community">上游社区</string>
+    <string name="vialen_upstream_donate">支持上游 NekoBox</string>
+    <string name="vialen_upstream_donate_info">此链接用于支持上游项目。</string>
 </resources>

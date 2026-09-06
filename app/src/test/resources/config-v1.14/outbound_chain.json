@@ -4,12 +4,10 @@
     "rules": [],
     "servers": [
       {
-        "detour": "direct",
         "tag": "dns-local",
         "type": "local"
       },
       {
-        "detour": "direct",
         "domain_resolver": "dns-local",
         "server": "223.5.5.5",
         "tag": "dns-direct",

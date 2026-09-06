@@ -12,6 +12,8 @@ setupApp()
 android {
     defaultConfig {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // AAPT locale filters must include our region-qualified Chinese resources.
+        resourceConfigurations += listOf("en", "zh-rCN", "zh-rHK", "zh-rTW")
     }
     compileOptions {
         isCoreLibraryDesugaringEnabled = true

@@ -28,6 +28,9 @@ import java.net.URL
 
 @RunWith(AndroidJUnit4::class)
 class RealDeviceHysteria2LiveTest {
+    @get:org.junit.Rule
+    val profileState = ProfileSelectionStateRule()
+
 
     private lateinit var profile: ProxyEntity
     private lateinit var connection: SagerConnection
@@ -179,20 +182,17 @@ class RealDeviceHysteria2LiveTest {
     @After
     fun tearDown() {
         runBlocking {
-            try {
-                SagerNet.stopService()
-            } catch (_: Exception) {}
-            try {
-                val app = ApplicationProvider.getApplicationContext<SagerNet>()
-                connection.disconnect(app)
-            } catch (_: Exception) {}
-            runOnDefaultDispatcher {
-                if (::profile.isInitialized) {
-                    SagerDatabase.proxyDao.deleteById(profile.id)
+            profileState.cleanupSteps({
+                if (::connection.isInitialized) profileState.stopAndAwait(connection)
+            }, {
+                if (::connection.isInitialized) connection.disconnect(ApplicationProvider.getApplicationContext<SagerNet>())
+            }, {
+                // Await deletion; the old GlobalScope launch could outlive @After.
+                io.nekohasekai.sagernet.ktx.onDefaultDispatcher {
+                    if (::profile.isInitialized) SagerDatabase.proxyDao.deleteById(profile.id)
+                    SagerDatabase.proxyDao.deleteById(9903L)
                 }
-                SagerDatabase.proxyDao.deleteById(9903L)
-            }
-            println("[HY2-TEST] Teardown & ephemeral profiles cleanup completed")
+            })
         }
     }
 

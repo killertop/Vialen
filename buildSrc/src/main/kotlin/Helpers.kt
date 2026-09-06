@@ -104,7 +104,7 @@ fun Project.setupCommon() {
                     it as BaseVariantOutputImpl
                     it.outputFileName = it.outputFileName.replace(
                         "app", "${project.name}-" + variant.versionName
-                    ).replace("-release", "").replace("-oss", "")
+                    ).replace("-release", "")
                 }
             }
         }
@@ -171,40 +171,13 @@ fun Project.setupApp() {
             }
         }
 
-        flavorDimensions += "vendor"
-        productFlavors {
-            create("oss")
-            create("fdroid")
-            create("play")
-            create("preview") {
-                buildConfigField(
-                    "String",
-                    "PRE_VERSION_NAME",
-                    "\"${requireMetadata().getProperty("PRE_VERSION_NAME")}\""
-                )
-            }
-        }
-
         applicationVariants.all {
             outputs.all {
                 this as BaseVariantOutputImpl
-                outputFileName = outputFileName.replace(".apk", "-arm64-v8a.apk")
-                val isPreview = outputFileName.contains("-preview")
-                outputFileName = if (isPreview) {
-                    outputFileName.replace(
-                        project.name,
-                        "NekoBox-" + requireMetadata().getProperty("PRE_VERSION_NAME")
-                    ).replace("-preview", "")
-                } else {
-                    outputFileName.replace(project.name, "NekoBox-$versionName")
-                        .replace("-release", "")
-                        .replace("-oss", "")
-                }
+                val debugSuffix = if (buildType.name == "debug") "-debug" else ""
+                val unsignedSuffix = if (outputFileName.contains("unsigned")) "-unsigned" else ""
+                outputFileName = "Vialen-$versionName$debugSuffix-arm64-v8a$unsignedSuffix.apk"
             }
-        }
-
-        tasks.register("assembleArm64FdroidRelease") {
-            dependsOn("assembleFdroidRelease")
         }
 
         sourceSets.getByName("main").apply {

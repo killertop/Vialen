@@ -1,5 +1,7 @@
 package io.nekohasekai.sagernet
 
+import android.content.Intent
+import android.net.VpnService
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -7,31 +9,46 @@ import io.nekohasekai.sagernet.aidl.ISagerNetService
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.SagerConnection
 import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.database.ProxyGroup
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
-import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
+import io.nekohasekai.sagernet.ktx.onDefaultDispatcher
+import io.nekohasekai.sagernet.database.RuleEntity
+import io.nekohasekai.sagernet.database.preference.KeyValuePair
+import io.nekohasekai.sagernet.database.preference.PublicDatabase
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.fail
+import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.Proxy
+import java.util.UUID
+import org.json.JSONObject
 
 @RunWith(AndroidJUnit4::class)
 class RealDeviceVpnLifecycleTest {
+    @get:org.junit.Rule
+    val profileState = ProfileSelectionStateRule()
+
 
     private lateinit var profile1: ProxyEntity
     private lateinit var profile2: ProxyEntity
     private lateinit var connection: SagerConnection
-    private var ssHost = "192.168.0.52"
+    private var ssHost = ""
+    private var fixtureGroupId = 0L
+    private val runNonce = UUID.randomUUID().toString()
+    private var targetRuleId = 0L
+    private var savedSettings = emptyMap<String, KeyValuePair?>()
 
     @Volatile
     private var callbackState: BaseService.State = BaseService.State.Idle
@@ -75,28 +92,12 @@ class RealDeviceVpnLifecycleTest {
                 null
             }
 
-            val dsState = DataStore.serviceState
-            val cbState = callbackState
-
             if (binderState == expected) {
-                lastState = binderState
-                lastSource = "ISagerNetService.getState()"
                 val elapsed = System.currentTimeMillis() - start
-                return StateObservation(stage, expected, lastState, lastSource, elapsed)
-            } else if (cbState == expected) {
-                lastState = cbState
-                lastSource = "SagerConnection.Callback.stateChanged"
-                val elapsed = System.currentTimeMillis() - start
-                return StateObservation(stage, expected, lastState, lastSource, elapsed)
-            } else if (dsState == expected) {
-                lastState = dsState
-                lastSource = "DataStore.serviceState"
-                val elapsed = System.currentTimeMillis() - start
-                return StateObservation(stage, expected, lastState, lastSource, elapsed)
+                return StateObservation(stage, expected, binderState, "ISagerNetService.getState()", elapsed)
             }
-
-            lastState = binderState ?: cbState
-            lastSource = if (binderState != null) "ISagerNetService.getState()" else "SagerConnection.Callback"
+            lastState = binderState ?: BaseService.State.Idle
+            lastSource = "binder=$binderState callback=$callbackState datastore=${DataStore.serviceState}"
             delay(100)
         }
 
@@ -118,6 +119,14 @@ class RealDeviceVpnLifecycleTest {
         runBlocking {
             val app = ApplicationProvider.getApplicationContext<SagerNet>()
             SagerNet.application = app
+            // Fail before owning a connection or changing fixture/settings state.
+            assertTrue("Supply ss_host for the controlled dual-SS/HTTP fixture", ssHost.isNotBlank())
+            assertNull("Grant VPN consent before the positive lifecycle test", VpnService.prepare(app))
+            check(!DataStore.serviceState.started) { "Refusing to interrupt an existing VPN" }
+
+            val settingKeys = listOf(Key.SERVICE_MODE, Key.DIRECT_DNS, Key.REMOTE_DNS,
+                Key.BYPASS_LAN, Key.BYPASS_LAN_IN_CORE, Key.PROXY_APPS, Key.ENABLE_FAKEDNS, Key.APPEND_HTTP_PROXY)
+            savedSettings = settingKeys.associateWith { key -> PublicDatabase.kvPairDao[key] }
 
             val ssBean1 = ShadowsocksBean().applyDefaultValues().apply {
                 name = "PhaseB-Deterministic-SS1"
@@ -127,8 +136,6 @@ class RealDeviceVpnLifecycleTest {
                 password = "phase-b-test-password"
             }
             profile1 = ProxyEntity().apply {
-                id = 9901L
-                groupId = 0L
                 type = 2 // TYPE_SS
                 putBean(ssBean1)
             }
@@ -141,22 +148,35 @@ class RealDeviceVpnLifecycleTest {
                 password = "phase-b-test-password-2"
             }
             profile2 = ProxyEntity().apply {
-                id = 9902L
-                groupId = 0L
                 type = 2 // TYPE_SS
                 putBean(ssBean2)
             }
 
-            runOnDefaultDispatcher {
-                SagerDatabase.proxyDao.deleteById(profile1.id)
-                SagerDatabase.proxyDao.deleteById(profile2.id)
-                SagerDatabase.proxyDao.addProxy(profile1)
-                SagerDatabase.proxyDao.addProxy(profile2)
+            onDefaultDispatcher {
+                SagerDatabase.instance.runInTransaction {
+                    fixtureGroupId = SagerDatabase.instance.groupDao().createGroup(
+                        ProxyGroup(name = "lifecycle-$runNonce"))
+                    profile1.groupId = fixtureGroupId
+                    profile2.groupId = fixtureGroupId
+                    profile1.id = SagerDatabase.proxyDao.addProxy(profile1)
+                    profile2.id = SagerDatabase.proxyDao.addProxy(profile2)
+                    targetRuleId = SagerDatabase.rulesDao.createRule(RuleEntity(
+                        name = "ss-route-$runNonce", userOrder = Long.MIN_VALUE, enabled = true,
+                        ip = "198.18.0.254/32", outbound = 0))
+                }
             }
 
             DataStore.serviceMode = Key.MODE_VPN
             DataStore.directDns = "local"
             DataStore.remoteDns = "local"
+            DataStore.bypassLan = false
+            DataStore.bypassLanInCore = false
+            DataStore.proxyApps = false
+            DataStore.enableFakeDns = false
+            DataStore.appendHttpProxy = false
+
+            app.startActivity(app.packageManager.getLaunchIntentForPackage(app.packageName)!!
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 
             connection = SagerConnection(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND)
             connection.connect(app, callback)
@@ -166,43 +186,70 @@ class RealDeviceVpnLifecycleTest {
     @After
     fun tearDown() {
         runBlocking {
-            try {
-                SagerNet.stopService()
-            } catch (_: Exception) {}
-            try {
-                val app = ApplicationProvider.getApplicationContext<SagerNet>()
-                connection.disconnect(app)
-            } catch (_: Exception) {}
-            runOnDefaultDispatcher {
-                SagerDatabase.proxyDao.deleteById(profile1.id)
-                SagerDatabase.proxyDao.deleteById(profile2.id)
-            }
+            profileState.cleanupSteps({
+                if (::connection.isInitialized) profileState.stopAndAwait(connection)
+            }, {
+                if (::connection.isInitialized) connection.disconnect(ApplicationProvider.getApplicationContext<SagerNet>())
+            }, {
+                onDefaultDispatcher {
+                    SagerDatabase.instance.runInTransaction {
+                        if (::profile1.isInitialized && profile1.id != 0L) SagerDatabase.proxyDao.deleteById(profile1.id)
+                        if (::profile2.isInitialized && profile2.id != 0L) SagerDatabase.proxyDao.deleteById(profile2.id)
+                        if (targetRuleId != 0L) SagerDatabase.rulesDao.deleteById(targetRuleId)
+                        if (fixtureGroupId != 0L) SagerDatabase.instance.groupDao().deleteById(fixtureGroupId)
+                    }
+                    if (::profile1.isInitialized && profile1.id != 0L) check(SagerDatabase.proxyDao.getById(profile1.id) == null)
+                    if (::profile2.isInitialized && profile2.id != 0L) check(SagerDatabase.proxyDao.getById(profile2.id) == null)
+                    if (targetRuleId != 0L) check(SagerDatabase.rulesDao.getById(targetRuleId) == null)
+                    if (fixtureGroupId != 0L) check(SagerDatabase.instance.groupDao().getById(fixtureGroupId) == null)
+                }
+                println("SS_ROUTE_CLEANUP temporary_profiles_and_rule_absent=true owned_group_absent=true")
+            }, {
+                PublicDatabase.instance.runInTransaction {
+                    savedSettings.forEach { (key, row) ->
+                        if (row == null) PublicDatabase.kvPairDao.delete(key) else PublicDatabase.kvPairDao.put(row)
+                    }
+                }
+                savedSettings.forEach { (key, expected) ->
+                    val actual = PublicDatabase.kvPairDao[key]
+                    check(if (expected == null) actual == null else actual != null &&
+                        actual.valueType == expected.valueType && actual.value.contentEquals(expected.value)) {
+                        "Lifecycle setting not restored: $key"
+                    }
+                }
+                println("SS_ROUTE_CLEANUP changed_settings_restored=true")
+            })
         }
     }
 
-    private fun testHttpTraffic(maxRetries: Int = 4): String {
-        var lastError: Exception? = null
-        for (i in 0..maxRetries) {
-            try {
-                val url = URL("http://$ssHost:8899/fixture")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.connectTimeout = 3000
-                conn.readTimeout = 3000
-                conn.requestMethod = "GET"
-                conn.instanceFollowRedirects = false
-
-                val code = conn.responseCode
-                if (code == 200) {
-                    val response = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText().trim() }
-                    conn.disconnect()
-                    return response
-                }
-            } catch (e: Exception) {
-                lastError = e
-                Thread.sleep(250)
-            }
+    private fun testHttpTraffic(stage: String): JSONObject {
+        val nonce = "$runNonce-$stage"
+        val conn = URL("http://198.18.0.254/probe?nonce=$nonce&stage=$stage")
+            .openConnection(Proxy.NO_PROXY) as HttpURLConnection
+        return try {
+            conn.connectTimeout = 3000
+            conn.readTimeout = 3000
+            conn.requestMethod = "GET"
+            conn.useCaches = false
+            conn.instanceFollowRedirects = false
+            conn.setRequestProperty("Cache-Control", "no-store")
+            conn.setRequestProperty("Connection", "close")
+            assertEquals("Probe HTTP status", 200, conn.responseCode)
+            JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+        } finally {
+            conn.disconnect()
         }
-        throw lastError ?: RuntimeException("HTTP traffic failed after retries")
+    }
+
+    private fun assertProbe(response: JSONObject, stage: String, expectedIdentity: String, expectedPort: Int) {
+        assertEquals("Probe nonce", "$runNonce-$stage", response.getString("nonce"))
+        assertEquals("Probe stage", stage, response.getString("stage"))
+        assertEquals("Observed ingress identity", expectedIdentity, response.getString("identity"))
+        assertEquals("Observed ingress port", expectedPort, response.getInt("port"))
+        val counts = response.getJSONObject("counts")
+        assertEquals("SS1 nonce count", if (expectedIdentity == "ss1") 1 else 0, counts.getInt("ss1"))
+        assertEquals("SS2 nonce count", if (expectedIdentity == "ss2") 1 else 0, counts.getInt("ss2"))
+        println("SS_ROUTE_PROBE stage=$stage nonce=${response.getString("nonce")} identity=${response.getString("identity")} port=${response.getInt("port")} ss1=${counts.getInt("ss1")} ss2=${counts.getInt("ss2")} PASS")
     }
 
     @Test
@@ -222,9 +269,10 @@ class RealDeviceVpnLifecycleTest {
             println("FIRST_CONNECT: expected=${c1.expected} actual=${c1.actualState} source=${c1.source} elapsed=${c1.elapsedMs}ms PASS")
 
             // 1b. FIRST TRAFFIC (Independent assertion on SS1 :8388)
-            val body1 = testHttpTraffic()
-            assertEquals("VIALEN_PHASE_B_OK", body1)
-            println("FIRST_TRAFFIC: target=http://$ssHost:8899/fixture inbound=8388 body=$body1 PASS")
+            val body1 = testHttpTraffic("first")
+            assertThrows(AssertionError::class.java) { assertProbe(body1, "first", "ss2", 8390) }
+            println("SS_ROUTE_NEGATIVE_ORACLE actual=ss1 expected=ss2 rejected=true")
+            assertProbe(body1, "first", "ss1", 8388)
 
             // 2. FIRST STOP
             callbackState = BaseService.State.Stopping
@@ -249,9 +297,8 @@ class RealDeviceVpnLifecycleTest {
             println("RECONNECT: expected=${c2.expected} actual=${c2.actualState} source=${c2.source} elapsed=${c2.elapsedMs}ms PASS")
 
             // 3b. RECONNECT TRAFFIC (Independent assertion on SS1 :8388)
-            val body2 = testHttpTraffic()
-            assertEquals("VIALEN_PHASE_B_OK", body2)
-            println("RECONNECT_TRAFFIC: target=http://$ssHost:8899/fixture inbound=8388 body=$body2 PASS")
+            val body2 = testHttpTraffic("reconnect")
+            assertProbe(body2, "reconnect", "ss1", 8388)
 
             // 4. SECOND STOP
             callbackState = BaseService.State.Stopping
@@ -277,9 +324,8 @@ class RealDeviceVpnLifecycleTest {
             println("PROFILE2_CONNECT: expected=${c3.expected} actual=${c3.actualState} source=${c3.source} elapsed=${c3.elapsedMs}ms PASS")
 
             // 5b. PROFILE2 TRAFFIC (Independent assertion on SS2 :8390)
-            val body3 = testHttpTraffic()
-            assertEquals("VIALEN_PHASE_B_OK", body3)
-            println("PROFILE2_TRAFFIC: target=http://$ssHost:8899/fixture inbound=8390 body=$body3 PASS")
+            val body3 = testHttpTraffic("switch")
+            assertProbe(body3, "switch", "ss2", 8390)
 
             // 6. FINAL STOP
             callbackState = BaseService.State.Stopping

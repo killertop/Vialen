@@ -1,101 +1,30 @@
-# NekoBox for Android
+# Vialen for Android
 
-[![API](https://img.shields.io/badge/API-21%2B-brightgreen.svg?style=flat)](https://android-arsenal.com/api?level=21)
-[![Releases](https://img.shields.io/github/v/release/MatsuriDayo/NekoBoxForAndroid)](https://github.com/MatsuriDayo/NekoBoxForAndroid/releases)
-[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-orange.svg)](https://www.gnu.org/licenses/gpl-3.0)
+Vialen 是基于 NekoBox for Android 的 Android 代理客户端，使用 sing-box 内核，并包含本项目的 Rust 组件。
 
-sing-box / universal proxy toolchain for Android.
+安装包标识为 `com.vialen.app`，Debug 构建为 `com.vialen.app.debug`。当前分支仅构建和支持 `arm64-v8a`（Android ARM64），APK、AAB、Go 内核和 Rust JNI 均使用这一架构。
 
-一款使用 sing-box 的 Android 通用代理软件.
+## 构建与发布
 
-## 下载 / Downloads
+应用仅保留英文和中文（简体、繁体），发布构建不再区分 OSS、F-Droid、Play 或 Preview 渠道。在 Android SDK/NDK、原生依赖及签名配置就绪后执行：
 
-[![GitHub All Releases](https://img.shields.io/github/downloads/Matsuridayo/NekoBoxForAndroid/total?label=downloads-total&logo=github&style=flat-square)](https://github.com/Matsuridayo/NekoBoxForAndroid/releases)
+```sh
+./gradlew :app:assembleRelease
+```
 
-[GitHub Releases 下载](https://github.com/Matsuridayo/NekoBoxForAndroid/releases)
+每次发布构建仅生成一个 ARM64 APK，位于 `app/build/outputs/apk/release/`，文件名为 `Vialen-<version>-arm64-v8a.apk`；未配置发布签名时文件名含 `-unsigned`。开发及测试仍使用 `:app:assembleDebug`、`:app:assembleDebugAndroidTest`、`:app:testDebugUnitTest` 和 `:app:connectedDebugAndroidTest`。
 
-**Google Play 版本自 2024 年 5 月起已被第三方控制，为非开源版本，请不要下载。**
+本仓库的本地构建和验证结果以对应的构建日志及验收记录为准。尚未在本次品牌统一中配置 Vialen 官方下载站点、发布仓库或社区入口；上游 NekoBox 的 Release 不作为 Vialen 更新来源。
 
-**The Google Play version has been controlled by a third party since May 2024 and is a non-open
-source version. Please do not download it.**
+## 订阅与兼容性
 
-## 更新日志 & Telegram 发布频道 / Changelog & Telegram Channel
+支持范围以当前实现与测试为准。订阅解析提取节点出站，订阅中的分流规则不自动作为应用规则导入。内部源码包名、JNI 导出符号与插件接口保留既有兼容标识；它们与 Android 安装包标识分别管理。
 
-https://t.me/Matsuridayo
+## 上游与许可
 
-## 项目主页 & 文档 / Homepage & Documents
+Vialen 基于 [NekoBox for Android](https://github.com/MatsuriDayo/NekoBoxForAndroid) 开发。保留仓库的 LICENSE、源码版权声明及第三方许可；上游链接用于来源追溯，不代表 Vialen 官方下载或服务入口。
 
-https://matsuridayo.github.io
-
-## 支持的代理协议 / Supported Proxy Protocols
-
-* SOCKS (4/4a/5)
-* HTTP(S)
-* SSH
-* Shadowsocks
-* VMess
-* Trojan
-* VLESS
-* AnyTLS
-* ShadowTLS
-* TUIC
-* Hysteria 1/2
-* WireGuard
-* Trojan-Go (trojan-go-plugin)
-* NaïveProxy (naive-plugin)
-* Mieru (mieru-plugin)
-
-请到[这里](https://matsuridayo.github.io/nb4a-plugin/)下载插件以获得完整的代理支持.
-
-Please visit [here](https://matsuridayo.github.io/nb4a-plugin/) to download plugins for full proxy
-supports.
-
-## 支持的订阅格式 / Supported Subscription Format
-
-* 一些广泛使用的格式 (如 Shadowsocks, ClashMeta 和 v2rayN)
-* sing-box 出站
-
-仅支持解析出站，即节点。分流规则等信息会被忽略。
-
-* Some widely used formats (like Shadowsocks, ClashMeta and v2rayN)
-* sing-box outbound
-
-Only resolving outbound, i.e. nodes, is supported. Information such as diversion rules are ignored.
-
-## 捐助 / Donate
-
-<details>
-
-如果这个项目对您有帮助, 可以通过捐赠的方式帮助我们维持这个项目.
-
-捐赠满等额 50 USD 可以在「[捐赠榜](https://mtrdnt.pages.dev/donation_list)」显示头像, 如果您未被添加到这里,
-欢迎联系我们补充.
-
-Donations of 50 USD or more can display your avatar on
-the [Donation List](https://mtrdnt.pages.dev/donation_list). If you are not added here, please
-contact us to add it.
-
-USDT TRC20
-
-`TRhnA7SXE5Sap5gSG3ijxRmdYFiD4KRhPs`
-
-XMR
-
-`49bwESYQjoRL3xmvTcjZKHEKaiGywjLYVQJMUv79bXonGiyDCs8AzE3KiGW2ytTybBCpWJUvov8SjZZEGg66a4e59GXa6k5`
-
-</details>
-
-## Credits
-
-Core:
-
-- [SagerNet/sing-box](https://github.com/SagerNet/sing-box)
-
-Android GUI:
-
-- [shadowsocks/shadowsocks-android](https://github.com/shadowsocks/shadowsocks-android)
-- [SagerNet/SagerNet](https://github.com/SagerNet/SagerNet)
-
-Web Dashboard:
-
-- [Yacd-meta](https://github.com/MetaCubeX/Yacd-meta)
+- 内核：[SagerNet/sing-box](https://github.com/SagerNet/sing-box)
+- Android GUI 来源：[SagerNet/SagerNet](https://github.com/SagerNet/SagerNet)、[shadowsocks/shadowsocks-android](https://github.com/shadowsocks/shadowsocks-android)
+- Web Dashboard 来源：[Yacd-meta](https://github.com/MetaCubeX/Yacd-meta)
+- 上游插件参考：[NekoBox 插件文档](https://matsuridayo.github.io/nb4a-plugin/)

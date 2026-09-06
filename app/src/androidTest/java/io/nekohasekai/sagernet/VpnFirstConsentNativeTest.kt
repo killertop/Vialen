@@ -20,6 +20,9 @@ import org.junit.runner.RunWith
 /** Actual system consent activity and existing ActivityResult contract, not appops auto-approval. */
 @RunWith(AndroidJUnit4::class)
 class VpnFirstConsentNativeTest {
+    @get:org.junit.Rule
+    val profileState = ProfileSelectionStateRule()
+
     @Test fun firstSystemApprovalResumesOnceAndConnects() = runBlocking {
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val app=instrumentation.targetContext.applicationContext as SagerNet
@@ -35,7 +38,7 @@ class VpnFirstConsentNativeTest {
         val group=ProxyGroup(name="first-consent-${System.nanoTime()}")
         group.id=db.groupDao().createGroup(group)
         val connection=SagerConnection(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND)
-        try {
+        profileState.preservingFailure({
             VpnConsentTestUi.assertClean()
             val node=ProxyEntity(groupId=group.id).apply {
                 putBean(SOCKSBean().applyDefaultValues().apply {name="consent";serverAddress="127.0.0.1";serverPort=1080})
@@ -70,17 +73,20 @@ class VpnFirstConsentNativeTest {
             assertTrue("Exactly one start request on this fresh bound service",state.contains("lastStartId=1"))
             assertFalse(state.contains("lastStartId=2"))
             println("FIRST_CONSENT granted_by_system_ui=true lastStartId=1 connected=true")
-        } finally {
-            VpnConsentTestUi.cleanup()
-            SagerNet.stopService()
-            val stopLimit=System.nanoTime()+5_000_000_000L
-            while(connection.service?.state!=BaseService.State.Stopped.ordinal && System.nanoTime()<stopLimit)delay(50)
-            connection.disconnect(app)
-            DataStore.serviceMode=oldMode;DataStore.selectedProxy=oldProxy
-            DataStore.directDns=oldDirect;DataStore.remoteDns=oldRemote
-            shell("cmd appops set ${app.packageName} ACTIVATE_VPN $oldOp")
-            db.runInTransaction { db.proxyDao().deleteByGroup(group.id);db.groupDao().deleteById(group.id) }
-        }
+        }, {
+            profileState.cleanupSteps({
+                VpnConsentTestUi.cleanup()
+            }, {
+                profileState.stopAndAwait(connection)
+            }, {
+                connection.disconnect(app)
+            }, {
+                DataStore.serviceMode=oldMode;DataStore.selectedProxy=oldProxy
+                DataStore.directDns=oldDirect;DataStore.remoteDns=oldRemote
+                shell("cmd appops set ${app.packageName} ACTIVATE_VPN $oldOp")
+                db.runInTransaction { db.proxyDao().deleteByGroup(group.id);db.groupDao().deleteById(group.id) }
+            })
+        })
         assertNull(db.groupDao().getById(group.id))
     }
 }

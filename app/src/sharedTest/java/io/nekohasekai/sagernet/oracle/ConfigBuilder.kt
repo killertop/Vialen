@@ -591,7 +591,6 @@ fun buildLegacyConfig(
                 this.http_clients = mutableListOf(
                     SingBoxOptions.HTTPClient().apply {
                         tag = "default-http-client"
-                        detour = TAG_DIRECT
                     }
                 )
                 route.default_http_client = "default-http-client"
@@ -633,7 +632,7 @@ fun buildLegacyConfig(
         }
 
         dns.servers.add(
-            SingBoxOptionsUtil.parseTypedDnsServer("local", "dns-local", detour = TAG_DIRECT)
+            SingBoxOptionsUtil.parseTypedDnsServer("local", "dns-local")
         )
 
         directDNS.firstOrNull().let {
@@ -642,8 +641,7 @@ fun buildLegacyConfig(
                 SingBoxOptionsUtil.parseTypedDnsServer(
                     s,
                     "dns-direct",
-                    domainResolver = "dns-local",
-                    detour = TAG_DIRECT
+                    domainResolver = "dns-local"
                 )
             )
         }

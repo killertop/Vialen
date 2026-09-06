@@ -290,9 +290,9 @@ fun Context.getColorAttr(@AttrRes resId: Int): Int {
 }
 
 val isExpert: Boolean by lazy { BuildConfig.DEBUG || DataStore.isExpert }
-const val isOss = BuildConfig.FLAVOR == "oss"
-const val isPlay = BuildConfig.FLAVOR == "play"
-const val isPreview = BuildConfig.FLAVOR == "preview"
+const val isOss = true
+const val isPlay = false
+const val isPreview = false
 
 fun <T> Continuation<T>.tryResume(value: T) {
     try {

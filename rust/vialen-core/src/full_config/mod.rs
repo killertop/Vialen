@@ -451,13 +451,15 @@ fn build(req: Request) -> Result<Value, &'static str> {
             b.direct_domains.push(format!("full:{host}"));
         }
     }
+    // An omitted detour uses the core direct dialer; an empty direct outbound
+    // is not a valid detour in current sing-box. User overlays are merged below.
     let mut servers = vec![
-        dns::server("local", "dns-local", None, Some("direct")),
+        dns::server("local", "dns-local", None, None),
         dns::server(
             direct.first().ok_or("NO_DIRECT_DNS")?,
             "dns-direct",
             Some("dns-local"),
-            Some("direct"),
+            None,
         ),
     ];
     if !req.for_test {
@@ -531,7 +533,7 @@ fn build(req: Request) -> Result<Value, &'static str> {
     let mut config = json!({"log":{"level":match s.log_level{0=>"panic",1=>"warn",3=>"debug",4=>"trace",_=>"info"}},"dns":dns_options,"inbounds":inbounds,"outbounds":outbounds,"endpoints":endpoints});
     if !rule_sets.is_empty() {
         route["default_http_client"] = json!("default-http-client");
-        config["http_clients"] = json!([{"tag":"default-http-client","detour":"direct"}]);
+        config["http_clients"] = json!([{"tag":"default-http-client"}]);
     }
     config["route"] = route;
     if !req.for_test && s.clash_api {
@@ -754,7 +756,54 @@ mod tests {
         assert_eq!(rules[pos + 1]["rules"][1]["match_response"], true);
         assert_eq!(rules[pos + 1]["server"], "dns-direct");
         assert_eq!(config["route"]["rule_set"][0]["tag"], "geoip-cn");
-        assert_eq!(config["http_clients"][0]["detour"], "direct");
+        assert_eq!(config["http_clients"], json!([{"tag":"default-http-client"}]));
+    }
+    #[test]
+    fn generated_direct_dns_uses_default_dialer_for_all_transports() {
+        for (address, kind) in [
+            ("local", "local"), ("1.1.1.1", "udp"),
+            ("udp://1.1.1.1", "udp"), ("tcp://1.1.1.1", "tcp"),
+            ("tls://dns.example", "tls"), ("quic://dns.example", "quic"),
+            ("https://223.5.5.5/dns-query", "https"),
+            ("https://dns.example/dns-query", "https"), ("h3://dns.example", "h3"),
+        ] {
+            for for_test in [false, true] {
+                let mut v = request();
+                v["for_test"] = json!(for_test);
+                v["settings"]["direct_dns"] = json!(address);
+                let output = run(&v);
+                assert_eq!(output["status"], "SUCCESS");
+                let config: Value = serde_json::from_str(output["config"].as_str().unwrap()).unwrap();
+                let servers = config["dns"]["servers"].as_array().unwrap();
+                assert_eq!(servers.len(), if for_test { 2 } else { 3 });
+                assert_eq!(servers[0], json!({"tag":"dns-local","type":"local"}));
+                assert_eq!(servers[1]["type"], kind);
+                assert!(servers[1].get("detour").is_none(), "{address}: {}", servers[1]);
+                if kind != "local" {
+                    assert_eq!(servers[1]["domain_resolver"], "dns-local");
+                }
+                if !for_test {
+                    assert_eq!(servers[2], json!({"tag":"dns-remote","type":"https","server":"dns.example","domain_resolver":"dns-direct"}));
+                }
+            }
+        }
+    }
+    #[test]
+    fn custom_dns_and_http_client_detours_survive_final_merge() {
+        let mut v = request();
+        let custom = json!({
+            "dns":{"servers":[{"tag":"custom-dns","type":"https","server":"1.1.1.1","detour":"proxy"}],"final":"custom-dns"},
+            "http_clients":[{"tag":"custom-http","detour":"direct"}]
+        });
+        for profile_level in [false, true] {
+            v["settings"]["custom"] = if profile_level { Value::Null } else { custom.clone() };
+            v["profiles"][0]["custom_config"] = if profile_level { custom.clone() } else { Value::Null };
+            let output = run(&v);
+            assert_eq!(output["status"], "SUCCESS");
+            let config: Value = serde_json::from_str(output["config"].as_str().unwrap()).unwrap();
+            assert_eq!(config["dns"]["servers"], custom["dns"]["servers"]);
+            assert_eq!(config["http_clients"], custom["http_clients"]);
+        }
     }
     #[test]
     fn missing_outbound_warns_only_for_nonempty_route_rule() {

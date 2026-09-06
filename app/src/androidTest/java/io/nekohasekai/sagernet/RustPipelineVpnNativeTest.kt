@@ -21,6 +21,9 @@ import java.net.URL
 /** Requires pre-granted VPN consent. Uses only local synthetic endpoints. */
 @RunWith(AndroidJUnit4::class)
 class RustPipelineVpnNativeTest {
+    @get:org.junit.Rule
+    val profileState = ProfileSelectionStateRule()
+
     @Test fun importedRustProfilesCarryTunTrafficAcrossReconnectAndSwitch() = runBlocking {
         val app = ApplicationProvider.getApplicationContext<SagerNet>()
         assertNull("Grant VPN consent before this explicit lifecycle test", VpnService.prepare(app))
@@ -41,7 +44,7 @@ class RustPipelineVpnNativeTest {
             error("VPN state did not reach $expected; binder=${connection.service?.state}")
         }
         val nonce = "rust-${System.nanoTime()}"
-        try {
+        profileState.preservingFailure({
             DataStore.serviceMode = Key.MODE_VPN
             DataStore.directDns = "local"; DataStore.remoteDns = "local"
             DataStore.bypassLan = false; DataStore.bypassLanInCore = false
@@ -78,19 +81,22 @@ class RustPipelineVpnNativeTest {
                     println("RUST_VPN_E2E stage=$stage binder_connected=true tun_payload=true binder_stopped=true")
                 }
             } }
-        } finally {
-            SagerNet.stopService()
-            if (connection.service != null) runCatching { awaitState(BaseService.State.Stopped) }
-            connection.disconnect(app)
-            DataStore.serviceMode = oldMode; DataStore.selectedProxy = oldProxy
-            DataStore.directDns = oldDirect; DataStore.remoteDns = oldRemote
-            DataStore.bypassLan = oldBypass; DataStore.bypassLanInCore = oldCoreBypass
-            DataStore.proxyApps = oldApps; DataStore.enableFakeDns = oldFake; DataStore.appendHttpProxy = oldHttp
-            db.runInTransaction {
-                if (ruleId != 0L) db.rulesDao().deleteById(ruleId)
-                if (groupId != 0L) { db.proxyDao().deleteByGroup(groupId); db.groupDao().deleteById(groupId) }
-            }
-        }
+        }, {
+            profileState.cleanupSteps({
+                profileState.stopAndAwait(connection)
+            }, {
+                connection.disconnect(app)
+            }, {
+                DataStore.serviceMode = oldMode; DataStore.selectedProxy = oldProxy
+                DataStore.directDns = oldDirect; DataStore.remoteDns = oldRemote
+                DataStore.bypassLan = oldBypass; DataStore.bypassLanInCore = oldCoreBypass
+                DataStore.proxyApps = oldApps; DataStore.enableFakeDns = oldFake; DataStore.appendHttpProxy = oldHttp
+                db.runInTransaction {
+                    if (ruleId != 0L) db.rulesDao().deleteById(ruleId)
+                    if (groupId != 0L) { db.proxyDao().deleteByGroup(groupId); db.groupDao().deleteById(groupId) }
+                }
+            })
+        })
         assertNull(db.groupDao().getById(groupId))
         assertNull(db.rulesDao().getById(ruleId))
         assertEquals(oldMode, DataStore.serviceMode)
