@@ -61,24 +61,21 @@ tasks.withType<Test>().configureEach {
         "java.library.path",
         "${rootProject.file("rust/vialen-core/target/release")}:${rootProject.file("rust/vialen-core/target/debug")}"
     )
-    doFirst {
-        listOf(
-            "ossDebug", "ossRelease",
-            "fdroidDebug", "fdroidRelease",
-            "playDebug", "playRelease",
-            "previewDebug", "previewRelease"
-        ).forEach { variant ->
-            copy {
-                from("$projectDir/schemas")
-                into("${project.buildDir}/intermediates/assets/$variant/merge${variant.replaceFirstChar { it.uppercase() }}Assets")
-            }
-            copy {
-                from("$projectDir/schemas")
-                into("${project.buildDir}/intermediates/assets/test/$variant/merge${variant.replaceFirstChar { it.uppercase() }}TestAssets")
-            }
-            copy {
-                from("$projectDir/schemas")
-                into("${project.buildDir}/intermediates/javaResources/test${variant.replaceFirstChar { it.uppercase() }}UnitTest")
+}
+
+// Robolectric's binary AssetManager reads the local-test resource APK. Copying
+// schemas into merge-assets directories at Test.doFirst is too late to reach it.
+// Add fixtures only to local-test packages, never production APKs/AABs.
+tasks.configureEach {
+    if (name.startsWith("package") && name.endsWith("UnitTestForUnitTest")) {
+        inputs.dir(file("schemas"))
+        doLast {
+            outputs.files.asFileTree.matching { include("**/apk-for-local-test.ap_") }.forEach { archive ->
+                ant.withGroovyBuilder {
+                    "zip"("destfile" to archive, "update" to true) {
+                        "zipfileset"("dir" to file("schemas"), "prefix" to "assets")
+                    }
+                }
             }
         }
     }
@@ -105,7 +102,7 @@ android.sourceSets.getByName("main").jniLibs.srcDir(rustJniLibsDir)
 
 val buildRustAndroid by tasks.registering(Exec::class) {
     group = "build"
-    description = "Build the Phase E1 Rust JNI POC for all supported Android ABIs"
+    description = "Build the Rust JNI library for arm64-v8a"
     val rustRoot = rootProject.file("rust/vialen-core")
     val buildScript = rootProject.file("scripts/build-rust-android.sh")
     inputs.file(rootProject.file("rust-toolchain.toml"))

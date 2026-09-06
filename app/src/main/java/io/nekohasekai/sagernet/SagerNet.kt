@@ -24,6 +24,7 @@ import io.nekohasekai.sagernet.ktx.isOss
 import io.nekohasekai.sagernet.ktx.isPreview
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import io.nekohasekai.sagernet.ui.MainActivity
+import io.nekohasekai.sagernet.ui.VpnRequestActivity
 import io.nekohasekai.sagernet.utils.*
 import kotlinx.coroutines.DEBUG_PROPERTY_NAME
 import kotlinx.coroutines.DEBUG_PROPERTY_VALUE_ON
@@ -190,9 +191,22 @@ class SagerNet : Application(),
             }
         }
 
-        fun startService() = ContextCompat.startForegroundService(
-            application, Intent(application, SagerConnection.serviceClass)
-        )
+        fun startService() {
+            // Consent UI can remain open indefinitely. Do not start the
+            // foreground-service deadline until Android has granted VPN access.
+            if (DataStore.serviceMode == Key.MODE_VPN &&
+                android.net.VpnService.prepare(application) != null
+            ) {
+                application.startActivity(
+                    Intent(application, VpnRequestActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+                return
+            }
+            ContextCompat.startForegroundService(
+                application, Intent(application, SagerConnection.serviceClass)
+            )
+        }
 
         fun reloadService() =
             application.sendBroadcast(Intent(Action.RELOAD).setPackage(application.packageName))

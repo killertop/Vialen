@@ -146,6 +146,7 @@ fun Project.setupApp() {
     val verCode = (requireMetadata().getProperty("VERSION_CODE").toInt()) * 5
     android.apply {
         defaultConfig {
+            ndk.abiFilters += "arm64-v8a"
             applicationId = pkgName
             versionCode = verCode
             versionName = verName
@@ -170,16 +171,6 @@ fun Project.setupApp() {
             }
         }
 
-        splits.abi {
-            reset()
-            isEnable = true
-            isUniversalApk = false
-            include("armeabi-v7a")
-            include("arm64-v8a")
-            include("x86")
-            include("x86_64")
-        }
-
         flavorDimensions += "vendor"
         productFlavors {
             create("oss")
@@ -197,6 +188,7 @@ fun Project.setupApp() {
         applicationVariants.all {
             outputs.all {
                 this as BaseVariantOutputImpl
+                outputFileName = outputFileName.replace(".apk", "-arm64-v8a.apk")
                 val isPreview = outputFileName.contains("-preview")
                 outputFileName = if (isPreview) {
                     outputFileName.replace(
@@ -211,10 +203,8 @@ fun Project.setupApp() {
             }
         }
 
-        for (abi in listOf("Arm64", "Arm", "X64", "X86")) {
-            tasks.create("assemble" + abi + "FdroidRelease") {
-                dependsOn("assembleFdroidRelease")
-            }
+        tasks.register("assembleArm64FdroidRelease") {
+            dependsOn("assembleFdroidRelease")
         }
 
         sourceSets.getByName("main").apply {

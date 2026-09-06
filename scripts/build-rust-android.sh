@@ -27,39 +27,26 @@ PREBUILT_DIR="$(find "$NDK_DIR/toolchains/llvm/prebuilt" -mindepth 1 -maxdepth 1
 BIN_DIR="$PREBUILT_DIR/bin"
 TARGET_DIR="$CRATE_DIR/target"
 
-declare -a ABIS=("arm64-v8a" "armeabi-v7a" "x86_64" "x86")
-declare -a TARGETS=("aarch64-linux-android" "armv7-linux-androideabi" "x86_64-linux-android" "i686-linux-android")
-declare -a LINKERS=(
-    "$BIN_DIR/aarch64-linux-android${API_LEVEL}-clang"
-    "$BIN_DIR/armv7a-linux-androideabi${API_LEVEL}-clang"
-    "$BIN_DIR/x86_64-linux-android${API_LEVEL}-clang"
-    "$BIN_DIR/i686-linux-android${API_LEVEL}-clang"
-)
+TARGET="aarch64-linux-android"
+LINKER="$BIN_DIR/${TARGET}${API_LEVEL}-clang"
+if [[ ! -x "$LINKER" ]]; then
+    echo "NDK linker not found: $LINKER" >&2
+    exit 1
+fi
 
+# Replace generated output so libraries from previous multi-ABI builds cannot remain.
 rm -rf "$OUT_DIR"
-mkdir -p "$OUT_DIR"
+mkdir -p "$OUT_DIR/arm64-v8a"
 
-for i in "${!ABIS[@]}"; do
-    abi="${ABIS[$i]}"
-    target="${TARGETS[$i]}"
-    linker="${LINKERS[$i]}"
-    if [[ ! -x "$linker" ]]; then
-        echo "NDK linker not found: $linker" >&2
-        exit 1
-    fi
+env \
+    CARGO_TARGET_DIR="$TARGET_DIR" \
+    RUSTC="$RUSTC_BIN" \
+    CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$LINKER" \
+    RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-z,max-page-size=16384" \
+    "$CARGO_BIN" build \
+        --manifest-path "$CRATE_DIR/Cargo.toml" \
+        --locked \
+        --release \
+        --target "$TARGET"
 
-    linker_env="CARGO_TARGET_$(echo "$target" | tr '[:lower:]-' '[:upper:]_')_LINKER"
-    env \
-        CARGO_TARGET_DIR="$TARGET_DIR" \
-        RUSTC="$RUSTC_BIN" \
-        "$linker_env=$linker" \
-        RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-z,max-page-size=16384" \
-        "$CARGO_BIN" build \
-            --manifest-path "$CRATE_DIR/Cargo.toml" \
-            --locked \
-            --release \
-            --target "$target"
-
-    mkdir -p "$OUT_DIR/$abi"
-    cp "$TARGET_DIR/$target/release/libvialen_core.so" "$OUT_DIR/$abi/libvialen_core.so"
-done
+cp "$TARGET_DIR/$TARGET/release/libvialen_core.so" "$OUT_DIR/arm64-v8a/libvialen_core.so"

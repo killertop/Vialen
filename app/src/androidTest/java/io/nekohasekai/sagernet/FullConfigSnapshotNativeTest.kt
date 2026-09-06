@@ -18,16 +18,6 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class FullConfigSnapshotNativeTest {
-    private fun semantic(value: JsonElement, key: String = ""): JsonElement {
-        if (value.isJsonObject) return JsonObject().apply { value.asJsonObject.entrySet().forEach { (k,v) -> add(k,semantic(v,k)) } }
-        if (value.isJsonArray) {
-            val children=value.asJsonArray.map { semantic(it) }
-            return JsonArray().apply {
-                (if (key in setOf("domain","domain_suffix","domain_keyword","domain_regex","user_id")) children.sortedBy { it.toString() } else children).forEach(::add)
-            }
-        }
-        return value
-    }
     @Test fun realRoomSnapshotMatchesLegacyAndRemainsFrozenAcrossWrites() {
         val db=SagerDatabase.instance
         val oldRemote=DataStore.remoteDns;val oldDirect=DataStore.directDns
@@ -53,7 +43,33 @@ class FullConfigSnapshotNativeTest {
                 val old=buildLegacyConfig(chain)
                 val snapshot=ConfigSnapshot.capture(chain,false,false)
                 val fresh=snapshot.generate().result
-                assertEquals(semantic(JsonParser.parseString(old.config)),semantic(JsonParser.parseString(fresh.config)))
+                val expected=JsonParser.parseString(old.config)
+                val actual=JsonParser.parseString(fresh.config)
+                if (selector) {
+                    // The frozen legacy oracle contains this known dangling chain edge.
+                    // Assert the exact defect and its replacement before full equality.
+                    val expectedOutbounds=expected.asJsonObject.getAsJsonArray("outbounds")
+                    val actualOutbounds=actual.asJsonObject.getAsJsonArray("outbounds")
+                    val dangling="g-${a.id}"
+                    assertFalse(expectedOutbounds.any { it.asJsonObject.get("tag")?.asString==dangling })
+                    val edges=expectedOutbounds.filter { it.asJsonObject.get("detour")?.asString==dangling }
+                    assertEquals(1,edges.size)
+                    val edge=edges.single().asJsonObject
+                    assertEquals("second-1",edge.get("tag").asString)
+                    assertEquals("socks",edge.get("type").asString)
+                    assertEquals("127.0.0.1",edge.get("server").asString)
+                    assertEquals(1081,edge.get("server_port").asInt)
+                    assertEquals("first",old.profileTagMap.getValue(a.id))
+                    assertEquals("second-1",old.profileTagMap.getValue(chain.id))
+                    val replacement="first"
+                    assertTrue(actualOutbounds.any { it.asJsonObject.get("tag")?.asString==replacement })
+                    assertEquals(replacement,actualOutbounds.single {
+                        it.asJsonObject.get("tag")==edge.get("tag")
+                    }.asJsonObject.get("detour").asString)
+                    edge.addProperty("detour",replacement)
+                }
+                // Only the old fixed-fixture edge above is amended. Rust JSON is never normalized.
+                assertEquals(expected,actual)
                 assertEquals(old.profileTagMap,fresh.profileTagMap)
         assertEquals(old.profileTagMap.keys.toList(),fresh.profileTagMap.keys.toList())
         assertEquals(old.trafficMap.keys.toList(),fresh.trafficMap.keys.toList())

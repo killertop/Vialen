@@ -245,7 +245,11 @@ impl Builder<'_> {
             }
             if is_global {
                 if let Some(existing) = self.global.get(node_id) {
-                    if index == 0 {
+                    // The global node may have been emitted as "proxy" or a
+                    // selector name, so the provisional g-id is not a valid tag.
+                    if let Some(prev) = previous {
+                        self.generated[prev].value["detour"] = json!(existing);
+                    } else {
                         chain_tag = existing.clone();
                     }
                     continue;
@@ -576,6 +580,114 @@ mod tests {
     }
     fn rule() -> Value {
         json!({"id":1,"domains":"","ip":"","port":"","source_port":"","network":"","source":"","protocol":"","outbound":999,"uids":[],"package_count":0,"custom":null})
+    }
+    // Validate the generated graph itself, independently of the Kotlin oracle.
+    fn assert_outbound_tag_integrity(config: &Value) {
+        let mut tags = HashSet::new();
+        for key in ["outbounds", "endpoints"] {
+            if let Some(nodes) = config[key].as_array() {
+                for node in nodes {
+                    let tag = node["tag"].as_str().expect("generated node tag");
+                    assert!(tags.insert(tag), "duplicate tag: {tag}");
+                }
+            }
+        }
+        fn visit(value: &Value, tags: &HashSet<&str>) {
+            match value {
+                Value::Object(object) => {
+                    if let Some(Value::String(tag)) = object.get("detour") {
+                        assert!(tags.contains(tag.as_str()), "dangling detour: {tag}");
+                    }
+                    if object.get("type").is_some_and(|v| v == "selector") {
+                        for tag in object["outbounds"].as_array().unwrap() {
+                            let tag = tag.as_str().unwrap();
+                            assert!(tags.contains(tag), "dangling selector option: {tag}");
+                        }
+                        if let Some(Value::String(tag)) = object.get("default") {
+                            assert!(
+                                tags.contains(tag.as_str()),
+                                "dangling selector default: {tag}"
+                            );
+                            assert!(
+                                object["outbounds"]
+                                    .as_array()
+                                    .unwrap()
+                                    .contains(&json!(tag))
+                            );
+                        }
+                    }
+                    for child in object.values() {
+                        visit(child, tags);
+                    }
+                }
+                Value::Array(values) => {
+                    for child in values {
+                        visit(child, tags);
+                    }
+                }
+                _ => {}
+            }
+        }
+        visit(config, &tags);
+    }
+    fn reused_global_request(selector: bool, reverse_order: bool) -> Value {
+        let mut v = request();
+        let mut second = v["profiles"][0].clone();
+        second["id"] = json!(2);
+        second["name"] = json!("two");
+        let mut chain = v["profiles"][0].clone();
+        chain["id"] = json!(3);
+        chain["name"] = json!("chain");
+        chain["chain"] = json!([1, 2]); // Builder traverses from node 2 to node 1.
+        chain["outbound"] = Value::Null;
+        v["profiles"]
+            .as_array_mut()
+            .unwrap()
+            .extend([second, chain]);
+        if selector {
+            v["groups"] = json!([{"id":1,"selector":true,"front":0,"landing":0}]);
+            v["selector_ids"] = if reverse_order {
+                json!([3, 1])
+            } else {
+                json!([1, 3])
+            };
+            v["selector_order"] = json!([1, 3]);
+        } else {
+            v["extra_ids"] = json!([3]);
+        }
+        v
+    }
+    #[test]
+    fn chain_reuses_selected_global_tag_without_dangling_detour() {
+        let output = run(&reused_global_request(false, false));
+        assert_eq!(output["status"], "SUCCESS");
+        let config: Value = serde_json::from_str(output["config"].as_str().unwrap()).unwrap();
+        eprintln!("TAG_REUSE_CONFIG nonselector={config}");
+        assert_outbound_tag_integrity(&config);
+        let hop = config["outbounds"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|v| v["tag"] == "c-3-2")
+            .unwrap();
+        assert_eq!(hop["detour"], "proxy");
+    }
+    #[test]
+    fn selector_chain_reuse_has_complete_tag_references_in_both_orders() {
+        for reverse_order in [false, true] {
+            let output = run(&reused_global_request(true, reverse_order));
+            assert_eq!(output["status"], "SUCCESS");
+            let config: Value = serde_json::from_str(output["config"].as_str().unwrap()).unwrap();
+            eprintln!("TAG_REUSE_CONFIG selector_reverse={reverse_order} config={config}");
+            assert_outbound_tag_integrity(&config);
+            let hop = config["outbounds"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|v| v["tag"] == "two")
+                .unwrap();
+            assert_eq!(hop["detour"], if reverse_order { "g-1" } else { "one" });
+        }
     }
     #[test]
     fn strict_snapshot_schema_and_graph_fail_closed() {
