@@ -215,16 +215,43 @@ class BaseService {
             else startService(Intent(this, javaClass))
         }
 
-        fun killProcesses() {
-            data.proxy?.close()
-            wakeLock?.apply {
-                release()
+        suspend fun killProcesses() {
+            var failure: Throwable? = null
+            fun retain(error: Throwable) {
+                val previous = failure
+                if (previous == null) failure = error
+                else if (previous !== error) {
+                    if (error is CancellationException && previous !is CancellationException) {
+                        error.addSuppressed(previous)
+                        failure = error
+                    } else previous.addSuppressed(error)
+                }
+            }
+            try {
+                data.proxy?.close()
+            } catch (error: Throwable) {
+                retain(error)
+            }
+            try {
+                wakeLock?.release()
+            } catch (error: Throwable) {
+                retain(error)
+            } finally {
                 wakeLock = null
             }
-            runOnDefaultDispatcher {
+            try {
                 DefaultNetworkListener.stop(this)
+            } catch (cancelled: CancellationException) {
+                retain(cancelled)
+            } catch (error: Exception) {
+                Logs.w("Network listener stop failed")
+                Logs.w(error)
+                failure?.let { if (it !== error) it.addSuppressed(error) }
             }
+            failure?.let { throw it }
         }
+
+        fun stopError(): String? = null
 
         fun stopRunner(restart: Boolean = false, msg: String? = null) {
             DataStore.baseService = null
@@ -251,9 +278,11 @@ class BaseService {
                 }
 
                 // change the state
-                data.changeState(State.Stopped, msg)
+                val stopIssue = stopError()
+                val finalMessage = listOfNotNull(msg, stopIssue).distinct().joinToString("\n").ifEmpty { null }
+                data.changeState(State.Stopped, finalMessage)
                 // stop the service if nothing has bound to it
-                if (restart) startRunner() else {
+                if (restart && stopIssue == null) startRunner() else {
                     stopSelf()
                 }
             }
@@ -278,7 +307,8 @@ class BaseService {
                     }
                     if (oldName != null && upstreamInterfaceName != null && oldName != upstreamInterfaceName) {
                         Logs.d("Network changed: $oldName -> $upstreamInterfaceName")
-                        if (DataStore.networkChangeResetConnections) {
+                        val resetConnections = DataStore.networkChangeResetConnections
+                        if (resetConnections) {
                             Libcore.resetAllConnections(true)
                         }
                     }
@@ -350,7 +380,8 @@ class BaseService {
             }
 
             data.changeState(State.Connecting)
-            runOnMainDispatcher {
+            // Publish the job before its first instruction so stopRunner can always join startup.
+            val connectingJob = GlobalScope.launch(Dispatchers.Main.immediate, start = CoroutineStart.LAZY) {
                 try {
                     data.notification = createNotification(ServiceNotification.genTitle(profile))
 
@@ -359,6 +390,7 @@ class BaseService {
                     DataStore.currentProfile = profile.id
 
                     startProcesses()
+                    currentCoroutineContext().ensureActive()
                     data.changeState(State.Connected)
 
                     lateInit()
@@ -376,9 +408,13 @@ class BaseService {
                         false, "${getString(R.string.service_failed)}: ${exc.readableMessage}"
                     )
                 } finally {
-                    data.connectingJob = null
+                    if (data.connectingJob === currentCoroutineContext()[Job]) {
+                        data.connectingJob = null
+                    }
                 }
             }
+            data.connectingJob = connectingJob
+            connectingJob.start()
             return Service.START_NOT_STICKY
         }
     }

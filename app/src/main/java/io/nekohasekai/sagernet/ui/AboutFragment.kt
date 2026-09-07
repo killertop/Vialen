@@ -9,7 +9,6 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.text.util.Linkify
 import android.view.View
-import android.widget.Toast
 import androidx.activity.result.component1
 import androidx.activity.result.component2
 import androidx.activity.result.contract.ActivityResultContracts
@@ -73,21 +72,21 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                                 .text(R.string.app_version)
                                 .subText(SagerNet.appVersionNameForDisplay)
                                 .setOnClickAction {
-                                    showReleaseChannelNotice()
+                                    openReleaseChannel()
                                 }
                                 .build())
                         .addItem(
                             MaterialAboutActionItem.Builder()
                                 .text(R.string.check_update_release)
                                 .setOnClickAction {
-                                    showReleaseChannelNotice()
+                                    openReleaseChannel()
                                 }
                                 .build())
                         .addItem(
                             MaterialAboutActionItem.Builder()
                                 .text(R.string.check_update_preview)
                                 .setOnClickAction {
-                                    showReleaseChannelNotice()
+                                    openReleaseChannel()
                                 }
                                 .build())
                         .addItem(
@@ -168,8 +167,8 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
             }
         }
 
-        private fun showReleaseChannelNotice() {
-            Toast.makeText(app, R.string.vialen_release_unconfigured, Toast.LENGTH_SHORT).show()
+        private fun openReleaseChannel() {
+            requireContext().launchCustomTab("https://github.com/killertop/Vialen/releases")
         }
 
     }

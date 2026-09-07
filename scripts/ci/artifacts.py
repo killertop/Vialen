@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Small CI provenance/unsigned-artifact checks; no signing or publishing."""
 import hashlib
+import tempfile
 import json
 import os
 from pathlib import Path
@@ -99,6 +100,130 @@ def verify_core(folder):
     return manifest
 
 
+
+def repository_tree(repo):
+    # Read Git blobs and canonical modes directly. Index flags and archive
+    # export-ignore/export-subst attributes must not conceal or rewrite source.
+    entries, tree = [], {}
+    raw = subprocess.check_output(["git", "ls-tree", "-rz", "--full-tree", "HEAD"], cwd=repo)
+    for item in filter(None, raw.split(b"\0")):
+        metadata, name = item.split(b"\t", 1)
+        mode, kind, object_id = metadata.split()
+        if kind == b"commit" and mode == b"160000":
+            tree[name.decode()] = {"bytes": object_id, "mode": 0, "symlink": False, "gitlink": True}
+            continue
+        require(kind == b"blob" and mode in {b"100644", b"100755", b"120000"},
+                "Unsupported dependency tree entry")
+        entries.append((name.decode(), int(mode, 8) & 0o777, mode == b"120000", object_id))
+    result = subprocess.run(["git", "cat-file", "--batch"], cwd=repo,
+                            input=b"".join(item[3] + b"\n" for item in entries), capture_output=True, check=True)
+    raw, offset = result.stdout, 0
+    for name, mode, symlink, object_id in entries:
+        end = raw.index(b"\n", offset)
+        actual_id, kind, size = raw[offset:end].split()
+        require(actual_id == object_id and kind == b"blob", "Unexpected Git object")
+        start, size = end + 1, int(size)
+        require(raw[start + size:start + size + 1] == b"\n", "Truncated Git object")
+        tree[name] = {"bytes": raw[start:start + size], "mode": mode, "symlink": symlink, "gitlink": False}
+        offset = start + size + 1
+    require(offset == len(raw), "Unexpected Git object data")
+    return tree
+
+
+def verify_repository_tree(repo, tree, overrides=None):
+    overrides = overrides or {}
+    require(not run("git", "diff", "--cached", "--name-only", cwd=repo),
+            "Replace repository has staged changes")
+    # Include ignored files: an ignored Go source can still enter a build.
+    added = set(filter(None, run("git", "ls-files", "--others", "-z", cwd=repo).split("\0")))
+    require(added == set(overrides) - set(tree), "Unexpected untracked dependency files")
+    for name in set(tree) | set(overrides):
+        path = repo / name
+        if name in overrides:
+            expected = overrides[name]
+            require(path.is_file() and not path.is_symlink(), "Invalid patched source file")
+            require(record(path) == expected["content"] and
+                    oct(path.stat().st_mode & 0o777) == expected["mode"],
+                    "Patched dependency file mismatch: " + name)
+        else:
+            expected = tree[name]
+            if expected["gitlink"]:
+                require(not path.is_symlink() and (not path.exists() or
+                        (path.is_dir() and not any(path.iterdir()))),
+                        "Dependency submodule must remain uninitialized: " + name)
+                continue
+            require(path.is_symlink() == expected["symlink"] and
+                    (path.is_file() or path.is_symlink()), "Missing or changed dependency file")
+            content = os.readlink(path).encode() if path.is_symlink() else path.read_bytes()
+            require(content == expected["bytes"] and (expected["symlink"] or
+                    path.lstat().st_mode & 0o777 == expected["mode"]),
+                    "Dependency differs from pinned tree: " + name)
+
+
+def patched_sing_box(repo, pin, apply=False):
+    """Accept exactly the reviewed downstream patch over the pinned upstream tree."""
+    patch_root = ROOT / "buildScript/lib/core/patches"
+    manifest_path = patch_root / "sing-box-reset.json"
+    spec = json.loads(manifest_path.read_text())
+    require(spec["schema"] == 1 and spec["base_commit"] == pin,
+            "Downstream patch base differs from pinned source")
+    patch = patch_root / "sing-box-reset.patch"
+    require(digest(patch) == spec["patch_sha256"], "Downstream patch digest mismatch")
+    require(run("git", "rev-parse", "HEAD", cwd=repo) == pin, "Replace repository pin mismatch")
+    tree = repository_tree(repo)
+    for name in spec["files"]:
+        relative = Path(name)
+        require(not relative.is_absolute() and ".." not in relative.parts,
+                "Invalid downstream manifest path")
+    # Validate the full patch against HEAD in an isolated temporary tree before
+    # touching a caller's checkout, including patch/manifest disagreement.
+    with tempfile.TemporaryDirectory(prefix="vialen-core-patch-") as temporary:
+        prepared = Path(temporary)
+        for name, expected in tree.items():
+            path = prepared / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if expected["gitlink"]:
+                path.mkdir(exist_ok=True)
+            elif expected["symlink"]:
+                path.symlink_to(os.fsdecode(expected["bytes"]))
+            else:
+                path.write_bytes(expected["bytes"])
+                path.chmod(expected["mode"])
+        run("git", "apply", str(patch), cwd=prepared)
+        for name, expected in spec["files"].items():
+            path = prepared / name
+            require(path.is_file() and not path.is_symlink() and record(path) == expected["content"] and
+                    oct(path.stat().st_mode & 0o777) == expected["mode"], "Patch and manifest disagree")
+        actual = {str(path.relative_to(prepared)) for path in prepared.rglob("*")
+                  if path.is_file() or path.is_symlink()}
+        require(actual == {name for name, entry in tree.items() if not entry["gitlink"]} | set(spec["files"]),
+                "Patch has undeclared paths")
+        for name, expected in tree.items():
+            if name in spec["files"]:
+                continue
+            path = prepared / name
+            if expected["gitlink"]:
+                require(path.is_dir() and not path.is_symlink() and not any(path.iterdir()),
+                        "Patch changes an uninitialized submodule")
+                continue
+            raw = os.readlink(path).encode() if path.is_symlink() else path.read_bytes()
+            require(path.is_symlink() == expected["symlink"] and raw == expected["bytes"] and
+                    (expected["symlink"] or path.lstat().st_mode & 0o777 == expected["mode"]),
+                    "Patch modifies undeclared source")
+    try:
+        verify_repository_tree(repo, tree, spec["files"])
+    except SystemExit:
+        if not apply:
+            raise
+        verify_repository_tree(repo, tree)
+        run("git", "apply", "--check", str(patch), cwd=repo)
+        run("git", "apply", str(patch), cwd=repo)
+        verify_repository_tree(repo, tree, spec["files"])
+    return {"commit": pin, "downstream_patch": record(patch),
+            "downstream_manifest": record(manifest_path), "patched_files": spec["files"],
+            "uninitialized_gitlinks": {name: entry["bytes"].decode() for name, entry in tree.items() if entry["gitlink"]}}
+
+
 def core(folder):
     require(json.loads((folder / "source-manifest.json").read_text()) == source(),
             "Source content changed while building core")
@@ -109,8 +234,13 @@ def core(folder):
     for name, key in [("sing-box", "SING_BOX"), ("libneko", "LIBNEKO")]:
         repo = ROOT.parent / name
         require(run("git", "rev-parse", "HEAD", cwd=repo) == pins[key], "Replace repository pin mismatch")
-        require(not run("git", "status", "--porcelain=v1", cwd=repo), "Replace repository is dirty")
-        repositories[name] = {"commit": pins[key]}
+        if name == "sing-box":
+            repositories[name] = patched_sing_box(repo, pins[key])
+        else:
+            tree = repository_tree(repo)
+            verify_repository_tree(repo, tree)
+            repositories[name] = {"commit": pins[key], "uninitialized_gitlinks":
+                                  {name: entry["bytes"].decode() for name, entry in tree.items() if entry["gitlink"]}}
     tools = {}
     for name in ["gomobile-matsuri", "gobind-matsuri"]:
         path = Path(os.environ["GOPATH"]) / "bin" / name
@@ -225,7 +355,7 @@ def apk(folder):
 
 
 if __name__ == "__main__":
-    require(len(sys.argv) == 3, "Usage: artifacts.py source|core|verify-core|apk <output path>")
+    require(len(sys.argv) == 3, "Usage: artifacts.py source|core|verify-core|apk|prepare-sing-box|prepare-libneko <path>")
     command, location = sys.argv[1], Path(sys.argv[2]).resolve()
     if command == "source":
         write(location, source())
@@ -235,5 +365,17 @@ if __name__ == "__main__":
         verify_core(location)
     elif command == "apk":
         apk(location)
+    elif command == "prepare-sing-box":
+        pins = dict(re.findall(r'export COMMIT_(\w+)="([0-9a-f]{40})"',
+                              (ROOT / "buildScript/lib/core/get_source_env.sh").read_text()))
+        print(json.dumps(patched_sing_box(location, pins["SING_BOX"], apply=True), sort_keys=True))
+    elif command == "prepare-libneko":
+        pins = dict(re.findall(r'export COMMIT_(\w+)="([0-9a-f]{40})"',
+                              (ROOT / "buildScript/lib/core/get_source_env.sh").read_text()))
+        require(run("git", "rev-parse", "HEAD", cwd=location) == pins["LIBNEKO"],
+                "Replace repository pin mismatch")
+        tree = repository_tree(location)
+        verify_repository_tree(location, tree)
+        print(json.dumps({"commit": pins["LIBNEKO"], "verified_full_tree": True}, sort_keys=True))
     else:
         raise SystemExit("Unknown command")

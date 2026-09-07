@@ -24,7 +24,9 @@ object DefaultNetworkListener {
             val response = CompletableDeferred<Network>()
         }
 
-        class Stop(val key: Any) : NetworkMessage()
+        class Stop(val key: Any) : NetworkMessage() {
+            val response = CompletableDeferred<Boolean>()
+        }
 
         class Put(val network: Network) : NetworkMessage()
         class Update(val network: Network) : NetworkMessage()
@@ -47,11 +49,17 @@ object DefaultNetworkListener {
                     network
                 )
             }
-            is NetworkMessage.Stop -> if (listeners.isNotEmpty() && // was not empty
-                listeners.remove(message.key) != null && listeners.isEmpty()
-            ) {
-                network = null
-                unregister()
+            is NetworkMessage.Stop -> {
+                try {
+                    val removed = listeners.remove(message.key) != null
+                    if (removed && listeners.isEmpty()) {
+                        network = null
+                        unregister()
+                    }
+                    message.response.complete(removed)
+                } catch (error: Throwable) {
+                    message.response.completeExceptionally(error)
+                }
             }
 
             is NetworkMessage.Put -> {
@@ -83,7 +91,10 @@ object DefaultNetworkListener {
         response.await()
     }
 
-    suspend fun stop(key: Any) = networkActor.send(NetworkMessage.Stop(key))
+    suspend fun stop(key: Any): Boolean = NetworkMessage.Stop(key).run {
+        networkActor.send(this)
+        response.await()
+    }
 
     // NB: this runs in ConnectivityThread, and this behavior cannot be changed until API 26
     private object Callback : ConnectivityManager.NetworkCallback() {
@@ -150,5 +161,8 @@ object DefaultNetworkListener {
         }
     }
 
-    private fun unregister() = SagerNet.connectivity.unregisterNetworkCallback(Callback)
+    private fun unregister() {
+        // Registration failures use the fallback network and have no callback to remove.
+        if (!fallback) SagerNet.connectivity.unregisterNetworkCallback(Callback)
+    }
 }
