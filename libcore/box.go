@@ -158,7 +158,7 @@ func (b *BoxInstance) Close() (err error) {
 		b.cancel()
 	}
 	if b.Box != nil {
-		b.Box.Close()
+		return b.Box.Close()
 	}
 
 	return nil

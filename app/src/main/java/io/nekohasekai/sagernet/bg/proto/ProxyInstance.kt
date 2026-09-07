@@ -6,6 +6,7 @@ import io.nekohasekai.sagernet.bg.ServiceNotification
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import moe.matsuri.nb4a.utils.JavaUtil
 
@@ -44,10 +45,26 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
     }
 
     override fun close() {
-        super.close()
-        runBlocking {
-            looper?.stop()
+        var failure: Throwable? = null
+        try {
+            super.close()
+        } catch (error: Throwable) {
+            failure = error
+        }
+        try {
+            runBlocking { looper?.stop() }
+        } catch (error: Throwable) {
+            val previous = failure
+            if (previous == null) failure = error
+            else if (previous !== error) {
+                if (error is CancellationException && previous !is CancellationException) {
+                    error.addSuppressed(previous)
+                    failure = error
+                } else previous.addSuppressed(error)
+            }
+        } finally {
             looper = null
         }
+        failure?.let { throw it }
     }
 }

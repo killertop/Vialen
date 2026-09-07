@@ -150,20 +150,23 @@ internal class VpnNetworkLifecycle(
             signalLocked()
             if (!established) return true
         }
-        return withTimeoutOrNull(timeoutMs) {
-            while (true) {
-                currentCoroutineContext().ensureActive()
-                val signal = synchronized(lock) {
-                    // An empty set after establish is not proof: AVAILABLE may still be queued.
-                    if (observed.isNotEmpty() && observed.all { it in lost }) return@withTimeoutOrNull true
-                    if (disposed) return@withTimeoutOrNull false
-                    changed
-                }
-                signal.await()
+        return withTimeoutOrNull(timeoutMs) { awaitRemoval(); true } ?: false
+    }
+
+    /** Continues the same generation's strict removal proof after the initial wait expires. */
+    suspend fun awaitRemoval() {
+        while (true) {
+            currentCoroutineContext().ensureActive()
+            val signal = synchronized(lock) {
+                check(begun && registered && !disposed) { "VPN observer is not registered" }
+                check(closing) { "VPN is not closing" }
+                if (!established) return
+                // Empty observation is not proof, even after establish. Disposal is not LOST.
+                if (observed.isNotEmpty() && observed.all { it in lost }) return
+                changed
             }
-            @Suppress("UNREACHABLE_CODE")
-            false
-        } ?: false
+            signal.await()
+        }
     }
 
     fun dispose() {

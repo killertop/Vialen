@@ -18,6 +18,10 @@ import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.ui.VpnRequestActivity
 import io.nekohasekai.sagernet.utils.Subnet
 import io.nekohasekai.sagernet.utils.VpnNetworkLifecycle
+import io.nekohasekai.sagernet.utils.VpnStopGate
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -29,7 +33,8 @@ class VpnService : BaseVpnService(),
 
     companion object {
 
-        @Volatile private var unconfirmedStop = false
+        private val stopGate = VpnStopGate()
+        private val removalScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
         const val PRIVATE_VLAN4_CLIENT = "172.19.0.1"
         const val PRIVATE_VLAN4_ROUTER = "172.19.0.2"
@@ -67,7 +72,7 @@ class VpnService : BaseVpnService(),
     override var upstreamInterfaceName: String? = null
 
     override suspend fun startProcesses() {
-        check(!unconfirmedStop) { "Previous VPN network removal was not confirmed. Restart the app before reconnecting." }
+        stopGate.checkCanStart()
         lastStopError = null
         linkExpectation = null
         val lifecycle = VpnNetworkLifecycle(SagerNet.connectivity, ::matchesVpnLink)
@@ -92,8 +97,9 @@ class VpnService : BaseVpnService(),
     @Suppress("EXPERIMENTAL_API_USAGE")
     override suspend fun killProcesses() {
         val lifecycle = networkLifecycle
-        var failure: Exception? = null
-        fun retain(error: Exception) {
+        var failure: Throwable? = null
+        var pendingRemoval = false
+        fun retain(error: Throwable) {
             val previous = failure
             if (previous == null) failure = error
             else if (previous !== error) {
@@ -106,7 +112,7 @@ class VpnService : BaseVpnService(),
         try {
             try {
                 conn?.close()
-            } catch (error: Exception) {
+            } catch (error: Throwable) {
                 retain(error)
             } finally {
                 conn = null
@@ -116,27 +122,46 @@ class VpnService : BaseVpnService(),
                 super.killProcesses()
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (error: Throwable) {
                 retain(error)
             }
             if (lifecycle != null && !lifecycle.closeAndConfirm()) {
-                retain(IllegalStateException("VPN network removal was not confirmed"))
+                currentCoroutineContext().ensureActive()
+                if (failure == null) pendingRemoval = true
+                else retain(IllegalStateException("VPN network removal was not confirmed"))
             }
         } catch (cancelled: CancellationException) {
             retain(cancelled)
             throw cancelled
-        } catch (error: Exception) {
+        } catch (error: Throwable) {
             retain(error)
         } finally {
+            var handedOff = false
             try {
-                lifecycle?.dispose()
-            } catch (error: Exception) {
+                if (pendingRemoval && failure == null && lifecycle != null) {
+                    stopGate.waitForRemoval(
+                        removalScope,
+                        lifecycle,
+                        lifecycle::awaitRemoval,
+                        lifecycle::dispose,
+                    ) { Logs.w(it) }
+                    handedOff = true
+                    lastStopError = "Waiting for the system to remove the previous VPN. Try connecting again after cleanup completes."
+                }
+            } catch (error: Throwable) {
                 retain(error)
+            }
+            if (!handedOff) {
+                try {
+                    lifecycle?.dispose()
+                } catch (error: Throwable) {
+                    retain(error)
+                }
             }
             networkLifecycle = null
             linkExpectation = null
             failure?.let {
-                unconfirmedStop = true
+                stopGate.markFailed()
                 lastStopError = "VPN cleanup could not be confirmed. Restart the app before reconnecting."
                 Logs.w(it)
             }
