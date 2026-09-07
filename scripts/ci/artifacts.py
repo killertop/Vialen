@@ -318,7 +318,7 @@ def check_locales(path, badging):
             "Unexpected source resourceConfigurations")
     strings = ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()
     source_strings = {item.get("name"): "".join(item.itertext()) for item in strings.findall("string")}
-    english = {"connect": "Connect", "vialen_release_unconfigured": "Vialen release channel is not configured."}
+    english = {"connect": "Connect", "settings": "Settings"}
     for name, expected in english.items():
         defaults = re.findall(r'^\s+\(\) (".*")$', resource_block(resources, "string/" + name), re.M)
         require(len(defaults) == 1 and json.loads(defaults[0]) == expected and source_strings.get(name) == expected,
