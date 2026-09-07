@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="108" height="108" viewBox="0 0 108 108">
+  <title>Vialen B continuous-path V</title>
+  <rect id="background" width="108" height="108" fill="#3564E8"/>
+  <path id="mark" transform="translate(54 54) scale(0.92) translate(-54 -54)" fill="#FFFFFF" d="M 27,32 L 33,32 C 37,32 39,34 41,38 L 52,61 C 53,63 55,63 56,61 L 67,38 C 69,34 71,32 75,32 L 81,32 L 64,68 C 62,73 59,76 54,76 C 49,76 46,73 44,68 Z"/>
+</svg>
