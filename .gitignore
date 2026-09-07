@@ -19,3 +19,6 @@ jniLibs/
 
 # submodules
 /external
+
+# Keep local signing material outside source control.
+/release.keystore
