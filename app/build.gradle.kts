@@ -10,6 +10,7 @@ plugins {
 setupApp()
 
 android {
+    ndkVersion = "28.1.13356709"
     defaultConfig {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // AAPT locale filters must include our region-qualified Chinese resources.
