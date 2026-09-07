@@ -282,4 +282,34 @@ class VpnNetworkLifecycleTest {
         callback.onLost(current)
         assertTrue(observer.closeAndConfirm(20))
     }
+    @Test fun lateRemovalContinuesOriginalOracleAfterInitialDeadline() = runBlocking {
+        val observer = lifecycle(); observer.begin(); observer.markEstablished()
+        val callback = callbacks.last(); val a = network(); val b = network()
+        ready(callback, a); ready(callback, b)
+        assertFalse(observer.closeAndConfirm(20))
+        val waiting = async(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) {
+            observer.awaitRemoval()
+        }
+        assertFalse(waiting.isCompleted)
+        callback.onLost(a)
+        assertFalse(waiting.isCompleted) // Every observed network must be lost.
+        callback.onLost(b)
+        withTimeout(1_000) { waiting.await() }
+        verify(exactly = 0) { connectivity.unregisterNetworkCallback(any<ConnectivityManager.NetworkCallback>()) }
+    }
+
+    @Test fun disposedObserverFailsIndefiniteRemovalWaitEvenIfLateLostArrives() = runBlocking {
+        val observer = lifecycle(); observer.begin(); observer.markEstablished()
+        val callback = callbacks.last(); val current = network()
+        ready(callback, current)
+        assertFalse(observer.closeAndConfirm(20))
+        // Capture the failure inside the child, so it cannot cancel this test's parent.
+        val waiting = async(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) {
+            failure { observer.awaitRemoval() }
+        }
+        observer.dispose()
+        callback.onLost(current)
+        assertTrue(withTimeout(1_000) { waiting.await() } is IllegalStateException)
+    }
+
 }
