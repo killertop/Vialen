@@ -1,6 +1,5 @@
 package io.nekohasekai.sagernet
 
-import android.content.Intent
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -48,7 +47,7 @@ class VpnFirstConsentNativeTest {
             DataStore.directDns="local";DataStore.remoteDns="local"
             shell("cmd appops set ${app.packageName} ACTIVATE_VPN default")
             assertNotNull("Consent must not exist before the system dialog",VpnService.prepare(app))
-            app.startActivity(app.packageManager.getLaunchIntentForPackage(app.packageName)!!.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            VpnConsentTestUi.launchMainResumed()
             connection.connect(app,object:SagerConnection.Callback {
                 override fun stateChanged(state:BaseService.State,profileName:String?,msg:String?) {}
                 override fun onServiceConnected(service:ISagerNetService) {}

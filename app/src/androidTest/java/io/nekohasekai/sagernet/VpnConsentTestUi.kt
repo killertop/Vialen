@@ -5,12 +5,32 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import io.nekohasekai.sagernet.ui.VpnRequestActivity
+import io.nekohasekai.sagernet.ui.MainActivity
 import kotlinx.coroutines.delay
 import org.junit.Assert.*
 
 /** Track the owner as well as the system window; never accept an orphaned dialog. */
 internal object VpnConsentTestUi {
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
+    suspend fun launchMainResumed() {
+        val app=instrumentation.targetContext.applicationContext as SagerNet
+        fun shell(command:String)=android.os.ParcelFileDescriptor.AutoCloseInputStream(
+            instrumentation.uiAutomation.executeShellCommand(command)
+        ).bufferedReader().use { it.readText() }
+        val launch=shell("am start -W -n ${app.packageName}/${MainActivity::class.java.name}")
+        assertFalse("MainActivity shell launch failed: $launch", launch.contains("Error",ignoreCase=true))
+        var mainResumed=false
+        val resumeLimit=System.nanoTime()+5_000_000_000L
+        while(!mainResumed && System.nanoTime()<resumeLimit) {
+            instrumentation.runOnMainSync {
+                mainResumed=ActivityLifecycleMonitorRegistry.getInstance()
+                    .getActivitiesInStage(Stage.RESUMED)
+                    .any { it is MainActivity && it.packageName==app.packageName && !it.isFinishing && !it.isDestroyed }
+            }
+            if(!mainResumed)delay(50)
+        }
+        assertTrue("MainActivity must be RESUMED before starting the consent flow; launch=$launch",mainResumed)
+    }
     fun owners(): List<VpnRequestActivity> {
         var owners=emptyList<VpnRequestActivity>()
         instrumentation.runOnMainSync {
@@ -35,13 +55,14 @@ internal object VpnConsentTestUi {
             }
             delay(50)
         }
-        throw AssertionError("Expected one fresh VpnRequestActivity and its system consent dialog")
+        throw AssertionError("Expected one fresh VpnRequestActivity and its system consent dialog; owners=${owners().size} rootPackage=${instrumentation.uiAutomation.rootInActiveWindow?.packageName}")
     }
     fun clickButton(id: String) {
         val root=instrumentation.uiAutomation.rootInActiveWindow
         assertEquals("com.android.vpndialogs",root?.packageName?.toString())
         val button=root!!.findAccessibilityNodeInfosByViewId(id).single()
         assertTrue("System consent button enabled",button.isEnabled)
+        println("VPN_SYSTEM_BUTTON beforeClick=$id text=${button.text}")
         assertTrue("System consent button click delivered once",button.performAction(AccessibilityNodeInfo.ACTION_CLICK))
         println("VPN_SYSTEM_BUTTON clicked=$id")
     }

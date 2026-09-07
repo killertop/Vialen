@@ -1,6 +1,5 @@
 package io.nekohasekai.sagernet
 
-import android.content.Intent
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -27,6 +26,11 @@ class VpnConsentNativeTest {
         fun shell(command: String): String = ParcelFileDescriptor.AutoCloseInputStream(
             instrumentation.uiAutomation.executeShellCommand(command)
         ).bufferedReader().use { it.readText() }
+        fun logConsentState(stage: String) {
+            val appOp = shell("cmd appops get ${app.packageName} ACTIVATE_VPN")
+            val prepared = VpnService.prepare(app) == null
+            println("VPN_CANCEL_DIAGNOSTIC stage=$stage prepareIsNull=$prepared appops=$appOp")
+        }
         val oldMode = DataStore.serviceMode
         val oldAppOp = shell("cmd appops get ${app.packageName} ACTIVATE_VPN")
             .substringAfter("ACTIVATE_VPN: ", "default").substringBefore(';').trim()
@@ -36,8 +40,7 @@ class VpnConsentNativeTest {
             DataStore.serviceMode = Key.MODE_VPN
             shell("cmd appops set ${app.packageName} ACTIVATE_VPN deny")
             assertNotNull("This test requires denied consent", VpnService.prepare(app))
-            app.startActivity(app.packageManager.getLaunchIntentForPackage(app.packageName)!!
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            VpnConsentTestUi.launchMainResumed()
             connection.connect(app, object : SagerConnection.Callback {
                 override fun stateChanged(state: BaseService.State, profileName: String?, msg: String?) {}
                 override fun onServiceConnected(service: ISagerNetService) {}
@@ -52,9 +55,12 @@ class VpnConsentNativeTest {
             assertFalse("A foreground service must not start before VPN consent: $services",
                 services.contains("startRequested=true") || services.contains("fgRequired=true"))
             // ConfirmDialog intentionally ignores BACK. Exercise its actual negative action.
+            logConsentState("before_button2")
             VpnConsentTestUi.clickButton("android:id/button2")
             VpnConsentTestUi.awaitDismissed(owner)
+            logConsentState("after_dismissed")
             delay(12_000) // Longer than the reproduced foreground-start deadline.
+            logConsentState("after_12_seconds")
             assertNotEquals("VPN dialog must have been dismissed by cancel", "com.android.vpndialogs", instrumentation.uiAutomation.rootInActiveWindow?.packageName?.toString())
             assertNotNull("No consent was granted", VpnService.prepare(app))
             assertTrue("Bound process must survive denied/cancelled consent", binder.pingBinder())

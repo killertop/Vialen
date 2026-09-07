@@ -28,6 +28,10 @@ class ProfileSelectionStateRuleTest {
                         })
                         dao.put(KeyValuePair(Key.PROFILE_GROUP).put(0L))
                         dao.put(KeyValuePair(Key.PROFILE_ID).put(Long.MAX_VALUE))
+                        dao.put(KeyValuePair(Key.SERVICE_MODE).put("proxy"))
+                        dao.put(KeyValuePair(Key.DIRECT_DNS).put("local"))
+                        dao.put(KeyValuePair(Key.REMOTE_DNS).put("https://example.test/dns-query"))
+                        dao.put(KeyValuePair(Key.ENABLE_DNS_ROUTING).put(false))
                     }
                     val expected = ProfileSelectionStateRule.keys.associateWith { dao[it] }
                     val fixture = LifecycleFixture(db, phase)

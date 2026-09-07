@@ -107,7 +107,10 @@ class ProfileSelectionStateRule : TestRule {
     }
 
     companion object {
-        internal val keys = listOf(Key.PROFILE_CURRENT, Key.PROFILE_GROUP, Key.PROFILE_ID)
+        internal val keys = listOf(
+            Key.PROFILE_CURRENT, Key.PROFILE_GROUP, Key.PROFILE_ID,
+            Key.SERVICE_MODE, Key.DIRECT_DNS, Key.REMOTE_DNS, Key.ENABLE_DNS_ROUTING,
+        )
 
         internal fun withSnapshot(db: PublicDatabase, label: String, body: () -> Unit, cleanup: () -> Unit = {}) {
             val dao = db.keyValuePairDao()

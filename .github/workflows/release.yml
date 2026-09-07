@@ -1,94 +1,145 @@
-name: Release Build
+name: Prepare Unsigned Release APK
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Release Tag"
+      source_ref:
+        description: Reviewed source ref or commit SHA (resolved once; no publishing)
         required: true
-      publish:
-        description: "Publish: If want ignore"
-        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  GOTOOLCHAIN: local
+  GOWORK: "off"
+  VIALEN_NDK_VERSION: 28.1.13356709
+  RUSTFLAGS: ""
+
 jobs:
   libcore:
-    name: Native Build (LibCore)
-    runs-on: ubuntu-latest
+    name: Build traceable ARM64 core
+    runs-on: ubuntu-24.04
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
+      manifest_sha: ${{ steps.manifest.outputs.sha }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: Vialen
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Golang Status
-        run: find buildScript libcore/*.sh | xargs cat | sha1sum > golang_status
-      - name: Libcore Status
-        run: git ls-files libcore | xargs cat | sha1sum > libcore_status
-      - name: LibCore Cache
-        id: cache
-        uses: actions/cache@v4
+      - uses: actions/checkout@v4
         with:
-          path: |
-            app/libs/libcore.aar
-          key: ${{ hashFiles('.github/workflows/*', 'golang_status', 'libcore_status') }}
-      - name: Install Golang
-        if: steps.cache.outputs.cache-hit != 'true'
-        uses: actions/setup-go@v5
-        with:
-          go-version: ^1.25
-      - name: Native Build
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: ./run lib core
-  build:
-    name: Build Vialen APK
-    runs-on: ubuntu-latest
-    needs:
-      - libcore
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Golang Status
-        run: find buildScript libcore/*.sh | xargs cat | sha1sum > golang_status
-      - name: Libcore Status
-        run: git ls-files libcore | xargs cat | sha1sum > libcore_status
-      - name: LibCore Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            app/libs/libcore.aar
-          key: ${{ hashFiles('.github/workflows/*', 'golang_status', 'libcore_status') }}
-      - name: Gradle cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.gradle
-          key: gradle-vialen-${{ hashFiles('**/*.gradle.kts') }}
-      - name: Gradle Build
-        env:
-          BUILD_PLUGIN: none
+          ref: ${{ inputs.source_ref }}
+          path: Vialen
+          persist-credentials: false
+      - name: Resolve immutable source
+        id: source
         run: |
-          echo "sdk.dir=${ANDROID_HOME}" > local.properties
-          echo "ndk.dir=${ANDROID_HOME}/ndk/25.0.8775105" >> local.properties
-          export LOCAL_PROPERTIES="${{ secrets.LOCAL_PROPERTIES }}"
-          ./run init action gradle
-          ./gradlew app:assembleRelease
+          set -euo pipefail
+          source_sha=$(git rev-parse --verify HEAD)
+          [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]]
+          printf 'sha=%s\n' "$source_sha" >> "$GITHUB_OUTPUT"
+          mkdir -p ci-artifacts/core
+          python3 scripts/ci/artifacts.py source ci-artifacts/core/source-manifest.json
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.5'
+          cache: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17.0.18'
+      - name: Install and verify Android/Rust tools
+        run: bash scripts/ci/prepare-toolchain.sh ci-artifacts/core/toolchain.txt
+      - name: Build pinned core sources
+        env:
+          GOPATH: ${{ runner.temp }}/vialen-core-go
+          GOCACHE: ${{ runner.temp }}/vialen-core-cache
+        run: |
+          set -euo pipefail
+          export PATH="$GOPATH/bin:$PATH"
+          # Use the existing source/tool revision checks; do not call the wrapper
+          # that can continue to build after a failed init.
+          bash buildScript/lib/core/get_source.sh
+          (cd libcore && bash init.sh)
+          mkdir -p libcore/.build
+          bash buildScript/lib/core/build.sh
+          cp app/libs/libcore.aar ci-artifacts/core/libcore.aar
+          bash scripts/check_16kb_alignment.sh ci-artifacts/core/libcore.aar
+          python3 scripts/ci/artifacts.py core ci-artifacts/core
+      - name: Record core manifest digest
+        id: manifest
+        run: |
+          set -euo pipefail
+          digest=$(sha256sum ci-artifacts/core/core-manifest.json | cut -d ' ' -f 1)
+          printf 'sha=%s\n' "$digest" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
-          name: Vialen-APK
-          path: app/build/outputs/apk/release/Vialen-*.apk
+          name: Vialen-Core-${{ steps.source.outputs.sha }}
+          path: Vialen/ci-artifacts/core/
           if-no-files-found: error
-  publish:
-    name: Publish Release
-    if: github.event.inputs.publish != 'y'
-    runs-on: ubuntu-latest
-    needs: build
+
+  apk:
+    name: Build unsigned APK (not for publication)
+    runs-on: ubuntu-24.04
+    needs: libcore
+    defaults:
+      run:
+        shell: bash
+        working-directory: Vialen
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Donwload Artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
         with:
-          name: Vialen-APK
-          path: artifacts
-      - name: Release
+          ref: ${{ needs.libcore.outputs.source_sha }}
+          path: Vialen
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: Vialen-Core-${{ needs.libcore.outputs.source_sha }}
+          path: Vialen/ci-artifacts/core
+      - name: Verify core handoff against resolved source
+        env:
+          EXPECTED_SOURCE_SHA: ${{ needs.libcore.outputs.source_sha }}
+          EXPECTED_CORE_MANIFEST_SHA: ${{ needs.libcore.outputs.manifest_sha }}
         run: |
-          wget -O ghr.tar.gz https://github.com/tcnksm/ghr/releases/download/v0.13.0/ghr_v0.13.0_linux_amd64.tar.gz
-          tar -xvf ghr.tar.gz
-          mv ghr*linux_amd64/ghr .
-          mkdir apks
-          find artifacts -name "*.apk" -exec cp {} apks \;
-          ./ghr -delete -t "${{ github.token }}" -n "${{ github.event.inputs.tag }}" "${{ github.event.inputs.tag }}" apks
+          set -euo pipefail
+          python3 scripts/ci/artifacts.py verify-core ci-artifacts/core
+          mkdir -p app/libs
+          cp ci-artifacts/core/libcore.aar app/libs/libcore.aar
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.5'
+          cache: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17.0.18'
+      - name: Install and verify Android/Rust tools
+        run: |
+          mkdir -p ci-artifacts/apk
+          bash scripts/ci/prepare-toolchain.sh ci-artifacts/apk/toolchain.txt
+      - name: Build unsigned ARM64 Release
+        run: |
+          set -euo pipefail
+          test ! -e release.keystore
+          printf 'sdk.dir=%s\nndk.dir=%s\n' "$ANDROID_HOME" "$ANDROID_NDK_HOME" > local.properties
+          # No signing material is requested or read. Preserve the source assets;
+          # do not call buildScript/init/action/gradle.sh (it downloads latest).
+          env -u LOCAL_PROPERTIES -u KEYSTORE_PASS -u ALIAS_NAME -u ALIAS_PASS \
+            nkmr_minify=1 ./gradlew --no-daemon :app:assembleRelease
+          shopt -s nullglob
+          apks=(app/build/outputs/apk/release/*.apk)
+          (( ${#apks[@]} == 1 ))
+          [[ "${apks[0]}" == *-arm64-v8a-unsigned.apk ]]
+          cp "${apks[0]}" ci-artifacts/apk/
+          aapt2 dump badging "${apks[0]}" > ci-artifacts/apk/badging.txt
+          bash scripts/check_16kb_alignment.sh "${apks[0]}" > ci-artifacts/apk/alignment.txt
+          test -s app/build/outputs/mapping/release/mapping.txt
+          cp app/build/outputs/mapping/release/mapping.txt ci-artifacts/apk/
+          python3 scripts/ci/artifacts.py apk ci-artifacts/apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Vialen-UNSIGNED-${{ needs.libcore.outputs.source_sha }}
+          path: Vialen/ci-artifacts/
+          if-no-files-found: error

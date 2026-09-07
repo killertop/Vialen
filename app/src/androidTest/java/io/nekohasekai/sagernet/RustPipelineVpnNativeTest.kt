@@ -48,7 +48,7 @@ class RustPipelineVpnNativeTest {
             DataStore.serviceMode = Key.MODE_VPN
             DataStore.directDns = "local"; DataStore.remoteDns = "local"
             DataStore.bypassLan = false; DataStore.bypassLanInCore = false
-            DataStore.proxyApps = false; DataStore.enableFakeDns = false; DataStore.appendHttpProxy = false
+            DataStore.proxyApps = androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("restrict_test_apps") == "true"; DataStore.enableFakeDns = false; DataStore.appendHttpProxy = false
             LoopbackSocksFixture(nonce).use { first -> LoopbackSocksFixture(nonce).use { second ->
                 LoopbackHttpFixture().use { server ->
                     server.reply.set(LoopbackHttpFixture.Reply(body = "socks5://127.0.0.1:${first.port}#RustVPN_A\nsocks5://127.0.0.1:${second.port}#RustVPN_B"))
@@ -65,19 +65,48 @@ class RustPipelineVpnNativeTest {
                     override fun stateChanged(state: BaseService.State, profileName: String?, msg: String?) {}
                     override fun onServiceConnected(service: ISagerNetService) {}
                 })
+                fun diagnostic(stage: Int, event: String, failure: Throwable? = null) {
+                    try {
+                        val connectivity = SagerNet.connectivity
+                        val network = connectivity.activeNetwork
+                        val capabilities = network?.let { connectivity.getNetworkCapabilities(it) }
+                        val link = network?.let { connectivity.getLinkProperties(it) }
+                        println("RUST_VPN_DIAGNOSTIC ns=${System.nanoTime()} stage=$stage event=$event selected=${DataStore.selectedProxy} binder=${connection.service?.state} network=${network?.networkHandle} vpn=${capabilities?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)} interface=${link?.interfaceName} underlying=${SagerNet.underlyingNetwork?.networkHandle} failure=${failure?.javaClass?.name}")
+                        first.diagnosticSnapshot().forEach { println("RUST_VPN_FIXTURE stage=$stage event=$event endpoint=first $it") }
+                        second.diagnosticSnapshot().forEach { println("RUST_VPN_FIXTURE stage=$stage event=$event endpoint=second $it") }
+                    } catch (diagnosticError: Throwable) {
+                        // Snapshot failures cannot replace the test's original result.
+                        println("RUST_VPN_DIAGNOSTIC stage=$stage event=$event snapshot_error=${diagnosticError.javaClass.name}")
+                    }
+                }
                 repeat(3) { stage ->
                     DataStore.selectedProxy = profiles[if (stage == 2) 1 else 0].id
+                    diagnostic(stage, "before_start")
                     SagerNet.startService(); awaitState(BaseService.State.Connected)
+                    diagnostic(stage, "connected")
                     // NO_PROXY disables explicit HTTP proxying: success must traverse TUN.
                     val request = URL("http://198.18.0.254/$nonce").openConnection(Proxy.NO_PROXY) as HttpURLConnection
+                    diagnostic(stage, "before_http")
+                    var requestFailure: Throwable? = null
                     val response = try {
                         request.connectTimeout = 5000; request.readTimeout = 5000
                         request.inputStream.bufferedReader().use { it.readText() }
-                    } finally { request.disconnect() }
+                    } catch (error: Throwable) {
+                        requestFailure = error
+                        diagnostic(stage, "http_failure", error)
+                        throw error
+                    } finally {
+                        try { request.disconnect() } catch (cleanupError: Throwable) {
+                            val original = requestFailure
+                            if (original != null) original.addSuppressed(cleanupError) else throw cleanupError
+                        }
+                    }
+                    diagnostic(stage, "http_success")
                     assertEquals("RUST_VPN_E2E_$nonce", response)
                     assertEquals(if (stage == 0) 1 else 2, first.requests.get())
                     assertEquals(if (stage == 2) 1 else 0, second.requests.get())
                     SagerNet.stopService(); awaitState(BaseService.State.Stopped)
+                    diagnostic(stage, "stopped")
                     println("RUST_VPN_E2E stage=$stage binder_connected=true tun_payload=true binder_stopped=true")
                 }
             } }

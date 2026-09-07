@@ -171,7 +171,7 @@ class RealDeviceVpnLifecycleTest {
             DataStore.remoteDns = "local"
             DataStore.bypassLan = false
             DataStore.bypassLanInCore = false
-            DataStore.proxyApps = false
+            DataStore.proxyApps = InstrumentationRegistry.getArguments().getString("restrict_test_apps") == "true"
             DataStore.enableFakeDns = false
             DataStore.appendHttpProxy = false
 
