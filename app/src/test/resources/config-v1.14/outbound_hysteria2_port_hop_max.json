@@ -1,0 +1,20 @@
+{
+  "down_mbps": 0,
+  "hop_interval": "15s",
+  "hop_interval_max": "45s",
+  "password": "hy2password",
+  "server": "hy2.example.com",
+  "server_ports": [
+    "20000:30000"
+  ],
+  "tls": {
+    "alpn": [
+      "h3"
+    ],
+    "enabled": true,
+    "insecure": false,
+    "server_name": "hy2.example.com"
+  },
+  "type": "hysteria2",
+  "up_mbps": 0
+}

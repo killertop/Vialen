@@ -1,0 +1,66 @@
+{
+  "dns": {
+    "final": "dns-direct",
+    "independent_cache": true,
+    "rules": [],
+    "servers": [
+      {
+        "address": "rcode://success",
+        "tag": "dns-block"
+      },
+      {
+        "address": "local",
+        "detour": "direct",
+        "tag": "dns-local"
+      },
+      {
+        "address": "223.5.5.5",
+        "address_resolver": "dns-local",
+        "detour": "direct",
+        "strategy": "prefer_ipv4",
+        "tag": "dns-direct"
+      }
+    ]
+  },
+  "inbounds": [],
+  "log": {
+    "level": "info"
+  },
+  "outbounds": [
+    {
+      "detour": "g-101",
+      "domain_strategy": "",
+      "password": "landingpass",
+      "server": "landing.anytls.example.com",
+      "server_port": 443,
+      "tag": "proxy",
+      "tls": {
+        "enabled": true,
+        "server_name": "landing.anytls.example.com"
+      },
+      "type": "anytls"
+    },
+    {
+      "domain_strategy": "",
+      "method": "chacha20-ietf-poly1305",
+      "password": "frontpassword",
+      "server": "front.ss.example.com",
+      "server_port": 8388,
+      "tag": "g-101",
+      "type": "shadowsocks"
+    },
+    {
+      "tag": "direct",
+      "type": "direct"
+    },
+    {
+      "tag": "bypass",
+      "type": "direct"
+    }
+  ],
+  "route": {
+    "auto_detect_interface": true,
+    "rule_set": [],
+    "rules": []
+  }
+}

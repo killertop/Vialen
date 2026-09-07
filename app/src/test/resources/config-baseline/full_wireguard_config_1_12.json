@@ -1,0 +1,128 @@
+{
+  "dns": {
+    "final": "dns-remote",
+    "independent_cache": true,
+    "rules": [
+      {
+        "domain": [
+          "wg.baseline.internal"
+        ],
+        "server": "dns-direct"
+      },
+      {
+        "outbound": [
+          "any"
+        ],
+        "server": "dns-direct"
+      }
+    ],
+    "servers": [
+      {
+        "address": "rcode://success",
+        "tag": "dns-block"
+      },
+      {
+        "address": "local",
+        "detour": "direct",
+        "tag": "dns-local"
+      },
+      {
+        "address": "223.5.5.5",
+        "address_resolver": "dns-local",
+        "detour": "direct",
+        "strategy": "prefer_ipv4",
+        "tag": "dns-direct"
+      },
+      {
+        "address": "tls://8.8.8.8",
+        "address_resolver": "dns-direct",
+        "strategy": "prefer_ipv4",
+        "tag": "dns-remote"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "domain_strategy": "",
+      "endpoint_independent_nat": true,
+      "inet4_address": [
+        "172.19.0.1/28"
+      ],
+      "inet6_address": [
+        "fdfe:dcba:9876::1/126"
+      ],
+      "mtu": 1500,
+      "sniff": true,
+      "sniff_override_destination": false,
+      "stack": "gvisor",
+      "tag": "tun-in",
+      "type": "tun"
+    },
+    {
+      "domain_strategy": "",
+      "listen": "127.0.0.1",
+      "listen_port": 2080,
+      "sniff": true,
+      "sniff_override_destination": false,
+      "tag": "mixed-in",
+      "type": "mixed"
+    }
+  ],
+  "log": {
+    "level": "info"
+  },
+  "outbounds": [
+    {
+      "domain_strategy": "prefer_ipv4",
+      "local_address": [
+        "10.0.0.2/32",
+        "fd00::2/128"
+      ],
+      "mtu": 1420,
+      "peer_public_key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "pre_shared_key": "",
+      "private_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "server": "wg.baseline.internal",
+      "server_port": 51820,
+      "tag": "proxy",
+      "type": "wireguard"
+    },
+    {
+      "tag": "direct",
+      "type": "direct"
+    },
+    {
+      "tag": "bypass",
+      "type": "direct"
+    }
+  ],
+  "route": {
+    "auto_detect_interface": true,
+    "rule_set": [],
+    "rules": [
+      {
+        "action": "hijack-dns",
+        "port": [
+          53
+        ]
+      },
+      {
+        "action": "hijack-dns",
+        "protocol": [
+          "dns"
+        ]
+      },
+      {
+        "action": "reject",
+        "ip_cidr": [
+          "224.0.0.0/3",
+          "ff00::/8"
+        ],
+        "source_ip_cidr": [
+          "224.0.0.0/3",
+          "ff00::/8"
+        ]
+      }
+    ]
+  }
+}

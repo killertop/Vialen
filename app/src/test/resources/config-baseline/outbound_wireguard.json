@@ -1,0 +1,13 @@
+{
+  "local_address": [
+    "10.0.0.2/32",
+    "fd00::2/128"
+  ],
+  "mtu": 1420,
+  "peer_public_key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "pre_shared_key": "",
+  "private_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "server": "wg.example.com",
+  "server_port": 51820,
+  "type": "wireguard"
+}

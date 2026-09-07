@@ -1,0 +1,12 @@
+{
+  "password": "secret",
+  "server": "proxy.example.com",
+  "server_port": 8443,
+  "tls": {
+    "enabled": true,
+    "insecure": false,
+    "server_name": "proxy.example.com"
+  },
+  "type": "http",
+  "username": "admin"
+}

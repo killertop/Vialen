@@ -1,0 +1,29 @@
+{
+  "http_clients": [
+    {
+      "detour": "direct",
+      "tag": "default-http-client"
+    }
+  ],
+  "log": {
+    "level": "info"
+  },
+  "outbounds": [
+    {
+      "tag": "direct",
+      "type": "direct"
+    }
+  ],
+  "route": {
+    "default_http_client": "default-http-client",
+    "rule_set": [
+      {
+        "format": "binary",
+        "http_client": "default-http-client",
+        "tag": "rules.srs",
+        "type": "remote",
+        "url": "https://example.com/rules.srs"
+      }
+    ]
+  }
+}

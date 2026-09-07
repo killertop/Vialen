@@ -1,0 +1,15 @@
+{
+  "congestion_control": "bbr",
+  "password": "tuicpassword",
+  "server": "tuic.example.com",
+  "server_port": 8443,
+  "tls": {
+    "disable_sni": false,
+    "enabled": true,
+    "insecure": false,
+    "server_name": "tuic.example.com"
+  },
+  "type": "tuic",
+  "uuid": "b831381d-6324-4d53-ad4f-8cda48b30811",
+  "zero_rtt_handshake": false
+}

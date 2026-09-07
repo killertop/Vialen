@@ -1,0 +1,61 @@
+{
+  "dns": {
+    "final": "dns-direct",
+    "rules": [],
+    "servers": [
+      {
+        "tag": "dns-local",
+        "type": "local"
+      },
+      {
+        "domain_resolver": "dns-local",
+        "server": "223.5.5.5",
+        "tag": "dns-direct",
+        "type": "udp"
+      }
+    ],
+    "strategy": "prefer_ipv4"
+  },
+  "endpoints": [],
+  "inbounds": [],
+  "log": {
+    "level": "info"
+  },
+  "outbounds": [
+    {
+      "detour": "g-101",
+      "domain_strategy": "",
+      "password": "landingpass",
+      "server": "landing.anytls.example.com",
+      "server_port": 443,
+      "tag": "proxy",
+      "tls": {
+        "enabled": true,
+        "server_name": "landing.anytls.example.com"
+      },
+      "type": "anytls"
+    },
+    {
+      "domain_strategy": "",
+      "method": "chacha20-ietf-poly1305",
+      "password": "frontpassword",
+      "server": "front.ss.example.com",
+      "server_port": 8388,
+      "tag": "g-101",
+      "type": "shadowsocks"
+    },
+    {
+      "tag": "direct",
+      "type": "direct"
+    },
+    {
+      "tag": "bypass",
+      "type": "direct"
+    }
+  ],
+  "route": {
+    "auto_detect_interface": true,
+    "rule_set": [],
+    "rules": []
+  }
+}

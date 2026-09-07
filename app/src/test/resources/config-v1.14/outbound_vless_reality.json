@@ -1,0 +1,22 @@
+{
+  "flow": "xtls-rprx-vision",
+  "packet_encoding": "",
+  "server": "vless.example.com",
+  "server_port": 443,
+  "tls": {
+    "enabled": true,
+    "insecure": false,
+    "reality": {
+      "enabled": true,
+      "public_key": "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE",
+      "short_id": "0123456789abcdef"
+    },
+    "server_name": "yahoo.com",
+    "utls": {
+      "enabled": true,
+      "fingerprint": "chrome"
+    }
+  },
+  "type": "vless",
+  "uuid": "b831381d-6324-4d53-ad4f-8cda48b30811"
+}

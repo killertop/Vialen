@@ -1,0 +1,2 @@
+hysteria://1.1.1.1:443?protocol=faketcp&auth=123#FakeTcp
+hysteria://1.1.1.1:443?protocol=wechat-video&auth=123#WeChat

@@ -1,0 +1,166 @@
+--- a/box.go
++++ b/box.go
+@@ -226,13 +226,13 @@
+ 	}
+ 	service.MustRegister[adapter.DNSRouter](ctx, dnsRouter)
+ 	service.MustRegister[adapter.DNSRuleSetUpdateValidator](ctx, dnsRouter)
+-	networkManager, err := route.NewNetworkManager(ctx, logFactory.NewLogger("network"), routeOptions, dnsOptions)
+-	if err != nil {
+-		return nil, E.Cause(err, "initialize network manager")
+-	}
+-	service.MustRegister[adapter.NetworkManager](ctx, networkManager)
+ 	connectionManager := route.NewConnectionManager(logFactory.NewLogger("connection"))
+ 	service.MustRegister[adapter.ConnectionManager](ctx, connectionManager)
++	networkManager, err := route.NewNetworkManager(ctx, logFactory.NewLogger("network"), routeOptions, dnsOptions)
++	if err != nil {
++		return nil, E.Cause(err, "initialize network manager")
++	}
++	service.MustRegister[adapter.NetworkManager](ctx, networkManager)
+ 	// Must register after ConnectionManager: the Apple HTTP engine's proxy bridge reads it from the context when Manager.Start resolves the default client.
+ 	httpClientManager := httpclient.NewManager(ctx, logFactory.NewLogger("httpclient"), options.HTTPClients, routeOptions.DefaultHTTPClient)
+ 	service.MustRegister[adapter.HTTPClientManager](ctx, httpClientManager)
+--- /dev/null
++++ b/box_network_reset_test.go
+@@ -0,0 +1,142 @@
++package box_test
++
++import (
++	"bytes"
++	"context"
++	"errors"
++	"fmt"
++	"io"
++	"net"
++	"testing"
++	"time"
++
++	box "github.com/sagernet/sing-box"
++	"github.com/sagernet/sing-box/adapter"
++	"github.com/sagernet/sing-box/adapter/certificate"
++	"github.com/sagernet/sing-box/adapter/endpoint"
++	"github.com/sagernet/sing-box/adapter/inbound"
++	"github.com/sagernet/sing-box/adapter/outbound"
++	boxService "github.com/sagernet/sing-box/adapter/service"
++	"github.com/sagernet/sing-box/dns"
++	"github.com/sagernet/sing-box/dns/transport/local"
++	"github.com/sagernet/sing-box/option"
++	M "github.com/sagernet/sing/common/metadata"
++	"github.com/sagernet/sing/service"
++)
++
++// Exercise Box.New's real registration order, then its real default outbound's
++// dialer. Registering a ConnectionManager by hand would hide the regression.
++func TestBoxResetNetworkClosesTrackedTCP(t *testing.T) {
++	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
++	t.Cleanup(cancel)
++	dnsRegistry := dns.NewTransportRegistry()
++	local.RegisterTransport(dnsRegistry)
++	ctx = box.Context(ctx, inbound.NewRegistry(), outbound.NewRegistry(), endpoint.NewRegistry(),
++		dnsRegistry, boxService.NewRegistry(), certificate.NewRegistry())
++	if service.FromContext[adapter.ConnectionManager](ctx) != nil {
++		t.Fatal("fresh context unexpectedly contains a connection manager")
++	}
++	instance, err := box.New(box.Options{
++		Context: ctx,
++		Options: option.Options{Log: &option.LogOptions{Level: "error"}},
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	// Start initializes Router and DNS before ResetNetwork uses them. This is
++	// deliberately the real lifecycle, not a reflection write into NetworkManager.
++	if err = instance.Start(); err != nil {
++		// Box.Start closes the instance itself on error.
++		t.Fatal(err)
++	}
++	t.Cleanup(func() {
++		if closeErr := instance.Close(); closeErr != nil {
++			t.Errorf("close box: %v", closeErr)
++		}
++	})
++	manager := service.FromContext[adapter.ConnectionManager](ctx)
++	if manager == nil {
++		t.Fatal("Box.New did not register a connection manager")
++	}
++	if count := manager.Count(); count != 0 {
++		t.Fatalf("unexpected initial tracked connections: %d", count)
++	}
++
++	listener, err := net.ListenTCP("tcp4", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { listener.Close() })
++	destination := M.SocksaddrFromNet(listener.Addr())
++	defaultOutbound := instance.Outbound().Default()
++	if defaultOutbound == nil {
++		t.Fatal("Box.Start did not initialize its default outbound")
++	}
++
++	// A second fresh connection proves that resetting does not permanently close
++	// the manager and that newly dialed sockets remain covered by the next reset.
++	for round := 0; round < 2; round++ {
++		t.Run(fmt.Sprintf("connection_%d", round), func(t *testing.T) {
++			conn, dialErr := defaultOutbound.DialContext(ctx, "tcp", destination)
++			if dialErr != nil {
++				t.Fatal(dialErr)
++			}
++			t.Cleanup(func() { conn.Close() })
++			deadline := time.Now().Add(5 * time.Second)
++			if err := listener.SetDeadline(deadline); err != nil {
++				t.Fatal(err)
++			}
++			peer, acceptErr := listener.AcceptTCP()
++			if acceptErr != nil {
++				t.Fatal(acceptErr)
++			}
++			t.Cleanup(func() { peer.Close() })
++			if err := conn.SetDeadline(deadline); err != nil {
++				t.Fatal(err)
++			}
++			if err := peer.SetDeadline(deadline); err != nil {
++				t.Fatal(err)
++			}
++			payload := []byte(fmt.Sprintf("box-reset-live-%d", round))
++			if _, err := conn.Write(payload); err != nil {
++				t.Fatal(err)
++			}
++			received := make([]byte, len(payload))
++			if _, err := io.ReadFull(peer, received); err != nil {
++				t.Fatal(err)
++			}
++			if !bytes.Equal(payload, received) {
++				t.Fatalf("outbound payload mismatch: %q", received)
++			}
++			if _, err := peer.Write(payload); err != nil {
++				t.Fatal(err)
++			}
++			if _, err := io.ReadFull(conn, received); err != nil {
++				t.Fatal(err)
++			}
++			if !bytes.Equal(payload, received) {
++				t.Fatalf("return payload mismatch: %q", received)
++			}
++			if count := manager.Count(); count != 1 {
++				t.Fatalf("default outbound TCP was not tracked exactly once: %d", count)
++			}
++
++			instance.Network().ResetNetwork(ctx)
++			if count := manager.Count(); count != 0 {
++				t.Fatalf("ResetNetwork left %d tracked TCP connections open", count)
++			}
++			// No timeout counts as closure. The peer has consumed all payload, so
++			// closing the tracked TCP must be observable as an orderly EOF.
++			var one [1]byte
++			if n, err := peer.Read(one[:]); n != 0 || !errors.Is(err, io.EOF) {
++				t.Fatalf("peer did not observe reset EOF: n=%d err=%v", n, err)
++			}
++			if n, err := conn.Read(one[:]); n != 0 || !errors.Is(err, net.ErrClosed) {
++				t.Fatalf("tracked local TCP is not closed: n=%d err=%v", n, err)
++			}
++		})
++		if t.Failed() {
++			return
++		}
++	}
++}

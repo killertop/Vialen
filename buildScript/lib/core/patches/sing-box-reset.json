@@ -1,0 +1,21 @@
+{
+  "base_commit": "0b8995879f29a9b98ee027bc17b75e101445b238",
+  "files": {
+    "box.go": {
+      "content": {
+        "bytes": 23571,
+        "sha256": "9c13140d5aba1caa742812e727169c29eeb0c38326d518afe5ce2ee4a70fa5bf"
+      },
+      "mode": "0o644"
+    },
+    "box_network_reset_test.go": {
+      "content": {
+        "bytes": 4729,
+        "sha256": "c93048c9afceee00508caf1cacf25a0db2c139e97f5da2fcc8a24853f735d217"
+      },
+      "mode": "0o644"
+    }
+  },
+  "patch_sha256": "3e39c884c151a50b75e39e6648bedcf41567ee80f4a24927f3c604ebb1f77cfe",
+  "schema": 1
+}

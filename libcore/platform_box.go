@@ -1,0 +1,250 @@
+package libcore
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"libcore/procfs"
+	"log"
+	"net/netip"
+	"os"
+	"strings"
+	"syscall"
+
+	"github.com/matsuridayo/libneko/neko_log"
+	"github.com/sagernet/sing-box/adapter"
+	sblog "github.com/sagernet/sing-box/log"
+	"github.com/sagernet/sing-box/option"
+	tun "github.com/sagernet/sing-tun"
+	E "github.com/sagernet/sing/common/exceptions"
+	"github.com/sagernet/sing/common/logger"
+)
+
+var boxPlatformInterfaceInstance adapter.PlatformInterface = &boxPlatformInterfaceWrapper{}
+
+type boxPlatformInterfaceWrapper struct{}
+
+func (w *boxPlatformInterfaceWrapper) ReadWIFIState(ctx context.Context) adapter.WIFIState {
+	state := strings.Split(intfBox.WIFIState(), ",")
+	if len(state) >= 2 {
+		return adapter.WIFIState{
+			SSID:  state[0],
+			BSSID: state[1],
+		}
+	}
+	return adapter.WIFIState{}
+}
+
+func (w *boxPlatformInterfaceWrapper) RequestPermissionForWIFIState() error {
+	return nil
+}
+
+func (w *boxPlatformInterfaceWrapper) UsePlatformWIFIMonitor() bool {
+	return false
+}
+
+func (w *boxPlatformInterfaceWrapper) Initialize(n adapter.NetworkManager) error {
+	return nil
+}
+
+func (w *boxPlatformInterfaceWrapper) UsePlatformAutoDetectInterfaceControl() bool {
+	return true
+}
+
+func (w *boxPlatformInterfaceWrapper) AutoDetectInterfaceControl(fd int) error {
+	// call protect_path
+	if !isBgProcess {
+		_ = sendFdToProtect(fd, "protect_path")
+		return nil
+	}
+	// bg process call VPNService
+	return intfBox.AutoDetectInterfaceControl(int32(fd))
+}
+
+func (w *boxPlatformInterfaceWrapper) UsePlatformInterface() bool {
+	return true
+}
+
+func (w *boxPlatformInterfaceWrapper) OpenInterface(options *tun.Options, platformOptions option.TunPlatformOptions) (tun.Tun, error) {
+	if len(options.IncludeUID) > 0 || len(options.ExcludeUID) > 0 {
+		return nil, E.New("android: unsupported uid options")
+	}
+	if len(options.IncludeAndroidUser) > 0 {
+		return nil, E.New("android: unsupported android_user option")
+	}
+	a, _ := json.Marshal(options)
+	b, _ := json.Marshal(platformOptions)
+	tunFd, err := intfBox.OpenTun(string(a), string(b))
+	if err != nil {
+		return nil, fmt.Errorf("intfBox.OpenTun: %v", err)
+	}
+	tunFd, err = syscall.Dup(tunFd)
+	if err != nil {
+		return nil, fmt.Errorf("syscall.Dup: %v", err)
+	}
+	options.FileDescriptor = int(tunFd)
+	return tun.New(*options)
+}
+
+func (w *boxPlatformInterfaceWrapper) ProcessPlatformOptions(options option.TunPlatformOptions) error {
+	return nil
+}
+
+func (w *boxPlatformInterfaceWrapper) CloseTun() error {
+	return nil
+}
+
+func (w *boxPlatformInterfaceWrapper) UsePlatformDefaultInterfaceMonitor() bool {
+	return true
+}
+
+func (w *boxPlatformInterfaceWrapper) CreateDefaultInterfaceMonitor(l logger.Logger) tun.DefaultInterfaceMonitor {
+	return &interfaceMonitorStub{}
+}
+
+func (w *boxPlatformInterfaceWrapper) UsePlatformNetworkInterfaces() bool {
+	return false
+}
+
+func (w *boxPlatformInterfaceWrapper) NetworkInterfaces() ([]adapter.NetworkInterface, error) {
+	return nil, errors.New("not supported")
+}
+
+func (w *boxPlatformInterfaceWrapper) UnderNetworkExtension() bool {
+	return false
+}
+
+func (w *boxPlatformInterfaceWrapper) NetworkExtensionIncludeAllNetworks() bool {
+	return false
+}
+
+func (w *boxPlatformInterfaceWrapper) ClearDNSCache() {
+}
+
+func (w *boxPlatformInterfaceWrapper) UsePlatformConnectionOwnerFinder() bool {
+	return true
+}
+
+func (w *boxPlatformInterfaceWrapper) FindConnectionOwner(request *adapter.FindConnectionOwnerRequest) (*adapter.ConnectionOwner, error) {
+	var uid int32
+	if useProcfs {
+		var network string
+		switch request.IpProtocol {
+		case syscall.IPPROTO_TCP:
+			network = "tcp"
+		case syscall.IPPROTO_UDP:
+			network = "udp"
+		default:
+			network = "tcp"
+		}
+		source, _ := netip.ParseAddrPort(fmt.Sprintf("%s:%d", request.SourceAddress, request.SourcePort))
+		destination, _ := netip.ParseAddrPort(fmt.Sprintf("%s:%d", request.DestinationAddress, request.DestinationPort))
+		uid = procfs.ResolveSocketByProcSearch(network, source, destination)
+		if uid == -1 {
+			return nil, E.New("procfs: not found")
+		}
+	} else {
+		var err error
+		uid, err = intfBox.FindConnectionOwner(request.IpProtocol, request.SourceAddress, request.SourcePort, request.DestinationAddress, request.DestinationPort)
+		if err != nil {
+			return nil, err
+		}
+	}
+	packageName, _ := intfBox.PackageNameByUid(uid)
+	var pkgNames []string
+	if packageName != "" {
+		pkgNames = []string{packageName}
+	}
+	return &adapter.ConnectionOwner{UserId: uid, AndroidPackageNames: pkgNames}, nil
+}
+
+func (w *boxPlatformInterfaceWrapper) UsePlatformNotification() bool {
+	return false
+}
+
+func (w *boxPlatformInterfaceWrapper) SendNotification(notification *adapter.Notification) error {
+	return nil
+}
+
+func (w *boxPlatformInterfaceWrapper) CancelNotification(identifier string, typeID int32) error {
+	return nil
+}
+
+func (w *boxPlatformInterfaceWrapper) MyInterfaceAddress() []netip.Addr {
+	return nil
+}
+
+func (w *boxPlatformInterfaceWrapper) UsePlatformNeighborResolver() bool {
+	return false
+}
+
+func (w *boxPlatformInterfaceWrapper) StartNeighborMonitor(listener adapter.NeighborUpdateListener) error {
+	return os.ErrInvalid
+}
+
+func (w *boxPlatformInterfaceWrapper) CloseNeighborMonitor(listener adapter.NeighborUpdateListener) error {
+	return nil
+}
+
+func (w *boxPlatformInterfaceWrapper) UsePlatformShell() bool {
+	return false
+}
+
+func (w *boxPlatformInterfaceWrapper) CheckPlatformShell() error {
+	return nil
+}
+
+func (w *boxPlatformInterfaceWrapper) OpenShellSession(user *adapter.PlatformUser, command string, env []string, term string, rows int32, cols int32) (adapter.ShellSession, error) {
+	return nil, os.ErrInvalid
+}
+
+func (w *boxPlatformInterfaceWrapper) LookupUser(username string) (*adapter.PlatformUser, error) {
+	return nil, os.ErrInvalid
+}
+
+func (w *boxPlatformInterfaceWrapper) LookupSFTPServer() (string, error) {
+	return "", os.ErrInvalid
+}
+
+func (w *boxPlatformInterfaceWrapper) ReadSystemSSHHostKey() ([]byte, error) {
+	return nil, os.ErrInvalid
+}
+
+func (w *boxPlatformInterfaceWrapper) TailscaleHostname() string {
+	return ""
+}
+
+func (w *boxPlatformInterfaceWrapper) UsePlatformBridge() bool {
+	return false
+}
+
+func (w *boxPlatformInterfaceWrapper) CreateBridge(options adapter.BridgeOptions) (adapter.BridgeSession, error) {
+	return nil, os.ErrInvalid
+}
+
+var disableSingBoxLog = false
+
+func (w *boxPlatformInterfaceWrapper) Write(p []byte) (n int, err error) {
+	if !disableSingBoxLog {
+		log.Print(string(p))
+	}
+	return len(p), nil
+}
+
+type boxPlatformLogWriterWrapper struct{}
+
+var boxPlatformLogWriter sblog.PlatformWriter = &boxPlatformLogWriterWrapper{}
+
+func (w *boxPlatformLogWriterWrapper) DisableColors() bool { return true }
+
+func (w *boxPlatformLogWriterWrapper) WriteMessage(level uint8, message string) {
+	if !strings.HasSuffix(message, "\n") {
+		message += "\n"
+	}
+	if neko_log.LogWriter != nil {
+		neko_log.LogWriter.Write([]byte(message))
+	} else {
+		log.Print(message)
+	}
+}
