@@ -158,6 +158,11 @@ func (b *BoxInstance) Close() (err error) {
 		b.cancel()
 	}
 	if b.Box != nil {
+		// Start closes itself on failure. Reuse only a completed cleanup result,
+		// preserving its error; a panic still requires unconfirmed-close handling.
+		if completed, closeErr := b.Box.StartFailureCleanupResult(); completed {
+			return closeErr
+		}
 		return b.Box.Close()
 	}
 

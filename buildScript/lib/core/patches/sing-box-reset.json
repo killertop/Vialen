@@ -1,10 +1,66 @@
 {
   "base_commit": "0b8995879f29a9b98ee027bc17b75e101445b238",
   "files": {
+    "adapter/endpoint/manager.go": {
+      "content": {
+        "bytes": 4030,
+        "sha256": "34356a7ac75f8e3ea8c494ac9fb496d6e7c73ab5de5b9cad3d3d5577eecaecb3"
+      },
+      "mode": "0o644"
+    },
+    "adapter/endpoint/manager_close_failure_test.go": {
+      "content": {
+        "bytes": 1075,
+        "sha256": "2f414d8c42dd971f424e812a4dd6c94f90297433a4514edb537784562e343ba0"
+      },
+      "mode": "0o644"
+    },
+    "adapter/inbound/manager.go": {
+      "content": {
+        "bytes": 4018,
+        "sha256": "cba782398cf5511e3030f2d9f42a5c96f85de9e0a067ddbf16f50a3db8df102a"
+      },
+      "mode": "0o644"
+    },
+    "adapter/inbound/manager_close_failure_test.go": {
+      "content": {
+        "bytes": 1071,
+        "sha256": "c8a97a716262a34d6c2e329bae7a7e471e3ebf8cc4adfd733ee99b5b580ba099"
+      },
+      "mode": "0o644"
+    },
+    "adapter/outbound/manager.go": {
+      "content": {
+        "bytes": 9082,
+        "sha256": "3e50c09009fea6b95c52fa3122de5bf1ed14d2449e0365c382845d56772a190f"
+      },
+      "mode": "0o644"
+    },
+    "adapter/outbound/manager_close_failure_test.go": {
+      "content": {
+        "bytes": 1075,
+        "sha256": "2521ac1e5b88b0bea6e47d16ce9b76be3a86aa25f1bb44b1bfcacfd7d8b25535"
+      },
+      "mode": "0o644"
+    },
+    "adapter/service/manager.go": {
+      "content": {
+        "bytes": 3844,
+        "sha256": "a272e850818edd6083b7bda745ce4887c84fd78df2ec95e8750f835394bcc63c"
+      },
+      "mode": "0o644"
+    },
+    "adapter/service/manager_close_failure_test.go": {
+      "content": {
+        "bytes": 1071,
+        "sha256": "61fc883b50800430aa82d05a43410aeac2cac48acc99cf0f0a76d09a63d67a52"
+      },
+      "mode": "0o644"
+    },
     "box.go": {
       "content": {
-        "bytes": 23571,
-        "sha256": "9c13140d5aba1caa742812e727169c29eeb0c38326d518afe5ce2ee4a70fa5bf"
+        "bytes": 24199,
+        "sha256": "640c3986299577a0f8ff4f525852800afa9aeed0e24862cecff50d5fbc6fe105"
       },
       "mode": "0o644"
     },
@@ -14,8 +70,29 @@
         "sha256": "c93048c9afceee00508caf1cacf25a0db2c139e97f5da2fcc8a24853f735d217"
       },
       "mode": "0o644"
+    },
+    "box_start_cleanup_test.go": {
+      "content": {
+        "bytes": 2505,
+        "sha256": "b9b60e2d6d694e692ac0d7a7e29e7380d24adffd756f30715f522ed26135761c"
+      },
+      "mode": "0o644"
+    },
+    "dns/manager_close_failure_test.go": {
+      "content": {
+        "bytes": 1088,
+        "sha256": "4b6d7cf7cf95fa4ab967a892320b57481b2fa67ae822ac4a2ef1366f3e31c0e4"
+      },
+      "mode": "0o644"
+    },
+    "dns/transport_manager.go": {
+      "content": {
+        "bytes": 9093,
+        "sha256": "efce28d5f523b558f2733887264626f1d50a4db85c8ceeef2d77fed3680b1c99"
+      },
+      "mode": "0o644"
     }
   },
-  "patch_sha256": "3e39c884c151a50b75e39e6648bedcf41567ee80f4a24927f3c604ebb1f77cfe",
+  "patch_sha256": "3528c20ebf3518a3d0718967f81ad68a13a90c2fb97654a174d8167561f44c39",
   "schema": 1
 }

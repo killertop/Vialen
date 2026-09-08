@@ -1,6 +1,227 @@
+--- a/adapter/endpoint/manager.go
++++ b/adapter/endpoint/manager.go
+@@ -78,7 +78,7 @@
+ 		monitor.Finish()
+ 		done()
+ 	}
+-	return nil
++	return err
+ }
+ 
+ func (m *Manager) Endpoints() []adapter.Endpoint {
+--- /dev/null
++++ b/adapter/endpoint/manager_close_failure_test.go
+@@ -0,0 +1,36 @@
++package endpoint
++
++import (
++	"errors"
++	"github.com/sagernet/sing-box/adapter"
++	"github.com/sagernet/sing-box/log"
++	"testing"
++)
++
++type closeFailureFixture struct {
++	adapter.Endpoint
++	err   error
++	calls int
++}
++
++func (*closeFailureFixture) Type() string   { return "test" }
++func (*closeFailureFixture) Tag() string    { return "test" }
++func (f *closeFailureFixture) Close() error { f.calls++; return f.err }
++func TestClosePreservesFailureAndClosesRemaining(t *testing.T) {
++	sentinel := errors.New("close failure")
++	first := &closeFailureFixture{err: sentinel}
++	last := &closeFailureFixture{}
++	m := &Manager{started: true, logger: log.NewNOPFactory().Logger(), endpoints: []adapter.Endpoint{first, last}}
++	if err := m.Close(); !errors.Is(err, sentinel) {
++		t.Fatalf("lost cleanup error: %v", err)
++	}
++	if first.calls != 1 || last.calls != 1 {
++		t.Fatalf("close calls: %d, %d", first.calls, last.calls)
++	}
++	if err := m.Close(); err != nil {
++		t.Fatalf("duplicate manager close: %v", err)
++	}
++	if first.calls != 1 || last.calls != 1 {
++		t.Fatal("duplicate close repeated cleanup")
++	}
++}
+--- a/adapter/inbound/manager.go
++++ b/adapter/inbound/manager.go
+@@ -77,7 +77,7 @@
+ 		monitor.Finish()
+ 		done()
+ 	}
+-	return nil
++	return err
+ }
+ 
+ func (m *Manager) Inbounds() []adapter.Inbound {
+--- /dev/null
++++ b/adapter/inbound/manager_close_failure_test.go
+@@ -0,0 +1,36 @@
++package inbound
++
++import (
++	"errors"
++	"github.com/sagernet/sing-box/adapter"
++	"github.com/sagernet/sing-box/log"
++	"testing"
++)
++
++type closeFailureFixture struct {
++	adapter.Inbound
++	err   error
++	calls int
++}
++
++func (*closeFailureFixture) Type() string   { return "test" }
++func (*closeFailureFixture) Tag() string    { return "test" }
++func (f *closeFailureFixture) Close() error { f.calls++; return f.err }
++func TestClosePreservesFailureAndClosesRemaining(t *testing.T) {
++	sentinel := errors.New("close failure")
++	first := &closeFailureFixture{err: sentinel}
++	last := &closeFailureFixture{}
++	m := &Manager{started: true, logger: log.NewNOPFactory().Logger(), inbounds: []adapter.Inbound{first, last}}
++	if err := m.Close(); !errors.Is(err, sentinel) {
++		t.Fatalf("lost cleanup error: %v", err)
++	}
++	if first.calls != 1 || last.calls != 1 {
++		t.Fatalf("close calls: %d, %d", first.calls, last.calls)
++	}
++	if err := m.Close(); err != nil {
++		t.Fatalf("duplicate manager close: %v", err)
++	}
++	if first.calls != 1 || last.calls != 1 {
++		t.Fatal("duplicate close repeated cleanup")
++	}
++}
+--- a/adapter/outbound/manager.go
++++ b/adapter/outbound/manager.go
+@@ -189,7 +189,7 @@
+ 			done()
+ 		}
+ 	}
+-	return nil
++	return err
+ }
+ 
+ func (m *Manager) Outbounds() []adapter.Outbound {
+--- /dev/null
++++ b/adapter/outbound/manager_close_failure_test.go
+@@ -0,0 +1,36 @@
++package outbound
++
++import (
++	"errors"
++	"github.com/sagernet/sing-box/adapter"
++	"github.com/sagernet/sing-box/log"
++	"testing"
++)
++
++type closeFailureFixture struct {
++	adapter.Outbound
++	err   error
++	calls int
++}
++
++func (*closeFailureFixture) Type() string   { return "test" }
++func (*closeFailureFixture) Tag() string    { return "test" }
++func (f *closeFailureFixture) Close() error { f.calls++; return f.err }
++func TestClosePreservesFailureAndClosesRemaining(t *testing.T) {
++	sentinel := errors.New("close failure")
++	first := &closeFailureFixture{err: sentinel}
++	last := &closeFailureFixture{}
++	m := &Manager{started: true, logger: log.NewNOPFactory().Logger(), outbounds: []adapter.Outbound{first, last}}
++	if err := m.Close(); !errors.Is(err, sentinel) {
++		t.Fatalf("lost cleanup error: %v", err)
++	}
++	if first.calls != 1 || last.calls != 1 {
++		t.Fatalf("close calls: %d, %d", first.calls, last.calls)
++	}
++	if err := m.Close(); err != nil {
++		t.Fatalf("duplicate manager close: %v", err)
++	}
++	if first.calls != 1 || last.calls != 1 {
++		t.Fatal("duplicate close repeated cleanup")
++	}
++}
+--- a/adapter/service/manager.go
++++ b/adapter/service/manager.go
+@@ -75,7 +75,7 @@
+ 		monitor.Finish()
+ 		done()
+ 	}
+-	return nil
++	return err
+ }
+ 
+ func (m *Manager) Services() []adapter.Service {
+--- /dev/null
++++ b/adapter/service/manager_close_failure_test.go
+@@ -0,0 +1,36 @@
++package service
++
++import (
++	"errors"
++	"github.com/sagernet/sing-box/adapter"
++	"github.com/sagernet/sing-box/log"
++	"testing"
++)
++
++type closeFailureFixture struct {
++	adapter.Service
++	err   error
++	calls int
++}
++
++func (*closeFailureFixture) Type() string   { return "test" }
++func (*closeFailureFixture) Tag() string    { return "test" }
++func (f *closeFailureFixture) Close() error { f.calls++; return f.err }
++func TestClosePreservesFailureAndClosesRemaining(t *testing.T) {
++	sentinel := errors.New("close failure")
++	first := &closeFailureFixture{err: sentinel}
++	last := &closeFailureFixture{}
++	m := &Manager{started: true, logger: log.NewNOPFactory().Logger(), services: []adapter.Service{first, last}}
++	if err := m.Close(); !errors.Is(err, sentinel) {
++		t.Fatalf("lost cleanup error: %v", err)
++	}
++	if first.calls != 1 || last.calls != 1 {
++		t.Fatalf("close calls: %d, %d", first.calls, last.calls)
++	}
++	if err := m.Close(); err != nil {
++		t.Fatalf("duplicate manager close: %v", err)
++	}
++	if first.calls != 1 || last.calls != 1 {
++		t.Fatal("duplicate close repeated cleanup")
++	}
++}
 --- a/box.go
 +++ b/box.go
-@@ -226,13 +226,13 @@
+@@ -7,6 +7,7 @@
+ 	"net/http"
+ 	"os"
+ 	"runtime/debug"
++	"sync/atomic"
+ 	"time"
+ 
+ 	"github.com/sagernet/sing-box/adapter"
+@@ -62,6 +63,12 @@
+ 	httpClientService   adapter.LifecycleService
+ 	internalService     []adapter.LifecycleService
+ 	done                chan struct{}
++
++	startFailureCleanup atomic.Pointer[startFailureCleanupResult]
++}
++
++type startFailureCleanupResult struct {
++	err error
+ }
+ 
+ type Options struct {
+@@ -226,13 +233,13 @@
  	}
  	service.MustRegister[adapter.DNSRouter](ctx, dnsRouter)
  	service.MustRegister[adapter.DNSRuleSetUpdateValidator](ctx, dnsRouter)
@@ -19,6 +240,42 @@
  	// Must register after ConnectionManager: the Apple HTTP engine's proxy bridge reads it from the context when Manager.Start resolves the default client.
  	httpClientManager := httpclient.NewManager(ctx, logFactory.NewLogger("httpclient"), options.HTTPClients, routeOptions.DefaultHTTPClient)
  	service.MustRegister[adapter.HTTPClientManager](ctx, httpClientManager)
+@@ -503,8 +510,8 @@
+ 	return nil
+ }
+ 
+-func (s *Box) Start() error {
+-	err := s.start()
++func (s *Box) Start() (err error) {
++	err = s.start()
+ 	if err != nil {
+ 		// TODO: remove catch error
+ 		defer func() {
+@@ -515,11 +522,23 @@
+ 				println("panic on early start: " + fmt.Sprint(v))
+ 			}
+ 		}()
+-		s.Close()
++		closeErr := s.Close()
++		s.startFailureCleanup.Store(&startFailureCleanupResult{err: closeErr})
+ 		return err
+ 	}
+ 	s.logger.Info("sing-box started (", F.Seconds(time.Since(s.createdAt).Seconds()), "s)")
+ 	return nil
++}
++
++// StartFailureCleanupResult reports a completed automatic cleanup after Start
++// failed, preserving its error. A panicking cleanup remains unconfirmed, and
++// ordinary repeated Close calls retain their existing behavior.
++func (s *Box) StartFailureCleanupResult() (completed bool, err error) {
++	result := s.startFailureCleanup.Load()
++	if result == nil {
++		return false, nil
++	}
++	return true, result.err
+ }
+ 
+ func (s *Box) preStart() error {
 --- /dev/null
 +++ b/box_network_reset_test.go
 @@ -0,0 +1,142 @@
@@ -164,3 +421,131 @@
 +		}
 +	}
 +}
+--- /dev/null
++++ b/box_start_cleanup_test.go
+@@ -0,0 +1,75 @@
++package box
++
++import (
++	"context"
++	"errors"
++	"os"
++	"testing"
++
++	"github.com/sagernet/sing-box/adapter"
++	"github.com/sagernet/sing-box/adapter/certificate"
++	"github.com/sagernet/sing-box/adapter/endpoint"
++	"github.com/sagernet/sing-box/adapter/inbound"
++	"github.com/sagernet/sing-box/adapter/outbound"
++	boxService "github.com/sagernet/sing-box/adapter/service"
++	"github.com/sagernet/sing-box/dns"
++	"github.com/sagernet/sing-box/dns/transport/local"
++	"github.com/sagernet/sing-box/option"
++)
++
++type failingStartService struct {
++	closeErr   error
++	closePanic bool
++	closes     int
++}
++
++func (*failingStartService) Name() string                   { return "failed-start-test" }
++func (*failingStartService) Start(adapter.StartStage) error { return errors.New("test start failure") }
++func (s *failingStartService) Close() error {
++	s.closes++
++	if s.closePanic {
++		panic("test close panic")
++	}
++	return s.closeErr
++}
++
++func TestStartFailureCleanupConfirmation(t *testing.T) {
++	for _, tc := range []struct {
++		name       string
++		closeErr   error
++		closePanic bool
++	}{
++		{name: "successful"},
++		{name: "failed", closeErr: errors.New("test close failure")},
++		{name: "panicked", closePanic: true},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			transports := dns.NewTransportRegistry()
++			local.RegisterTransport(transports)
++			ctx := Context(context.Background(), inbound.NewRegistry(), outbound.NewRegistry(), endpoint.NewRegistry(), transports, boxService.NewRegistry(), certificate.NewRegistry())
++			instance, err := New(Options{Context: ctx, Options: option.Options{Log: &option.LogOptions{Disabled: true}}})
++			if err != nil {
++				t.Fatal(err)
++			}
++			fixture := &failingStartService{closeErr: tc.closeErr, closePanic: tc.closePanic}
++			instance.internalService = append(instance.internalService, fixture)
++			if completed, _ := instance.StartFailureCleanupResult(); completed {
++				t.Fatal("cleanup confirmed before Start")
++			}
++			startErr := instance.Start()
++			if startErr == nil {
++				t.Fatal("expected Start failure")
++			}
++			if fixture.closes != 1 {
++				t.Fatalf("automatic closes = %d", fixture.closes)
++			}
++			completed, closeErr := instance.StartFailureCleanupResult()
++			if completed != !tc.closePanic || !errors.Is(closeErr, tc.closeErr) {
++				t.Fatalf("cleanup result = %v, %v; want completed=%v, error=%v", completed, closeErr, !tc.closePanic, tc.closeErr)
++			}
++			if err := instance.Close(); !errors.Is(err, os.ErrClosed) {
++				t.Fatalf("ordinary repeated Close changed semantics: %v", err)
++			}
++		})
++	}
++}
+--- /dev/null
++++ b/dns/manager_close_failure_test.go
+@@ -0,0 +1,36 @@
++package dns
++
++import (
++	"errors"
++	"github.com/sagernet/sing-box/adapter"
++	"github.com/sagernet/sing-box/log"
++	"testing"
++)
++
++type closeFailureFixture struct {
++	adapter.DNSTransport
++	err   error
++	calls int
++}
++
++func (*closeFailureFixture) Type() string   { return "test" }
++func (*closeFailureFixture) Tag() string    { return "test" }
++func (f *closeFailureFixture) Close() error { f.calls++; return f.err }
++func TestClosePreservesFailureAndClosesRemaining(t *testing.T) {
++	sentinel := errors.New("close failure")
++	first := &closeFailureFixture{err: sentinel}
++	last := &closeFailureFixture{}
++	m := &TransportManager{started: true, logger: log.NewNOPFactory().Logger(), transports: []adapter.DNSTransport{first, last}}
++	if err := m.Close(); !errors.Is(err, sentinel) {
++		t.Fatalf("lost cleanup error: %v", err)
++	}
++	if first.calls != 1 || last.calls != 1 {
++		t.Fatalf("close calls: %d, %d", first.calls, last.calls)
++	}
++	if err := m.Close(); err != nil {
++		t.Fatalf("duplicate manager close: %v", err)
++	}
++	if first.calls != 1 || last.calls != 1 {
++		t.Fatal("duplicate close repeated cleanup")
++	}
++}
+--- a/dns/transport_manager.go
++++ b/dns/transport_manager.go
+@@ -166,7 +166,7 @@
+ 			monitor.Finish()
+ 		}
+ 	}
+-	return nil
++	return err
+ }
+ 
+ func (m *TransportManager) Transports() []adapter.DNSTransport {
