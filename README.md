@@ -1,30 +1,77 @@
-# Vialen for Android
+# Vialen
 
-Vialen 是基于 NekoBox for Android 的 Android 代理客户端，使用 sing-box 内核，并包含本项目的 Rust 组件。
+**轻量、清晰的 Android 代理客户端。**
 
-安装包标识为 `com.vialen.app`，Debug 构建为 `com.vialen.app.debug`。当前分支仅构建和支持 `arm64-v8a`（Android ARM64），APK、AAB、Go 内核和 Rust JNI 均使用这一架构。
+[下载最新版本](https://github.com/killertop/Vialen/releases/latest) · [版本记录](https://github.com/killertop/Vialen/releases) · [English](#english)
 
-## 构建与发布
+## 中文
 
-应用仅保留英文和中文（简体、繁体），发布构建不再区分 OSS、F-Droid、Play 或 Preview 渠道。在 Android SDK/NDK、原生依赖及签名配置就绪后执行：
+Vialen 提供节点与订阅管理、分组、路由和 VPN 连接，采用简洁的黑色主题与独立夜间模式设置。当前正式安装包适用于 Android ARM64（`arm64-v8a`），应用包名为 `com.vialen.app`。
+
+### 功能
+
+- 导入和管理节点、订阅与分组。
+- 配置路由，在应用内查看连接状态与流量统计。
+- 首次添加或导入节点后，在没有有效选择且 VPN 已停止时自动选中首个节点。
+- 启动时不申请通知权限，运行时保留最小 VPN 前台服务通知。
+- 统一的 Vialen 图标与关于页，减少无关入口。
+
+### Rust 与订阅处理
+
+Vialen 在订阅处理流程中集成 Rust，并根据实际测量采用混合解析：符合保守检查条件的普通 JSON 使用 Kotlin 快速路径，其余输入继续通过 Rust 处理。该设计兼顾兼容性、可维护性与完整更新流程的效率，不将局部解析速度等同于整体性能或续航提升。
+
+订阅导入提取节点配置，订阅中的分流规则不会自动导入为应用路由规则。
+
+### 安装
+
+从 [Releases](https://github.com/killertop/Vialen/releases) 下载正式 APK，可使用同一版本的 `SHA256SUMS` 文件核验完整性。同签名版本支持覆盖升级。当前版本不提供备份恢复功能。
+
+### 开发与构建
+
+应用层使用 Kotlin，原生组件包含 Rust。构建需要 Android SDK/NDK、Rust 工具链及已准备好的原生依赖。发布构建还需配置签名。
 
 ```sh
 ./gradlew :app:assembleRelease
 ```
 
-每次发布构建仅生成一个 ARM64 APK，位于 `app/build/outputs/apk/release/`，文件名为 `Vialen-<version>-arm64-v8a.apk`；未配置发布签名时文件名含 `-unsigned`。开发及测试仍使用 `:app:assembleDebug`、`:app:assembleDebugAndroidTest`、`:app:testDebugUnitTest` 和 `:app:connectedDebugAndroidTest`。
+每次构建生成一个 ARM64 APK。仓库提供手动触发的构建工作流，用于从指定源码生成并校验原生组件和未签名 APK；正式签名与发布单独完成。
 
-本仓库的本地构建和验证结果以对应的构建日志及验收记录为准。应用内发布入口已配置为 [Vialen Releases](https://github.com/killertop/Vialen/releases)。尚未配置独立的官方下载站点或社区入口；上游 NekoBox 的 Release 不作为 Vialen 更新来源。
+## English
 
-## 订阅与兼容性
+**A clean, lightweight proxy client for Android.**
 
-支持范围以当前实现与测试为准。订阅解析提取节点出站，订阅中的分流规则不自动作为应用规则导入。内部源码包名、JNI 导出符号与插件接口保留既有兼容标识；它们与 Android 安装包标识分别管理。
+[Download the latest release](https://github.com/killertop/Vialen/releases/latest) · [Release history](https://github.com/killertop/Vialen/releases)
 
-## 上游与许可
+Vialen provides profile, subscription, group, routing, and VPN management with a restrained black theme and separate night-mode settings. Current release packages target Android ARM64 (`arm64-v8a`) and use the application ID `com.vialen.app`.
 
-Vialen 基于 [NekoBox for Android](https://github.com/MatsuriDayo/NekoBoxForAndroid) 开发。保留仓库的 LICENSE、源码版权声明及第三方许可；上游链接用于来源追溯，不代表 Vialen 官方下载或服务入口。
+### Features
 
-- 内核：[SagerNet/sing-box](https://github.com/SagerNet/sing-box)
-- Android GUI 来源：[SagerNet/SagerNet](https://github.com/SagerNet/SagerNet)、[shadowsocks/shadowsocks-android](https://github.com/shadowsocks/shadowsocks-android)
-- Web Dashboard 来源：[Yacd-meta](https://github.com/MetaCubeX/Yacd-meta)
-- 上游插件参考：[NekoBox 插件文档](https://matsuridayo.github.io/nb4a-plugin/)
+- Import and manage profiles, subscriptions, and groups.
+- Configure routing and view connection status and traffic statistics in the app.
+- Automatically select the first profile after an addition or import when there is no valid selection and the VPN is stopped.
+- No notification permission request at startup; a minimal VPN foreground-service notification remains while running.
+- Consistent Vialen branding and a focused About page.
+
+### Rust and subscription processing
+
+Vialen integrates Rust into its subscription processing pipeline. Its hybrid parser follows measured results: ordinary JSON that passes conservative checks uses a Kotlin fast path, while other inputs continue through Rust. The design balances compatibility, maintainability, and end-to-end update efficiency. Parser-only measurements are not presented as overall performance or battery-life improvements.
+
+Subscription imports extract profile configurations. Routing rules contained in a subscription are not automatically imported as application routing rules.
+
+### Installation
+
+Download the signed APK from [Releases](https://github.com/killertop/Vialen/releases). Use the matching `SHA256SUMS` file to verify its integrity. Builds signed with the same certificate support in-place upgrades. Backup and restore are not available in the current version.
+
+### Development and building
+
+The application layer uses Kotlin, with native components including Rust. Building requires the Android SDK/NDK, the Rust toolchain, and prepared native dependencies. Release signing must be configured separately.
+
+```sh
+./gradlew :app:assembleRelease
+```
+
+Each build produces one ARM64 APK. A manually triggered repository workflow builds and verifies native components and an unsigned APK from a specified source revision. Official signing and publishing are handled separately.
+
+## 许可证 / License
+
+[LICENSE](LICENSE)
