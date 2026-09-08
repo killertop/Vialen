@@ -6,12 +6,15 @@ import io.nekohasekai.sagernet.group.RawUpdater
 import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.Base64
 
 @RunWith(AndroidJUnit4::class)
 class SubscriptionEndToEndNativeTest {
+    @get:Rule val selectionState = ProfileSelectionStateRule()
+
     @Test fun completeFormatsReachRealHttpAndRoomPersistence() = runBlocking {
         val db=SagerDatabase.instance
         LoopbackHttpFixture().use { server ->
