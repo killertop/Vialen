@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_desc">适用于 Android 之通用代理工具, 使用 Kotlin 编写。</string>
+    <string name="app_desc">Android 代理客户端。</string>
     <string name="project">项目</string>
     <string name="github">源代码</string>
     <string name="telegram">Telegram 更新频道</string>
     <string name="oss_licenses">开放源代码协议</string>
     <string name="app_version">版本</string>
-    <string name="logcat">导出调试信息</string>
     <string name="menu_configuration">配置</string>
     <string name="menu_group">分组</string>
     <string name="menu_about">关于</string>
@@ -170,7 +169,6 @@
     <string name="yes">是</string>
     <string name="no">否</string>
     <string name="apply">应用</string>
-    <string name="license">授权协议</string>
     <string name="route_proxy">代理</string>
     <string name="route_bypass">绕过</string>
     <string name="route_block">屏蔽</string>
@@ -187,7 +185,7 @@
     <string name="ws_path">WebSocket 路径</string>
     <string name="http_host">HTTP 主机</string>
     <string name="http_path">HTTP 路径</string>
-    <string name="show_bottom_bar">像 SagerNet 一样显示底栏</string>
+    <string name="show_bottom_bar">显示底栏</string>
     <string name="utls_fingerprint">uTLS 指纹</string>
     <string name="grpc_service_name">gRPC 服务名称</string>
     <string name="alpn">应用层协议协商</string>
@@ -215,7 +213,7 @@
     <string name="route_profile">选择配置…</string>
     <string name="empty_route">空路由</string>
     <string name="empty_route_notice">在保存前设置一些规则</string>
-    <string name="route_warn">在添加自定义规则之前，请确保您已经阅读了文档，否则您将可能无法连接到互联网。</string>
+    <string name="route_warn">在添加自定义规则之前，请确保您已经阅读了上游参考文档，否则您将可能无法连接到互联网。</string>
     <string name="route_bypass_domain">%s 域名规则</string>
     <string name="route_bypass_ip">%s IP 规则</string>
     <string name="no_proxies_found_in_file">未在此文件内找到服务器配置</string>
@@ -238,9 +236,6 @@
     <string name="connection_test_available_http">连接成功: HTTP 握手耗时 %dms</string>
     <string name="certificates">证书 (链)</string>
     <string name="bypass_lan_in_core">在核心中绕过 LAN</string>
-    <string name="ignore_battery_optimizations">忽略电池优化</string>
-    <string name="ignore_battery_optimizations_sum">移除一些限制</string>
-    <string name="document">文档</string>
     <string name="early_data_header_name">前置数据标头</string>
     <string name="config_settings">配置设置</string>
     <string name="custom_config">自定义配置</string>
@@ -380,9 +375,6 @@
     <string name="ssh_private_key">私钥</string>
     <string name="ssh_public_key">公钥</string>
     <string name="ssh_auth_type_none">无</string>
-    <string name="clear_logcat">清空日志</string>
-    <string name="menu_log">日志</string>
-    <string name="menu_tools">工具</string>
     <string name="translate_platform">翻译平台</string>
     <string name="wireguard_local_address">本地地址</string>
     <string name="wireguard_public_key">节点公钥</string>
@@ -399,29 +391,12 @@
     <string name="app_statistics_disabled">应用流量统计已禁用</string>
     <string name="pcap_notice">Pcap 文件将被保存到 %s</string>
     <string name="profile_traffic_statistics">配置流量统计</string>
-    <string name="stun_test_summary">使用 STUN 确定客户端的 RFC 3478 中定义的 NAT 过滤行为。</string>
-    <string name="stun_test">NAT 行为发现</string>
-    <string name="start">开始</string>
-    <string name="stun_attest_loading">这可能需要几分钟的时间…</string>
     <string name="route_play_store">%s Play 商店规则</string>
     <string name="route_opt_block_analysis">屏蔽跟踪器</string>
     <string name="naive_insecure_concurrency">不安全并发</string>
     <string name="naive_insecure_concurrency_summary">使用N个并发的隧道连接，在恶劣的网络条件下更加强大。更多的连接使隧道更容易被发现，安全性更低。这个项目力求对流量分析有最强的安全性。以不安全的方式使用它就违背了它的目的。
         \n
         \n如果你必须使用它，先试试N=2，看看是否能解决你的问题。强烈建议不要在这里使用超过4个连接。</string>
-    <string name="tools_network">网络</string>
-    <string name="backup">备份</string>
-    <string name="backup_groups_and_configurations">分组和配置</string>
-    <string name="backup_import">导入</string>
-    <string name="backup_summary">如果路由规则与配置一起备份，则自定义出站将丢失。</string>
-    <string name="backup_settings">设置</string>
-    <string name="backup_not_file">不是一个备份文件，预期 .json，但 %s</string>
-    <string name="backup_rules">路由规则</string>
-    <string name="nat_result_hint">NAT 测试结果</string>
-    <string name="nat_stun_server_hint">Stun 服务器</string>
-    <string name="invalid_backup_file">无效的备份文件</string>
-    <string name="backup_import_summary">导入将覆盖现有的数据。</string>
-    <string name="backup_importing">正导入…</string>
     <string name="action_copy">复制</string>
     <string name="action_open">打开</string>
     <string name="please_update">您的 APP (%s) 太旧了喵，%s 再不更新就没的用了喵～</string>
@@ -456,7 +431,6 @@
     <string name="enable_clash_api_summary">在 127.0.0.1:9090 提供 clash api 和 yacd 仪表板</string>
     <string name="xtls_flow">Flow（VLESS 子协议）</string>
     <string name="log_level">日志级别</string>
-    <string name="ads">推广</string>
     <string name="need_restart">重新启动应用程序以应用更改</string>
     <string name="use_selector">启用 selector （免重载切换节点）</string>
     <string name="front_proxy">前置代理</string>
@@ -489,20 +463,10 @@
     <string name="network_change_reset_connections">当网络发生变化时重置出站连接</string>
     <string name="wake_reset_connections">当设备从睡眠状态唤醒时重置出站连接</string>
     <string name="preview_version_hint">本应用为预览版，可能存在诸多问题。若您不愿参与测试，请前往GitHub下载正式发布版本！</string>
-    <string name="check_update_preview">检查预览版更新</string>
-    <string name="check_update_release">检查正式版更新</string>
     <string name="update_dialog_title">发现新版本</string>
     <string name="update_dialog_message">当前版本：%1$s\n可升级版本：%2$s\n是否前往下载？</string>
-    <string name="check_update_no">检查成功，但没有更新。</string>
-    <string name="reset_settings">恢复默认设置</string>
-    <string name="reset_settings_message">恢复默认设置，但节点、分组等数据将保留。如需完全清除数据，请在系统设置中直接清除应用数据。</string>
     <string name="minimize">最小化</string>
     <string name="app_list_permission_denied">无法读取已安装的应用。\n这通常是由于系统限制了应用的读取权限（例如某些中国厂商系统）。\n请在系统设置中授予权限。</string>
     <string name="open_app_settings">打开系统设置</string>
-    <string name="vialen_release_unconfigured">尚未配置 Vialen 发布渠道。</string>
-    <string name="vialen_upstream_project">上游项目</string>
-    <string name="vialen_upstream_repository">NekoBox for Android（上游）</string>
-    <string name="vialen_upstream_community">上游社区</string>
-    <string name="vialen_upstream_donate">支持上游 NekoBox</string>
-    <string name="vialen_upstream_donate_info">此链接用于支持上游项目。</string>
+    <string name="vialen_releases">Vialen 版本发布</string>
 </resources>

@@ -1,20 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">Vialen</string>
-    <string name="app_name_long" translatable="false">Vialen for Android</string>
-    <string name="app_desc">The universal proxy toolchain for Android, written in Kotlin.</string>
+    <string name="app_desc">A proxy client for Android.</string>
     <string name="project">Project</string>
     <string name="github">Source code</string>
     <string name="telegram">Telegram update channel</string>
     <string name="oss_licenses">Open source licenses</string>
     <string name="app_version">Version</string>
     <string name="version_x">Version (%s)</string>
-    <string name="logcat">Export debug information</string>
     <string name="menu_configuration">Configuration</string>
     <string name="menu_group">Group</string>
     <string name="menu_about">About</string>
     <string name="theme">Theme</string>
-    <string name="document">Document</string>
     <string name="group_default">Ungrouped</string>
     <string name="quick_toggle">Toggle</string>
     <string name="quick_enable">Enable</string>
@@ -283,8 +280,6 @@
     <string name="deduplication">Deduplication</string>
     <string name="donate">Donate</string>
     <string name="donate_info">I love money</string>
-    <string name="ignore_battery_optimizations">Ignore battery optimizations</string>
-    <string name="ignore_battery_optimizations_sum">Remove some restrictions</string>
     <!-- plugin -->
     <string name="plugin">Plugin</string>
     <string name="plugin_configure">Configure…</string>
@@ -300,8 +295,7 @@
     <string name="no">No</string>
     <string name="apply">Apply</string>
     <string name="need_reload">Reload proxy service to apply changes</string>
-    <string name="license">License</string>
-    <string name="route_warn">Make sure you have read the documentation before adding custom rules,
+    <string name="route_warn">Make sure you have read the upstream reference documentation before adding custom rules,
         otherwise you may not be able to connect to the Internet.</string>
     <string name="lines">%d Lines</string>
     <string name="night_mode">Night Mode</string>
@@ -445,9 +439,6 @@
     <string name="ssh_private_key">Private Key</string>
     <string name="ssh_private_key_passphrase">Private Key Passphrase</string>
     <string name="translate_platform">Translate Platform</string>
-    <string name="menu_tools">Tools</string>
-    <string name="menu_log">Logs</string>
-    <string name="clear_logcat">Clear Logcat</string>
     <string name="wireguard_local_address">Local Address</string>
     <string name="wireguard_public_key">Peer Public Key</string>
     <string name="wireguard_psk">Peer Pre-Shared Key</string>
@@ -473,27 +464,8 @@
         Using it in an insecure way defeats its purpose. \n\nIf you must use this, try N=2 first to
         see if it solves your issues. Strongly recommend against using more than 4 connections here.</string>
 
-    <string name="stun_test">NAT behaviour discovery</string>
-    <string name="stun_test_summary">Determine the client\'s NAT mapping behaviour and the NAT
-        filtering behaviour defined in RFC 3478 using STUN.</string>
-    <string name="start">Start</string>
-    <string name="stun_attest_loading">This may take a few minutes…</string>
-    <string name="nat_stun_server_hint">Stun server</string>
-    <string name="nat_result_hint">NAT check result</string>
-    <string name="tools_network">Network</string>
     <string name="mtu" translatable="false">MTU</string>
 
-    <string name="backup">Backup</string>
-    <string name="backup_groups_and_configurations">Groups and configurations</string>
-    <string name="backup_rules">Routing rules</string>
-    <string name="backup_settings">Settings</string>
-    <string name="backup_summary">If the routing settings are not backed up with configurations,
-        then custom outbounds will be lost.</string>
-    <string name="backup_not_file">Not an backup file: excepted .json, but %s</string>
-    <string name="invalid_backup_file">Invalid backup file</string>
-    <string name="backup_import">Import</string>
-    <string name="backup_import_summary">Importing will overwrite the existing data.</string>
-    <string name="backup_importing">Importing…</string>
 
     <string name="packet_encoding">Packet Encoding</string>
     <string name="acquire_wake_lock">Acquire WakeLock</string>
@@ -519,7 +491,7 @@
     <string name="domain_strategy_for_remote">Domain strategy for Remote</string>
     <string name="domain_strategy_for_direct">Domain strategy for Direct</string>
     <string name="domain_strategy_for_server">Domain strategy for Server address</string>
-    <string name="show_bottom_bar">Show bottom bar like SagerNet</string>
+    <string name="show_bottom_bar">Show bottom bar</string>
     <string name="utls_fingerprint">uTLS fingerprint</string>
     <string name="custom_outbound_json">Custom outbound JSON</string>
     <string name="custom_config_json">Custom config JSON</string>
@@ -530,7 +502,6 @@
     <string name="log_level">Log Level</string>
     <string name="enable_clash_api_summary">Provide clash api and yacd dashboard at 127.0.0.1:9090</string>
     <string name="xtls_flow">Flow (VLESS Sub-protocol)</string>
-    <string name="ads">Ads</string>
     <string name="bypass_lan_in_core">Bypass LAN in Core</string>
     <string name="need_restart">Restart APP to apply changes</string>
     <string name="use_selector">Use selector</string>
@@ -569,13 +540,8 @@
     <string name="network_change_reset_connections">Reset outbound connections when network changes</string>
     <string name="wake_reset_connections">Reset outbound connections when device wake from sleep</string>
     <string name="preview_version_hint">This application is a preview version and may contain many problems. If you do not want to test it, please go to GitHub to download the Release version!</string>
-    <string name="check_update_preview">Check for preview version updates</string>
-    <string name="check_update_release">Check for release version updates</string>
     <string name="update_dialog_title">New version available</string>
     <string name="update_dialog_message">Current version: %1$s\nAvailable version: %2$s\nDo you want to download it?</string>
-    <string name="check_update_no">Check successful, but no updates.</string>
-    <string name="reset_settings">Restore default settings</string>
-    <string name="reset_settings_message">Restore default settings, but data such as nodes and groups will be retained. To completely clear data, clear application data directly in the system settings.</string>
     <string name="minimize">Minimize</string>
     <string name="app_list_permission_denied">Unable to read installed apps.\nThis is usually because the system has restricted app read permissions.\nPlease grant permissions in the system settings.</string>
     <string name="open_app_settings">Open System Settings</string>
@@ -587,10 +553,5 @@
     <string name="hysteria_obfs_type">Obfuscation Type</string>
     <string name="obfs_min_packet_size">Min Packet Size (Gecko)</string>
     <string name="obfs_max_packet_size">Max Packet Size (Gecko)</string>
-    <string name="vialen_release_unconfigured">Vialen release channel is not configured.</string>
-    <string name="vialen_upstream_project">Upstream project</string>
-    <string name="vialen_upstream_repository">NekoBox for Android (upstream)</string>
-    <string name="vialen_upstream_community">Upstream community</string>
-    <string name="vialen_upstream_donate">Support upstream NekoBox</string>
-    <string name="vialen_upstream_donate_info">This link supports the upstream project.</string>
+    <string name="vialen_releases">Vialen releases</string>
 </resources>
