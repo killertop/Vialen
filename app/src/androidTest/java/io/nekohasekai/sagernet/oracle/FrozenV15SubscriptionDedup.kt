@@ -1,10 +1,12 @@
-package io.nekohasekai.sagernet.group
+// Frozen from 297a077; only package and object name changed. Test-only Rust oracle.
+package io.nekohasekai.sagernet.oracle
 
 import io.nekohasekai.sagernet.fmt.AbstractBean
+import io.nekohasekai.sagernet.rust.RustBridge
 import moe.matsuri.nb4a.proxy.config.ConfigBean
 
-/** Stable Kotlin grouping of actual post-resolution Beans without JNI key copies. */
-internal object SubscriptionDedup {
+/** Kotlin projects actual post-resolution Beans; Rust owns exact stable grouping. */
+internal object FrozenV15SubscriptionDedup {
     data class Result(val proxies: List<AbstractBean>, val duplicates: List<String>)
 
     private fun key(bean: AbstractBean): String {
@@ -19,8 +21,7 @@ internal object SubscriptionDedup {
     }
 
     fun apply(proxies: List<AbstractBean>): Result {
-        val seen = LinkedHashMap<String, Int>()
-        val ranks = proxies.map { bean -> seen.getOrPut(key(bean)) { seen.size } }
+        val ranks = RustBridge.rankDedupKeys(proxies.map(::key))
         val unique = ArrayList<AbstractBean>()
         val firstNames = ArrayList<String>()
         val duplicates = ArrayList<String>()

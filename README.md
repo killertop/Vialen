@@ -16,9 +16,9 @@ Vialen 提供节点与订阅管理、分组、路由和 VPN 连接，采用简�
 - 启动时不申请通知权限，运行时保留最小 VPN 前台服务通知。
 - 统一的 Vialen 图标与关于页，减少无关入口。
 
-### Rust 与订阅处理
+### 订阅处理
 
-Vialen 在订阅处理流程中集成 Rust，并根据实际测量采用混合解析：符合保守检查条件的普通 JSON 使用 Kotlin 快速路径，其余输入继续通过 Rust 处理。该设计兼顾兼容性、可维护性与完整更新流程的效率，不将局部解析速度等同于整体性能或续航提升。
+订阅去重、差异匹配与数据库更新使用 Kotlin，避免为这些步骤额外复制数据到 Rust。符合保守检查条件的普通 JSON 同样使用 Kotlin 解析；其他输入保留 Rust 解析以维持格式兼容。实现语言按完整流程的实测收益选择，不将局部解析速度等同于整体性能或续航提升。
 
 订阅导入提取节点配置，订阅中的分流规则不会自动导入为应用路由规则。
 
@@ -52,9 +52,9 @@ Vialen provides profile, subscription, group, routing, and VPN management with a
 - No notification permission request at startup; a minimal VPN foreground-service notification remains while running.
 - Consistent Vialen branding and a focused About page.
 
-### Rust and subscription processing
+### Subscription processing
 
-Vialen integrates Rust into its subscription processing pipeline. Its hybrid parser follows measured results: ordinary JSON that passes conservative checks uses a Kotlin fast path, while other inputs continue through Rust. The design balances compatibility, maintainability, and end-to-end update efficiency. Parser-only measurements are not presented as overall performance or battery-life improvements.
+Subscription deduplication, change matching, and database updates use Kotlin, avoiding extra copies into Rust for these steps. Ordinary JSON that passes conservative checks also uses Kotlin parsing; other inputs retain Rust parsing for format compatibility. Implementation languages are chosen by measured end-to-end benefit. Parser-only measurements are not presented as overall performance or battery-life improvements.
 
 Subscription imports extract profile configurations. Routing rules contained in a subscription are not automatically imported as application routing rules.
 
