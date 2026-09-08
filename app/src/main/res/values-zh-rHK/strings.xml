@@ -5,10 +5,9 @@
     <string name="version_x">版本 (%s)</string>
     <string name="menu_about">關於</string>
     <string name="telegram">Telegram 更新頻道</string>
-    <string name="app_desc">以 Kotlin 編寫的 Android 通用代理工具鏈。</string>
+    <string name="app_desc">Android 代理用戶端。</string>
     <string name="group_update">更新</string>
     <string name="theme">主題</string>
-    <string name="document">文件</string>
     <string name="project">項目</string>
     <string name="oss_licenses">開放源碼授權條款</string>
     <string name="menu_group">分組</string>
@@ -39,9 +38,6 @@
     <string name="plugin">插件</string>
     <string name="action_download">下載</string>
     <string name="install_from_fdroid">從 F-Droid 安裝</string>
-    <string name="menu_tools">工具</string>
-    <string name="tools_network">網絡</string>
-    <string name="backup">備份</string>
     <string name="auto_connect_summary">在開機或本程式更新後將自動重新啓用代理</string>
     <string name="delete">移除</string>
     <string name="enable">啟用</string>
@@ -73,7 +69,6 @@
     <string name="connection_test_error">失敗：%s</string>
     <string name="connection_test_available_http">連接成功: HTTP 握手需時 %dms</string>
     <string name="password_opt">密碼（可選）</string>
-    <string name="start">開始</string>
     <string name="quick_toggle">切換</string>
     <string name="quick_enable">啟用</string>
     <string name="quick_disable">停用</string>
@@ -94,4 +89,5 @@
     <string name="route_asset_no_update">沒有更新</string>
     <string name="insecure">不安全</string>
     <string name="connection_test_icmp_ping_unavailable">ICMPing 不可用</string>
+    <string name="vialen_releases">Vialen 版本發佈</string>
 </resources>

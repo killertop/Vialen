@@ -14,7 +14,7 @@ Vialen 是基于 NekoBox for Android 的 Android 代理客户端，使用 sing-b
 
 每次发布构建仅生成一个 ARM64 APK，位于 `app/build/outputs/apk/release/`，文件名为 `Vialen-<version>-arm64-v8a.apk`；未配置发布签名时文件名含 `-unsigned`。开发及测试仍使用 `:app:assembleDebug`、`:app:assembleDebugAndroidTest`、`:app:testDebugUnitTest` 和 `:app:connectedDebugAndroidTest`。
 
-本仓库的本地构建和验证结果以对应的构建日志及验收记录为准。尚未在本次品牌统一中配置 Vialen 官方下载站点、发布仓库或社区入口；上游 NekoBox 的 Release 不作为 Vialen 更新来源。
+本仓库的本地构建和验证结果以对应的构建日志及验收记录为准。应用内发布入口已配置为 [Vialen Releases](https://github.com/killertop/Vialen/releases)，当前版本尚未发布。尚未配置独立的官方下载站点或社区入口；上游 NekoBox 的 Release 不作为 Vialen 更新来源。
 
 ## 订阅与兼容性
 

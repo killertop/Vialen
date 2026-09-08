@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_desc">適用於 Android 的通用代理工具鏈，由 Kotlin 編寫。</string>
+    <string name="app_desc">Android 代理用戶端。</string>
     <string name="project">計畫</string>
     <string name="github">原始碼</string>
     <string name="telegram">Telegram 更新頻道</string>
     <string name="oss_licenses">開放原始碼授權條款</string>
     <string name="app_version">版本</string>
-    <string name="logcat">匯出 debug 所需資訊</string>
     <string name="menu_configuration">設定檔</string>
     <string name="menu_group">群組</string>
     <string name="menu_about">關於</string>
@@ -102,7 +101,7 @@
     <!-- notification category -->
     <string name="service_vpn">VPN 服務</string>
     <string name="service_proxy">代理服務</string>
-    <string name="forward_success">SagerNet 已啟動。</string>
+    <string name="forward_success">代理已啟動。</string>
     <string name="invalid_server">伺服器名稱無效</string>
     <string name="stop">停止</string>
     <string name="stopping">正在關閉…</string>
@@ -166,8 +165,6 @@
     <string name="yes">是</string>
     <string name="no">否</string>
     <string name="apply">套用</string>
-    <string name="license">授權條款</string>
-    <string name="document">文件</string>
     <string name="early_data_header_name">前置資料標頭</string>
     <string name="certificates">憑證</string>
     <string name="alpn">應用層通訊協定協商</string>
@@ -258,11 +255,9 @@
     <string name="no_proxies_found_in_clipboard">未在剪貼簿中找到代理</string>
     <string name="deduplication">重複資料刪除</string>
     <string name="donate">捐贈</string>
-    <string name="ignore_battery_optimizations">忽略電池效能最佳化</string>
-    <string name="ignore_battery_optimizations_sum">移除一些限制</string>
     <string name="ss_cat">Shadowsocks 設定</string>
     <string name="need_reload">重新載入代理服務以套用修改</string>
-    <string name="route_warn">請在新增客製化規則前閱讀文件，否則您可能會無法連線至網際網路。</string>
+    <string name="route_warn">請在新增客製化規則前閱讀上游參考文件，否則您可能會無法連線至網際網路。</string>
     <string name="lines">%d 行</string>
     <string name="night_mode">夜間模式</string>
     <string name="follow_system">跟隨系統</string>
@@ -372,15 +367,12 @@
     <string name="hysteria_auth_payload">認證密碼</string>
     <string name="hysteria_auth_type">認證類型</string>
     <string name="hysteria_obfs">混淆密碼</string>
-    <string name="menu_tools">工具</string>
     <string name="translate_platform">翻譯平台</string>
-    <string name="menu_log">記錄檔</string>
     <string name="profile_traffic_statistics_summary">當停用時，使用的流量將不會被統計</string>
     <string name="app_statistics_disabled">應用程式流量統計資料被停用</string>
     <string name="tun_implementation">TUN 實作</string>
     <string name="destination_override">覆寫目的地位址</string>
     <string name="resolve_destination">解析目的地位址</string>
-    <string name="clear_logcat">清除記錄檔</string>
     <string name="wireguard_local_address">本機位址</string>
     <string name="wireguard_public_key">節點公開金鑰</string>
     <string name="wireguard_psk">節點預先共用金鑰</string>
@@ -394,23 +386,9 @@
     <string name="route_opt_block_analysis">封鎖分析</string>
     <string name="route_play_store">%s Google Play商店規則</string>
     <string name="naive_insecure_concurrency">不安全並發</string>
-    <string name="stun_test">NAT 行為尋找</string>
     <string name="naive_insecure_concurrency_summary">使用N個並發的隧道能使網路條件較差时更加可用。但數量越多，越易被偵測，安全性越低。由於本項目致力於面對流量分析的安全性，以不安全的方式使用違背了其初忠。
 \n
 \n如一定要使用，請先嘗試 N=2，觀察其是否解決了您的問題。強烈反對於此使用多於4個隧道。</string>
-    <string name="stun_attest_loading">這可能需要數分鐘…</string>
-    <string name="stun_test_summary">使用 STUN 確定用戶端的 NAT 映射行為和 RFC 5780 中定義的 NAT 篩選行為。</string>
-    <string name="start">開始</string>
-    <string name="backup">備份</string>
-    <string name="backup_rules">路由規則</string>
-    <string name="invalid_backup_file">無效的備份檔</string>
-    <string name="tools_network">網路</string>
-    <string name="backup_settings">設定</string>
-    <string name="backup_import">匯入</string>
-    <string name="backup_import_summary">匯入將覆蓋現有資料。</string>
-    <string name="backup_importing">正在匯入…</string>
-    <string name="backup_groups_and_configurations">分組和設定檔</string>
-    <string name="backup_summary">如果路由規則不與設定檔一起備份，則自訂出站將丟失。</string>
-    <string name="backup_not_file">不是一個備份檔案，預計 .json，但 %s</string>
     <string name="packet_encoding">封包編碼</string>
+    <string name="vialen_releases">Vialen 版本發佈</string>
 </resources>
