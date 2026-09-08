@@ -176,11 +176,6 @@ class TrafficLooper
                 }
             }
 
-            // ServiceNotification
-            data.notification?.apply {
-                if (listenPostSpeed) postNotificationSpeedUpdate(speed)
-            }
-
             delay(delayMs)
         }
     }
