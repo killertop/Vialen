@@ -390,4 +390,5 @@
 \n如一定要使用，請先嘗試 N=2，觀察其是否解決了您的問題。強烈反對於此使用多於4個隧道。</string>
     <string name="packet_encoding">封包編碼</string>
     <string name="vialen_releases">Vialen 版本發佈</string>
+    <string name="close">關閉</string>
 </resources>
