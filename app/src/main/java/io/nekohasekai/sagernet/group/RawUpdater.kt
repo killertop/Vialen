@@ -102,7 +102,7 @@ object RawUpdater : GroupUpdater() {
     }
 
     suspend fun parseRaw(text: String, fileName: String = ""): List<AbstractBean>? =
-        RustRawSubscription.parse(text, fileName)
+        HybridRawSubscription.parse(text, fileName)
 
     fun clashCipher(cipher: String): String = if (cipher == "dummy") "none" else cipher
 
