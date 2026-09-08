@@ -94,7 +94,7 @@ object ProfileManager {
         val selected = DataStore.selectedProxy
         if (selected != 0L && SagerDatabase.proxyDao.getById(selected) != null) return
         val first = SagerDatabase.proxyDao.getIdsByGroup(groupId).firstOrNull() ?: return
-        DataStore.selectedProxy = first
+        DataStore.selectProxyIfUnchanged(selected, first)
     }
 
     suspend fun updateProfile(profile: ProxyEntity) {

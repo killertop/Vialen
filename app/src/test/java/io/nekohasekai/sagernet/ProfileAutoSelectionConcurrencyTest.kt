@@ -1,0 +1,135 @@
+package io.nekohasekai.sagernet
+
+import androidx.room.Room
+import io.mockk.clearMocks
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
+import io.mockk.verify
+import io.nekohasekai.sagernet.bg.BaseService
+import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.database.ProfileManager
+import io.nekohasekai.sagernet.database.ProxyEntity
+import io.nekohasekai.sagernet.database.SagerDatabase
+import io.nekohasekai.sagernet.database.preference.PublicDatabase
+import moe.matsuri.nb4a.TempDatabase
+import org.junit.AfterClass
+import org.junit.Before
+import org.junit.Test
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.runner.RunWith
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+
+@RunWith(RustBridgeRobolectricTestRunner::class)
+@Config(sdk = [34], application = android.app.Application::class)
+class ProfileAutoSelectionConcurrencyTest {
+    companion object {
+        private const val TARGET = 10L
+        private const val FIRST = 101L
+        private const val MANUAL = 202L
+        private lateinit var preferences: PublicDatabase
+        private lateinit var profiles: ProxyEntity.Dao
+
+        private fun ensureDatabase() {
+            if (!::preferences.isInitialized) setUpDatabase()
+        }
+
+        private fun setUpDatabase() {
+            preferences = Room.inMemoryDatabaseBuilder(
+                RuntimeEnvironment.getApplication(), PublicDatabase::class.java
+            ).allowMainThreadQueries().build()
+            profiles = mockk()
+            mockkObject(PublicDatabase.Companion, TempDatabase.Companion, SagerDatabase.Companion)
+            every { PublicDatabase.instance } returns preferences
+            every { PublicDatabase.kvPairDao } returns preferences.keyValuePairDao()
+            every { TempDatabase.profileCacheDao } returns preferences.keyValuePairDao()
+            every { SagerDatabase.proxyDao } returns profiles
+            // DataStore and its selectedProxy delegate are real, backed by Room/SQLite.
+            // Only profile lookup is mocked to make the race deterministic.
+            DataStore.selectedProxy = 0L
+        }
+
+        @AfterClass @JvmStatic fun closeDatabase() {
+            if (::preferences.isInitialized) preferences.close()
+            unmockkObject(PublicDatabase.Companion, TempDatabase.Companion, SagerDatabase.Companion)
+        }
+    }
+
+    @Before fun reset() {
+        // Robolectric has installed the Application by @Before, but not @BeforeClass.
+        ensureDatabase()
+        preferences.keyValuePairDao().reset()
+        clearMocks(profiles)
+        DataStore.serviceState = BaseService.State.Stopped
+        every { profiles.getIdsByGroup(TARGET) } returns listOf(FIRST)
+    }
+
+    @Test fun absentAndInvalidSelectionsPickTheFirstCandidate() {
+        ProfileManager.selectFirstIfNeeded(TARGET)
+        assertEquals(FIRST, DataStore.selectedProxy)
+        DataStore.selectedProxy = 999L
+        every { profiles.getById(999L) } returns null
+        ProfileManager.selectFirstIfNeeded(TARGET)
+        assertEquals(FIRST, DataStore.selectedProxy)
+    }
+
+    @Test fun validSelectionIsPreservedWithoutCandidateLookup() {
+        DataStore.selectedProxy = MANUAL
+        every { profiles.getById(MANUAL) } returns ProxyEntity(id = MANUAL)
+        ProfileManager.selectFirstIfNeeded(TARGET)
+        assertEquals(MANUAL, DataStore.selectedProxy)
+        verify(exactly = 0) { profiles.getIdsByGroup(any()) }
+    }
+
+    @Test fun emptyGroupDoesNotCreateASelection() {
+        every { profiles.getIdsByGroup(TARGET) } returns emptyList()
+        ProfileManager.selectFirstIfNeeded(TARGET)
+        assertEquals(0L, DataStore.selectedProxy)
+    }
+
+    private fun whileCandidateLookupIsBlocked(action: () -> Unit) {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val worker = Executors.newSingleThreadExecutor()
+        every { profiles.getIdsByGroup(TARGET) } answers {
+            entered.countDown()
+            check(release.await(10, TimeUnit.SECONDS)) { "candidate lookup release timed out" }
+            listOf(FIRST)
+        }
+        try {
+            val automatic = worker.submit { ProfileManager.selectFirstIfNeeded(TARGET) }
+            assertTrue("candidate lookup was not reached", entered.await(10, TimeUnit.SECONDS))
+            action()
+            release.countDown()
+            automatic.get(10, TimeUnit.SECONDS)
+        } finally {
+            release.countDown()
+            worker.shutdownNow()
+            worker.awaitTermination(10, TimeUnit.SECONDS)
+        }
+    }
+
+    @Test fun laterManualSelectionSurvivesBlockedCandidateLookup() {
+        whileCandidateLookupIsBlocked {
+            // Same real preference setter used by the profile click handler. This must
+            // complete before releasing the query: no selection lock may cover lookup.
+            DataStore.selectedProxy = MANUAL
+            assertEquals(MANUAL, DataStore.selectedProxy)
+        }
+        assertEquals(MANUAL, DataStore.selectedProxy)
+    }
+
+    @Test fun serviceStartingDuringLookupPreventsAutomaticSelection() {
+        for (state in listOf(BaseService.State.Connecting, BaseService.State.Connected, BaseService.State.Stopping)) {
+            DataStore.serviceState = BaseService.State.Stopped
+            whileCandidateLookupIsBlocked { DataStore.serviceState = state }
+            assertEquals("state=$state", 0L, DataStore.selectedProxy)
+        }
+    }
+}

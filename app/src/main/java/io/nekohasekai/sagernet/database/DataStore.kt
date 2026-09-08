@@ -23,9 +23,13 @@ import moe.matsuri.nb4a.TempDatabase
 
 object DataStore : OnPreferenceDataStoreChangeListener {
 
-    // share service state in main & bg process
+    // Each process observes service state through its service/binder callbacks.
+    private val serviceStateLock = Any()
     @Volatile
-    var serviceState = BaseService.State.Idle
+    private var observedServiceState = BaseService.State.Idle
+    var serviceState: BaseService.State
+        get() = observedServiceState
+        set(value) = synchronized(serviceStateLock) { observedServiceState = value }
 
     val configurationStore = RoomPreferenceDataStore(PublicDatabase.kvPairDao)
     val profileCacheStore = RoomPreferenceDataStore(TempDatabase.profileCacheDao)
@@ -34,6 +38,25 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var currentProfile by configurationStore.long(Key.PROFILE_CURRENT)
 
     var selectedProxy by configurationStore.long(Key.PROFILE_ID)
+
+    /** Candidate lookup must happen before this short transaction. SQLite serializes this
+     * conditional write with ordinary selectedProxy writes, including other processes.
+     */
+    fun selectProxyIfUnchanged(expected: Long, candidate: Long): Boolean =
+        PublicDatabase.instance.runInTransaction<Boolean> {
+            // Acquire SQLite's write transaction before the local state monitor.
+            // State setters never access SQLite while holding this monitor.
+            synchronized(serviceStateLock) {
+                if ((serviceState != BaseService.State.Idle && serviceState != BaseService.State.Stopped) ||
+                    selectedProxy != expected) {
+                    false
+                } else {
+                    selectedProxy = candidate
+                    true
+                }
+            }
+        }
+
     var selectedGroup by configurationStore.long(Key.PROFILE_GROUP) { currentGroupId() } // "ungrouped" group id = 1
 
     // only in bg process
