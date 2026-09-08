@@ -61,13 +61,12 @@
     <string name="ws_max_early_data" translatable="false">Max early data</string>
     <string name="ws_browser_forwarding">Browser Forwarding</string>
     <string name="ws_browser_forwarding_sum">Forward corresponding WebSockets through the browser.</string>
-    <string name="speed_interval">Speed Notification Update Interval</string>
+    <string name="speed_interval">Traffic Statistics Update Interval</string>
     <string name="cag_misc">Misc Settings</string>
     <string name="show_stop">Show Stop Button</string>
     <string name="show_stop_sum">If you don’t want to use Quick Tile as the switch</string>
     <string name="show_direct_speed">Show Direct Speed</string>
-    <string name="show_direct_speed_sum">Show the traffic speed without proxy in the notification as
-        well</string>
+    <string name="show_direct_speed_sum">Show direct traffic speed in the app</string>
     <string name="security_settings">TLS Security Settings</string>
     <string name="allow_insecure">Allow Insecure</string>
     <string name="allow_insecure_sum">Disable certificate checking. When enabled, this configuration
