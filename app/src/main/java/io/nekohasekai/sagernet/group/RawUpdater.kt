@@ -94,6 +94,7 @@ object RawUpdater : GroupUpdater() {
             subscription.lastUpdated = previousTimestamp
             throw error
         }
+        io.nekohasekai.sagernet.database.ProfileManager.selectFirstIfNeeded(proxyGroup.id)
         finishUpdate(proxyGroup)
 
         userInterface?.onUpdateSuccess(

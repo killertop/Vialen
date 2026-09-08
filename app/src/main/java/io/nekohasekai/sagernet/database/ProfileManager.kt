@@ -81,8 +81,20 @@ object ProfileManager {
             userOrder = SagerDatabase.proxyDao.nextOrder(groupId) ?: 1
         }
         profile.id = SagerDatabase.proxyDao.addProxy(profile)
+        selectFirstIfNeeded(groupId)
         iterator { onAdd(profile) }
         return profile
+    }
+
+    /** Use only the persisted import target; never borrow a node from another group. */
+    @Synchronized
+    fun selectFirstIfNeeded(groupId: Long) {
+        if (DataStore.serviceState != io.nekohasekai.sagernet.bg.BaseService.State.Idle &&
+            DataStore.serviceState != io.nekohasekai.sagernet.bg.BaseService.State.Stopped) return
+        val selected = DataStore.selectedProxy
+        if (selected != 0L && SagerDatabase.proxyDao.getById(selected) != null) return
+        val first = SagerDatabase.proxyDao.getIdsByGroup(groupId).firstOrNull() ?: return
+        DataStore.selectedProxy = first
     }
 
     suspend fun updateProfile(profile: ProxyEntity) {
