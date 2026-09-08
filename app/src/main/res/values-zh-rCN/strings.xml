@@ -52,7 +52,7 @@
     <string name="cag_ws">WebSocket 设置</string>
     <string name="ws_browser_forwarding">浏览器转发</string>
     <string name="ws_browser_forwarding_sum">转发相应的 WebSockets 到浏览器.</string>
-    <string name="speed_interval">速度通知更新间隔</string>
+    <string name="speed_interval">流量统计更新间隔</string>
     <string name="traffic">%1$s↑ %2$s↓</string>
     <string name="speed_detail">代理： %1$s↑ %2$s↓
         \n直连： %3$s↑ %4$s↓</string>
@@ -199,7 +199,7 @@
     <string name="insecure">不安全</string>
     <string name="deprecated">已废弃</string>
     <string name="show_direct_speed">显示直连速度</string>
-    <string name="show_direct_speed_sum">在通知中也显示不经过代理的流量速度</string>
+    <string name="show_direct_speed_sum">在应用内显示不经过代理的流量速度</string>
     <string name="select_profile">选择配置</string>
     <string name="proxy_chain">链式代理</string>
     <string name="chain_settings">链设置</string>
