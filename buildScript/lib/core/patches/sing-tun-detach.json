@@ -1,0 +1,28 @@
+{
+  "base_commit": "f4c1f3ae265b930460774295b8fe5c73596c81cf",
+  "files": {
+    "stack_gvisor_filter.go": {
+      "content": {
+        "bytes": 3453,
+        "sha256": "3793e2fcc9dae37b42b22734dab00b78b148fb0c879cf67a8b4fd5cdec3e94dc"
+      },
+      "mode": "0o644"
+    },
+    "stack_gvisor_filter_detach_linux_test.go": {
+      "content": {
+        "bytes": 1303,
+        "sha256": "aad7d7f2ea8e26e601e0f17e88dbe0c3563c3e3c809db2bef1d7097cb3a823ac"
+      },
+      "mode": "0o644"
+    },
+    "stack_gvisor_filter_detach_test.go": {
+      "content": {
+        "bytes": 1600,
+        "sha256": "4e3771597f625049936df4cd586598b492ec704482009c10e7a275196d70b4d9"
+      },
+      "mode": "0o644"
+    }
+  },
+  "patch_sha256": "595135e56fbe5d69f707008fc67c8f056497c456934c69636dad07dfbed1f1f6",
+  "schema": 1
+}

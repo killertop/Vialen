@@ -1,111 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Base application theme. -->
-    <style name="Theme.SagerNet" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Base.Theme.Vialen" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="actionBarStyle">@style/Widget.MaterialComponents.ActionBar.Solid</item>
         <item name="actionModeCloseDrawable">@drawable/ic_navigation_close</item>
-        <item name="colorButtonNormal">?colorAccent</item>
-        <item name="android:navigationBarColor">?colorPrimaryDark</item>
-        <item name="colorPrimary">@color/color_ng_black_primary</item>
-        <item name="colorPrimaryDark">@color/color_ng_black_primary</item>
-        <item name="colorAccent">@color/color_ng_black_accent</item>
-
-        <item name="colorMaterial100">@color/color_ng_black_primary</item>
-        <item name="colorMaterial300">@color/color_ng_black_primary</item>
-
-        <item name="accentOrTextSecondary">?android:textColorSecondary</item>
-        <item name="accentOrTextPrimary">?android:textColorPrimary</item>
-        <item name="primaryOrTextSecondary">?android:textColorSecondary</item>
-        <item name="primaryOrTextPrimary">?android:textColorPrimary</item>
-
-        <item name="fabColorBackground">@color/color_ng_black_accent</item>
-        <item name="selectedColorPrimary">@color/color_ng_black_accent</item>
-        <item name="actionBarTheme">@style/ThemeOverlay.AppCompat.Dark.ActionBar</item>
-        <item name="tabTextColor">#99FFFFFF</item>
-        <item name="tabSelectedTextColor">@color/white</item>
-        <item name="tabIndicatorColor">@color/white</item>
-        <item name="tabRippleColor">@color/white</item>
-        <item name="whiteOrTextPrimary">@color/white</item>
-
+        <item name="colorButtonNormal">@color/vialen_selected_background</item>
+        <item name="android:navigationBarColor">@color/vialen_surface</item>
+        <item name="colorPrimary">@color/vialen_brand</item>
+        <item name="colorPrimaryDark">@color/vialen_brand</item>
+        <item name="colorAccent">@color/vialen_accent</item>
+        <item name="colorMaterial100">@color/vialen_selected_background</item>
+        <item name="colorMaterial300">@color/vialen_surface</item>
+        <item name="accentOrTextSecondary">@color/vialen_text_secondary</item>
+        <item name="accentOrTextPrimary">@color/vialen_text_primary</item>
+        <item name="primaryOrTextSecondary">@color/vialen_accent</item>
+        <item name="primaryOrTextPrimary">@color/vialen_accent</item>
+        <item name="fabColorBackground">@color/vialen_brand</item>
+        <item name="selectedColorPrimary">@color/vialen_accent</item>
+        <item name="actionBarTheme">@style/ThemeOverlay.Vialen.Toolbar</item>
+        <item name="tabTextColor">@color/vialen_text_secondary</item>
+        <item name="tabSelectedTextColor">@color/vialen_accent</item>
+        <item name="tabIndicatorColor">@color/vialen_accent</item>
+        <item name="tabRippleColor">@color/vialen_ripple</item>
+        <item name="whiteOrTextPrimary">@color/vialen_text_primary</item>
         <item name="windowActionModeOverlay">true</item>
-
-        <!-- Remove ActionBar but keep styles and themes -->
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
-
         <item name="chipStyle">@style/Widget.MaterialComponents.Chip.Choice.SagerNet</item>
-
         <item name="itemShapeAppearance">
             @style/ShapeAppearance.MaterialComponents.MediumComponent
         </item>
-
         <item name="alertDialogTheme">
             @style/ThemeOverlay.MaterialComponents.MaterialAlertDialog.SagerNet
         </item>
-
         <item name="materialAlertDialogTheme">
             @style/ThemeOverlay.MaterialComponents.MaterialAlertDialog.SagerNet
         </item>
-
-        <item name="itemShapeFillColor">@color/color_ng_black_accent</item>
+        <item name="itemShapeFillColor">@color/vialen_selected_background</item>
+        <item name="android:statusBarColor">@color/vialen_surface</item>
+        <item name="colorPrimaryVariant">@color/vialen_brand</item>
+        <item name="colorOnPrimary">@color/vialen_on_brand</item>
+        <item name="colorSecondary">@color/vialen_accent</item>
+        <item name="colorOnSecondary">@color/vialen_surface</item>
+        <item name="colorSurface">@color/vialen_surface</item>
+        <item name="colorOnSurface">@color/vialen_text_primary</item>
+        <item name="android:colorBackground">@color/vialen_background</item>
+        <item name="android:windowBackground">@color/vialen_background</item>
+        <item name="colorOnBackground">@color/vialen_text_primary</item>
+        <item name="android:textColorPrimary">@color/vialen_text_primary_tint</item>
+        <item name="android:textColorSecondary">@color/vialen_text_secondary_tint</item>
+        <item name="android:textColorTertiary">@color/vialen_text_secondary_tint</item>
+        <item name="android:textColorLink">@color/vialen_accent</item>
+        <item name="colorControlNormal">@color/vialen_icon</item>
+        <item name="android:colorControlNormal">@color/vialen_icon</item>
+        <item name="colorControlActivated">@color/vialen_accent</item>
+        <item name="android:colorControlActivated">@color/vialen_accent</item>
+        <item name="colorControlHighlight">@color/vialen_ripple</item>
+        <item name="colorError">@color/vialen_error</item>
+        <item name="preferenceCategoryTitleTextColor">@color/vialen_text_category</item>
+        <item name="switchStyle">@style/Widget.Vialen.Switch</item>
+        <item name="android:switchStyle">@style/Widget.Vialen.PlatformSwitch</item>
+        <item name="snackbarStyle">@style/Widget.Vialen.Snackbar</item>
+        <item name="snackbarTextViewStyle">@style/Widget.Vialen.Snackbar.TextView</item>
+        <item name="snackbarButtonStyle">@style/Widget.Vialen.Snackbar.Button</item>
     </style>
-
-    <style name="Theme.SagerNet.Dialog" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
+    <style name="Base.Theme.Vialen.Dialog" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
         <item name="actionBarStyle">@style/Widget.MaterialComponents.ActionBar.Solid</item>
         <item name="actionModeCloseDrawable">@drawable/ic_navigation_close</item>
-        <item name="colorButtonNormal">?colorAccent</item>
-        <item name="android:navigationBarColor">?colorPrimaryDark</item>
-        <item name="colorPrimary">@color/color_ng_black_primary</item>
-        <item name="colorPrimaryDark">@color/color_ng_black_primary</item>
-        <item name="colorAccent">@color/color_ng_black_accent</item>
-
-        <item name="colorMaterial100">@color/color_ng_black_primary</item>
-        <item name="colorMaterial300">@color/color_ng_black_primary</item>
-
-        <item name="accentOrTextSecondary">?android:textColorSecondary</item>
-        <item name="accentOrTextPrimary">?android:textColorPrimary</item>
-        <item name="primaryOrTextSecondary">?android:textColorSecondary</item>
-        <item name="primaryOrTextPrimary">?android:textColorPrimary</item>
-
-        <item name="fabColorBackground">@color/color_ng_black_accent</item>
-        <item name="selectedColorPrimary">@color/color_ng_black_accent</item>
-        <item name="actionBarTheme">@style/ThemeOverlay.AppCompat.Dark.ActionBar</item>
-        <item name="tabTextColor">#99FFFFFF</item>
-        <item name="tabSelectedTextColor">@color/white</item>
-        <item name="tabIndicatorColor">@color/white</item>
-        <item name="tabRippleColor">@color/white</item>
-        <item name="whiteOrTextPrimary">@color/white</item>
-
+        <item name="colorButtonNormal">@color/vialen_selected_background</item>
+        <item name="android:navigationBarColor">@color/vialen_surface</item>
+        <item name="colorPrimary">@color/vialen_brand</item>
+        <item name="colorPrimaryDark">@color/vialen_brand</item>
+        <item name="colorAccent">@color/vialen_accent</item>
+        <item name="colorMaterial100">@color/vialen_selected_background</item>
+        <item name="colorMaterial300">@color/vialen_surface</item>
+        <item name="accentOrTextSecondary">@color/vialen_text_secondary</item>
+        <item name="accentOrTextPrimary">@color/vialen_text_primary</item>
+        <item name="primaryOrTextSecondary">@color/vialen_accent</item>
+        <item name="primaryOrTextPrimary">@color/vialen_accent</item>
+        <item name="fabColorBackground">@color/vialen_brand</item>
+        <item name="selectedColorPrimary">@color/vialen_accent</item>
+        <item name="actionBarTheme">@style/ThemeOverlay.Vialen.Toolbar</item>
+        <item name="tabTextColor">@color/vialen_text_secondary</item>
+        <item name="tabSelectedTextColor">@color/vialen_accent</item>
+        <item name="tabIndicatorColor">@color/vialen_accent</item>
+        <item name="tabRippleColor">@color/vialen_ripple</item>
+        <item name="whiteOrTextPrimary">@color/vialen_text_primary</item>
         <item name="windowActionModeOverlay">true</item>
-
-        <!-- Remove ActionBar but keep styles and themes -->
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
-
         <item name="chipStyle">@style/Widget.MaterialComponents.Chip.Choice.SagerNet</item>
-
         <item name="itemShapeAppearance">
             @style/ShapeAppearance.MaterialComponents.MediumComponent
         </item>
-
         <item name="alertDialogTheme">
             @style/ThemeOverlay.MaterialComponents.MaterialAlertDialog.SagerNet
         </item>
-
         <item name="materialAlertDialogTheme">
             @style/ThemeOverlay.MaterialComponents.MaterialAlertDialog.SagerNet
         </item>
-
         <item name="windowFixedHeightMajor" type="dimen">95%</item>
-
-        <item name="itemShapeFillColor">@color/color_ng_black_accent</item>
+        <item name="itemShapeFillColor">@color/vialen_selected_background</item>
+        <item name="android:statusBarColor">@color/vialen_surface</item>
+        <item name="colorPrimaryVariant">@color/vialen_brand</item>
+        <item name="colorOnPrimary">@color/vialen_on_brand</item>
+        <item name="colorSecondary">@color/vialen_accent</item>
+        <item name="colorOnSecondary">@color/vialen_surface</item>
+        <item name="colorSurface">@color/vialen_surface</item>
+        <item name="colorOnSurface">@color/vialen_text_primary</item>
+        <item name="android:colorBackground">@color/vialen_background</item>
+        <item name="android:windowBackground">@color/vialen_background</item>
+        <item name="colorOnBackground">@color/vialen_text_primary</item>
+        <item name="android:textColorPrimary">@color/vialen_text_primary_tint</item>
+        <item name="android:textColorSecondary">@color/vialen_text_secondary_tint</item>
+        <item name="android:textColorTertiary">@color/vialen_text_secondary_tint</item>
+        <item name="android:textColorLink">@color/vialen_accent</item>
+        <item name="colorControlNormal">@color/vialen_icon</item>
+        <item name="android:colorControlNormal">@color/vialen_icon</item>
+        <item name="colorControlActivated">@color/vialen_accent</item>
+        <item name="android:colorControlActivated">@color/vialen_accent</item>
+        <item name="colorControlHighlight">@color/vialen_ripple</item>
+        <item name="colorError">@color/vialen_error</item>
+        <item name="preferenceCategoryTitleTextColor">@color/vialen_text_category</item>
+        <item name="switchStyle">@style/Widget.Vialen.Switch</item>
+        <item name="android:switchStyle">@style/Widget.Vialen.PlatformSwitch</item>
+        <item name="snackbarStyle">@style/Widget.Vialen.Snackbar</item>
+        <item name="snackbarTextViewStyle">@style/Widget.Vialen.Snackbar.TextView</item>
+        <item name="snackbarButtonStyle">@style/Widget.Vialen.Snackbar.Button</item>
     </style>
-
     <style name="AppearanceFoundation.Title" parent="TextAppearance.AppCompat.Title">
         <item name="android:textColor">?attr/colorOnSurface</item>
         <item name="android:textStyle">bold</item>
     </style>
-
-    <style name="ThemeOverlay.MaterialComponents.MaterialAlertDialog.SagerNet">
+    <style name="ThemeOverlay.Vialen.DialogBase" parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog">
+        <item name="android:statusBarColor">@color/vialen_legacy_system_bar</item>
+        <item name="android:navigationBarColor">@color/vialen_legacy_system_bar</item>
+        <item name="android:checkedTextViewStyle">@style/Widget.Vialen.DialogChoice</item>
+        <item name="materialAlertDialogBodyTextStyle">@style/Widget.Vialen.DialogBody</item>
+        <item name="materialAlertDialogTitleTextStyle">@style/Widget.Vialen.DialogTitle</item>
         <item name="buttonBarPositiveButtonStyle">
             @style/Widget.MaterialComponents.Button.TextButton.Dialog.Primary
         </item>
@@ -116,58 +147,25 @@
             @style/Widget.MaterialComponents.Button.TextButton.Dialog.Flush.Primary
         </item>
     </style>
-
     <style name="Widget.MaterialComponents.Button.TextButton.Dialog.Primary">
         <item name="android:textColor">?primaryOrTextPrimary</item>
     </style>
-
     <style name="Widget.MaterialComponents.Button.TextButton.Dialog.Flush.Primary">
         <item name="android:textColor">?primaryOrTextPrimary</item>
     </style>
-
     <style name="Widget.MaterialComponents.Chip.Choice.SagerNet">
         <item name="textStartPadding">30dp</item>
         <item name="textEndPadding">30dp</item>
         <item name="chipBackgroundColor">@color/chip_background</item>
         <item name="android:textColor">@color/chip_text_color</item>
-        <item name="checkedIconTint">?primaryOrTextPrimary</item>
+        <item name="checkedIconTint">@color/vialen_accent</item>
         <item name="rippleColor">@color/chip_ripple_color</item>
     </style>
-
-    <style name="Theme.SagerNet.Black">
-        <item name="colorPrimary">@color/color_ng_black_primary</item>
-        <item name="colorPrimaryDark">@color/color_ng_black_primary</item>
-        <item name="colorAccent">@color/color_ng_black_accent</item>
-        <item name="colorMaterial100">@color/color_ng_black_primary</item>
-        <item name="colorMaterial300">@color/color_ng_black_primary</item>
-
-        <item name="selectedColorPrimary">@color/color_ng_black_accent</item>
-        <item name="fabColorBackground">@color/color_ng_black_accent</item>
-        <item name="itemShapeFillColor">@color/color_ng_black_accent</item>
-
-        <item name="accentOrTextSecondary">?android:textColorSecondary</item>
-        <item name="accentOrTextPrimary">?android:textColorPrimary</item>
-        <item name="primaryOrTextSecondary">?android:textColorSecondary</item>
-        <item name="primaryOrTextPrimary">?android:textColorPrimary</item>
-    </style>
-
-    <style name="Theme.SagerNet.Dialog.Black">
-        <item name="colorPrimary">@color/color_ng_black_primary</item>
-        <item name="colorPrimaryDark">@color/color_ng_black_primary</item>
-        <item name="colorAccent">@color/color_ng_black_accent</item>
-        <item name="colorMaterial100">@color/color_ng_black_primary</item>
-        <item name="colorMaterial300">@color/color_ng_black_primary</item>
-
-        <item name="selectedColorPrimary">@color/color_ng_black_accent</item>
-        <item name="fabColorBackground">@color/color_ng_black_accent</item>
-        <item name="itemShapeFillColor">@color/color_ng_black_accent</item>
-
-        <item name="accentOrTextSecondary">?android:textColorSecondary</item>
-        <item name="accentOrTextPrimary">?android:textColorPrimary</item>
-        <item name="primaryOrTextSecondary">?android:textColorSecondary</item>
-        <item name="primaryOrTextPrimary">?android:textColorPrimary</item>
-    </style>
-
+    <style name="Theme.SagerNet" parent="Base.Theme.Vialen" />
+    <style name="Theme.SagerNet.Dialog" parent="Base.Theme.Vialen.Dialog" />
+    <style name="ThemeOverlay.MaterialComponents.MaterialAlertDialog.SagerNet" parent="ThemeOverlay.Vialen.DialogBase" />
+    <style name="Theme.SagerNet.Black" />
+    <style name="Theme.SagerNet.Dialog.Black" />
     <style name="Theme.Start" parent="Theme.MaterialComponents.DayNight">
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="colorPrimary">@android:color/transparent</item>
@@ -177,5 +175,36 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
     </style>
-
+    <style name="ThemeOverlay.Vialen.Toolbar" parent="ThemeOverlay.AppCompat">
+        <item name="android:textColorPrimary">@color/vialen_text_primary</item>
+        <item name="android:textColorSecondary">@color/vialen_text_secondary</item>
+        <item name="colorControlNormal">@color/vialen_toolbar_icon</item>
+        <item name="android:colorControlNormal">@color/vialen_toolbar_icon</item>
+    </style>
+    <style name="Widget.Vialen.Switch" parent="Widget.AppCompat.CompoundButton.Switch">
+        <item name="thumbTint">@color/vialen_switch_thumb</item>
+        <item name="trackTint">@color/vialen_switch_track</item>
+    </style>
+    <style name="Widget.Vialen.PlatformSwitch" parent="android:style/Widget.Material.CompoundButton.Switch">
+        <item name="android:thumbTint">@color/vialen_switch_thumb</item>
+    </style>
+    <style name="Widget.Vialen.Snackbar" parent="Widget.MaterialComponents.Snackbar">
+        <item name="backgroundTint">@color/vialen_snackbar_background</item>
+        <item name="actionTextColorAlpha">1</item>
+    </style>
+    <style name="Widget.Vialen.Snackbar.TextView" parent="Widget.MaterialComponents.Snackbar.TextView">
+        <item name="android:textColor">@color/vialen_snackbar_text</item>
+    </style>
+    <style name="Widget.Vialen.Snackbar.Button" parent="Widget.MaterialComponents.Button.TextButton.Snackbar">
+        <item name="android:textColor">@color/vialen_snackbar_action</item>
+    </style>
+    <style name="Widget.Vialen.DialogChoice" parent="Widget.MaterialComponents.CheckedTextView">
+        <item name="android:textColor">@color/vialen_text_primary_tint</item>
+    </style>
+    <style name="Widget.Vialen.DialogBody" parent="MaterialAlertDialog.MaterialComponents.Body.Text">
+        <item name="android:textColor">@color/vialen_text_secondary_tint</item>
+    </style>
+    <style name="Widget.Vialen.DialogTitle" parent="MaterialAlertDialog.MaterialComponents.Title.Text">
+        <item name="android:textColor">@color/vialen_text_primary_tint</item>
+    </style>
 </resources>

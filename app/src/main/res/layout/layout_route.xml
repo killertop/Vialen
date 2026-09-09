@@ -21,8 +21,8 @@
             android:padding="4dp"
             android:scrollbarSize="0dp"
             app:fastScrollAutoHide="true"
-            app:fastScrollThumbColor="?colorPrimary"
-            app:fastScrollThumbInactiveColor="?colorPrimary">
+            app:fastScrollThumbColor="@color/vialen_accent"
+            app:fastScrollThumbInactiveColor="@color/vialen_scroll_thumb">
 
         </com.simplecityapps.recyclerview_fastscroll.views.FastScrollRecyclerView>
 

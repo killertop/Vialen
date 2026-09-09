@@ -1,5 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <lint>
+    <!-- Newer-version notices are maintenance information, not defects in the
+         tested minSdk 21 / compileSdk 35 dependency graph. Keep them visible;
+         correctness warnings still fail the build via warningsAsErrors. -->
+    <issue id="GradleDependency" severity="informational" />
+
+    <!-- This signature-only permission name is also consumed by the existing
+         receiver contract; changing the spelling provides no security benefit. -->
+    <issue id="PermissionNamingConvention">
+        <ignore path="app/src/main/AndroidManifest.xml" />
+    </issue>
+    <!-- Per-app VPN routing must offer arbitrary installed apps, including apps
+         without launcher activities; a fixed queries list is insufficient. -->
+    <issue id="QueryAllPackagesPermission">
+        <ignore path="app/src/main/AndroidManifest.xml" />
+    </issue>
+    <!-- This is a RecyclerView key's ripple, not an Activity root background. -->
+    <issue id="Overdraw">
+        <ignore path="app/src/main/res/layout/item_keyboard_key.xml" />
+    </issue>
+    <!-- Two established toolbar actions must retain their visible entry points. -->
+    <issue id="AlwaysShowAction">
+        <ignore path="app/src/main/res/menu/add_group_menu.xml" />
+    </issue>
+    <!-- Keep these three existing small static glyphs at full precision;
+         no animation or per-frame path parsing occurs in these preference icons.
+         Removing numeric leading zeroes is unsafe on older vector parsers. -->
+    <issue id="VectorPath">
+        <ignore path="app/src/main/res/drawable/ic_baseline_fingerprint_24.xml" />
+        <ignore path="app/src/main/res/drawable/ic_action_copyright.xml" />
+        <ignore path="app/src/main/res/drawable/ic_action_settings.xml" />
+    </issue>
     <issue id="UnusedAttribute" severity="ignore" />
     <issue id="UnknownNullness" severity="ignore" />
     <issue id="DiscouragedPrivateApi" severity="ignore" />

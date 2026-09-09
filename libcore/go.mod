@@ -96,3 +96,5 @@ replace github.com/matsuridayo/libneko => ../../libneko
 replace github.com/sagernet/sing-box => ../../sing-box
 
 replace github.com/sagernet/gvisor => github.com/sagernet/gvisor v0.0.0-20260727.0-sing-box-mod.1
+
+replace github.com/sagernet/sing-tun => ../../sing-tun

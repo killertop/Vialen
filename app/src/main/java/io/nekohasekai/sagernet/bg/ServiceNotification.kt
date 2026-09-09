@@ -2,6 +2,9 @@ package io.nekohasekai.sagernet.bg
 
 import android.app.PendingIntent
 import android.app.Service
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED
@@ -132,7 +135,11 @@ class ServiceNotification(
         }
 
     private suspend fun update() = useBuilder {
-        NotificationManagerCompat.from(service as Service).notify(notificationId, it.build())
+        if (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(
+                service as Service, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED) {
+            NotificationManagerCompat.from(service as Service).notify(notificationId, it.build())
+        }
     }
 
     fun destroy() {

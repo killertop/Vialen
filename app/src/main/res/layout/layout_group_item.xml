@@ -6,6 +6,8 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="4dp"
+    app:cardBackgroundColor="@color/vialen_surface"
+    app:strokeColor="@color/vialen_outline"
     app:cardElevation="2dp">
 
     <LinearLayout
@@ -65,6 +67,7 @@
                 android:contentDescription="@string/edit"
                 android:focusable="true"
                 android:padding="12dp"
+                app:tint="@color/vialen_icon_tint"
                 app:srcCompat="@drawable/ic_image_edit" />
 
             <androidx.appcompat.widget.AppCompatImageView
@@ -76,6 +79,7 @@
                 android:focusable="true"
                 android:nextFocusLeft="@+id/container"
                 android:padding="12dp"
+                app:tint="@color/vialen_icon_tint"
                 app:srcCompat="@drawable/ic_baseline_more_vert_24" />
 
         </LinearLayout>

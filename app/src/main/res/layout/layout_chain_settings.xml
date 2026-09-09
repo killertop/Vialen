@@ -18,7 +18,7 @@
         android:id="@+id/list_cell"
         android:layout_width="match_parent"
         android:layout_height="0.5dp"
-        android:background="@android:color/darker_gray"
+        android:background="@color/vialen_outline"
         android:orientation="horizontal" />
 
     <com.simplecityapps.recyclerview_fastscroll.views.FastScrollRecyclerView
@@ -30,9 +30,10 @@
         android:padding="4dp"
         android:overScrollMode="never"
         app:fastScrollAutoHide="true"
-        app:fastScrollPopupTextColor="?colorPrimary"
-        app:fastScrollThumbColor="?colorPrimary"
-        app:fastScrollThumbInactiveColor="?colorPrimary"
+        app:fastScrollPopupTextColor="@color/vialen_on_brand"
+        app:fastScrollPopupBgColor="@color/vialen_brand"
+        app:fastScrollThumbColor="@color/vialen_accent"
+        app:fastScrollThumbInactiveColor="@color/vialen_scroll_thumb"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
     </com.simplecityapps.recyclerview_fastscroll.views.FastScrollRecyclerView>

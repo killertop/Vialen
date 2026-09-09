@@ -1,5 +1,9 @@
 package moe.matsuri.nb4a.ui
 
+import android.os.Build
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import android.content.Context
 import androidx.core.app.NotificationCompat
 import io.nekohasekai.sagernet.R
@@ -21,7 +25,11 @@ class ConnectionTestNotification(val context: Context, val title: String) {
                 .setContentTitle(title)
                 .setOnlyAlertOnce(true)
                 .setContentText("$progress / $max").setProgress(max, progress, false)
-            SagerNet.notification.notify(notificationId, builder.build())
+            if (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED) {
+                SagerNet.notification.notify(notificationId, builder.build())
+            }
         } catch (e: Exception) {
             Logs.w(e)
         }

@@ -628,19 +628,19 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                     1 -> {
                         profileStatusText = getString(R.string.available, profile.ping)
-                        profileStatusColor = context.getColour(R.color.material_green_500)
+                        profileStatusColor = context.getColour(R.color.vialen_success)
                     }
 
                     2 -> {
                         profileStatusText = profile.error
-                        profileStatusColor = context.getColour(R.color.material_red_500)
+                        profileStatusColor = context.getColour(R.color.vialen_error)
                     }
 
                     3 -> {
                         val err = profile.error ?: ""
                         val msg = Protocols.genFriendlyMsg(err)
                         profileStatusText = if (msg != err) msg else getString(R.string.unavailable)
-                        profileStatusColor = context.getColour(R.color.material_red_500)
+                        profileStatusColor = context.getColour(R.color.vialen_error)
                     }
                 }
 
@@ -1456,16 +1456,29 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             val trafficText: TextView = view.findViewById(R.id.traffic_text)
             val selectedView: LinearLayout = view.findViewById(R.id.selected_view)
+            val profileCard = view as com.google.android.material.card.MaterialCardView
             val editButton: ImageView = view.findViewById(R.id.edit)
             val shareLayout: LinearLayout = view.findViewById(R.id.share)
             val shareLayer: LinearLayout = view.findViewById(R.id.share_layer)
             val shareButton: ImageView = view.findViewById(R.id.shareIcon)
             val removeButton: ImageView = view.findViewById(R.id.remove)
 
+            private var visualBinding = 0
+
+            private fun updateCardBackground(selected: Boolean, expectedBinding: Int) {
+                // Ignore queued colors from a previous bind or selection click.
+                if (visualBinding != expectedBinding) return
+                profileCard.setCardBackgroundColor(requireContext().getColour(
+                    if (selected) R.color.vialen_selected_background else R.color.vialen_surface
+                ))
+            }
+
             fun bind(proxyEntity: ProxyEntity, trafficData: TrafficData? = null) {
                 val pf = parentFragment as? ConfigurationFragment ?: return
 
                 entity = proxyEntity
+                val binding = ++visualBinding
+                updateCardBackground(selectedItem?.id == proxyEntity.id, binding)
 
                 if (select) {
                     view.setOnClickListener {
@@ -1473,6 +1486,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                 } else {
                     view.setOnClickListener {
+                        val clickedBinding = ++visualBinding
                         runOnDefaultDispatcher {
                             var update: Boolean
                             var lastSelected: Long
@@ -1482,6 +1496,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                                 DataStore.selectedProxy = proxyEntity.id
                                 onMainDispatcher {
                                     selectedView.visibility = View.VISIBLE
+                                    updateCardBackground(true, clickedBinding)
                                 }
                             }
 
@@ -1548,9 +1563,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                 } else if (proxyEntity.status == 1) {
                     profileStatus.text = getString(R.string.available, proxyEntity.ping)
-                    profileStatus.setTextColor(requireContext().getColour(R.color.material_green_500))
+                    profileStatus.setTextColor(requireContext().getColour(R.color.vialen_success))
                 } else {
-                    profileStatus.setTextColor(requireContext().getColour(R.color.material_red_500))
+                    profileStatus.setTextColor(requireContext().getColour(R.color.vialen_error))
                     if (proxyEntity.status == 2) {
                         profileStatus.text = proxyEntity.error
                     }
@@ -1596,6 +1611,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                         editButton.isEnabled = !started
                         removeButton.isEnabled = !started
                         selectedView.visibility = if (selected) View.VISIBLE else View.INVISIBLE
+                        updateCardBackground(selected, binding)
                     }
 
                     fun showShare(anchor: View) {
@@ -1624,7 +1640,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                         onMainDispatcher {
                             shareLayer.setBackgroundColor(Color.TRANSPARENT)
                             shareButton.setImageResource(R.drawable.ic_social_share)
-                            shareButton.setColorFilter(Color.GRAY)
+                            shareButton.clearColorFilter()
                             shareButton.isVisible = true
 
                             shareLayout.setOnClickListener {
