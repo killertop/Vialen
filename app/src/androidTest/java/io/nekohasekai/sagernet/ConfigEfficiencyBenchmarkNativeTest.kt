@@ -26,7 +26,8 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class ConfigEfficiencyBenchmarkNativeTest {
-    @get:org.junit.Rule val state = ProfileSelectionStateRule()
+    @get:org.junit.Rule val state = org.junit.rules.RuleChain.outerRule(ProfileSelectionStateRule())
+        .around(BenchmarkForegroundRule())
     private fun hash(text: String) = MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") { "%02x".format(it) }
     private fun rssKb(): Long = File("/proc/self/status").useLines { rows ->
         rows.firstOrNull { it.startsWith("VmRSS:") }?.substringAfter(':')?.trim()?.substringBefore(' ')?.toLongOrNull() ?: -1
