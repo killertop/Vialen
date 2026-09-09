@@ -75,6 +75,8 @@ class TrafficEfficiencyLifecycleTest {
             mapOf(1L to "one",2L to "two"),if(selector) 1 else -1)
         val proxy=mockk<ProxyInstance>(relaxed=true)
         every { proxy.config } returns config
+        // changeState reads its backing field directly; populate it for the real Data spy too.
+        data.proxy = proxy
         every { data.proxy } returns proxy
         return TrafficLooper(data,readStats={tag,direction -> readStats(tag,direction)},installStats={installs.incrementAndGet();Unit}).also { looper=it;every { proxy.looper } returns it;it.start() }
     }
@@ -121,15 +123,18 @@ class TrafficEfficiencyLifecycleTest {
         every { DataStore.speedInterval } returns 10_000
         every { DataStore.serviceState = any() } just Runs
         data=spyk(BaseService.Data(mockk(relaxed=true)))
+        val ownedBinder=data.binder
         every { data.binder } returns binder
         data.state=BaseService.State.Connecting
         consumers[callback]=SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND
-        start()
-        delay(80)
-        assertEquals(0,queries.get())
-        data.changeState(BaseService.State.Connected)
-        awaitCondition { speeds.get()>0 }
-        assertTrue(queries.get()>=6)
+        try {
+            start()
+            delay(80)
+            assertEquals(0,queries.get())
+            data.changeState(BaseService.State.Connected)
+            awaitCondition { speeds.get()>0 }
+            assertTrue(queries.get()>=6)
+        } finally { ownedBinder.close() }
     }
 
     @Test fun selectionDrainsOldCounterBeforeReassigningAndRepeatedIdDoesNothing() = runBlocking {

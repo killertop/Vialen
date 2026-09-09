@@ -9,6 +9,16 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CancellableUrlTestLifecycleTest {
+    private fun assertObservableFailure(expected: Throwable, actual: Throwable?) {
+        assertNotNull(actual)
+        assertEquals(expected.javaClass, actual!!.javaClass)
+        assertEquals(expected.message, actual.message)
+        // Coroutine stacktrace recovery (-ea / debug mode) can copy an exception,
+        // retaining the original as its cause. Require the actual sentinel to remain reachable.
+        assertTrue("Original failure must remain observable in the cause chain",
+            generateSequence(actual) { it.cause }.take(16).any { it === expected })
+    }
+
     private fun cancellationAt(stage: Int) = runBlocking {
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
@@ -47,8 +57,8 @@ class CancellableUrlTestLifecycleTest {
             runCancellableUrlTest({}, {}, { throw failure }, { error("must not test") }, { closed.incrementAndGet(); throw cleanup })
             fail("expected failure")
         } catch (e: IllegalStateException) {
-            assertSame(failure, e)
-            assertTrue(e.suppressed.contains(cleanup))
+            assertObservableFailure(failure, e)
+            assertTrue(failure.suppressed.contains(cleanup))
         }
         assertEquals(1, closed.get())
     }
@@ -84,7 +94,7 @@ class CancellableUrlTestLifecycleTest {
             check(entered.await(3, TimeUnit.SECONDS))
             pending.cancelAndJoin()
             assertEquals(1, closed.get())
-            assertSame("Cleanup failure must survive an already cancelled continuation", cleanup, completion.get())
+            assertObservableFailure(cleanup, completion.get())
         }
     }
 
@@ -98,7 +108,7 @@ class CancellableUrlTestLifecycleTest {
                 pending.await()
                 fail("Expected cleanup failure")
             } catch (failure: IllegalStateException) {
-                assertSame(cleanup, failure)
+                assertObservableFailure(cleanup, failure)
             }
         }
     }

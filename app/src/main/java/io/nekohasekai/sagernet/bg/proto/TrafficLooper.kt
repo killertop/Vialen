@@ -29,7 +29,7 @@ class TrafficLooper internal constructor(
     private val idMap = mutableMapOf<Long, TrafficUpdater.TrafficLooperData>()
     private val tagMap = mutableMapOf<String, TrafficUpdater.TrafficLooperData>()
     private val profiles = mutableMapOf<Long, ProxyEntity>()
-    private var selectedId = -1L
+    private var selectedId = Long.MIN_VALUE // -1 is the bypass counter, never a selection sentinel.
     private var selectedTag = ""
     private val interval = DataStore.speedInterval.toLong()
     private val statistics = DataStore.profileTrafficStatistics

@@ -1,5 +1,8 @@
 package io.nekohasekai.sagernet.ktx
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
 import moe.matsuri.nb4a.utils.NGUtil
 import java.io.FileDescriptor
 import java.net.Socket
@@ -36,3 +39,9 @@ fun String.urlSafe(): String {
 fun String.unUrlSafe(): String {
     return NGUtil.urlDecode(this)
 }
+
+// Keep the production Data constructor callable in Robolectric despite this file's UtilsKt shadow.
+fun broadcastReceiver(callback: (Context, Intent) -> Unit): BroadcastReceiver =
+    object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) = callback(context, intent)
+    }
