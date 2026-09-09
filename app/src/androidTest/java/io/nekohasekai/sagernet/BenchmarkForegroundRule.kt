@@ -1,38 +1,54 @@
 package io.nekohasekai.sagernet
 
 import android.app.Activity
-import android.content.Intent
+import android.os.ParcelFileDescriptor
 import android.util.Log
-import androidx.lifecycle.Lifecycle
-import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import org.junit.rules.TestRule
 import org.junit.runner.Description
 import org.junit.runners.model.Statement
 
-/** Keep one inert debug Activity resumed for the entire benchmark, outside measured work. */
+/** An inert debug Activity owns foreground; launch and cleanup are outside measured work. */
 class BenchmarkForegroundRule : TestRule {
     override fun apply(base: Statement, description: Description): Statement = object : Statement() {
         override fun evaluate() {
             val instrumentation = InstrumentationRegistry.getInstrumentation()
             val context = instrumentation.targetContext
-            // Some vendor builds suppress app-originated background Activity launches,
-            // even under instrumentation. Shell starts this debug-only inert host first.
-            // No app-op, power policy or system setting is modified.
-            val component = "${context.packageName}/io.nekohasekai.sagernet.BenchmarkHostActivity"
-            val launch = instrumentation.uiAutomation.executeShellCommand("am start -W -n $component")
-            val output = android.os.ParcelFileDescriptor.AutoCloseInputStream(launch)
-                .bufferedReader().use { it.readText() }
-            check(!output.contains("Error:") && !output.contains("Exception")) { output }
-            val intent = Intent().setClassName(context.packageName,
-                "io.nekohasekai.sagernet.BenchmarkHostActivity")
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            ActivityScenario.launch<Activity>(intent).use { scenario ->
-                check(scenario.state == Lifecycle.State.RESUMED) { "Benchmark host did not resume" }
+            val className = "io.nekohasekai.sagernet.BenchmarkHostActivity"
+            var host: Activity? = null
+            fun resumed() = instrumentation.runOnMainSync {
+                val activities = ActivityLifecycleMonitorRegistry.getInstance()
+                    .getActivitiesInStage(Stage.RESUMED).filter { it.javaClass.name == className }
+                check(activities.size == 1) { "Expected one resumed benchmark host" }
+                val current = activities.single()
+                check(host == null || host === current) { "Benchmark host was replaced" }
+                host = current
+            }
+            try {
+                // Vendor builds can suppress app-originated background launches, including
+                // ActivityScenario's cleanup EmptyActivity. Use shell only to open this host;
+                // no app-op, power policy or system setting changes are needed.
+                val command = "am start -W -n ${context.packageName}/$className"
+                val output = ParcelFileDescriptor.AutoCloseInputStream(
+                    instrumentation.uiAutomation.executeShellCommand(command))
+                    .bufferedReader().use { it.readText() }
+                check(!output.contains("Error:") && !output.contains("Exception")) { output }
+                instrumentation.waitForIdleSync()
+                resumed()
                 Log.i("BenchmarkForeground", "case=${description.methodName} stage=before state=RESUMED")
                 base.evaluate()
-                check(scenario.state == Lifecycle.State.RESUMED) { "Benchmark host lost foreground" }
+                resumed()
                 Log.i("BenchmarkForeground", "case=${description.methodName} stage=after state=RESUMED")
+            } finally {
+                instrumentation.runOnMainSync {
+                    val monitor = ActivityLifecycleMonitorRegistry.getInstance()
+                    // Include a paused launch if startup failed before assigning host.
+                    val owned = Stage.values().flatMap { monitor.getActivitiesInStage(it) }
+                        .filter { it.javaClass.name == className }.distinct()
+                    owned.forEach { it.finishAndRemoveTask() }
+                }
             }
         }
     }

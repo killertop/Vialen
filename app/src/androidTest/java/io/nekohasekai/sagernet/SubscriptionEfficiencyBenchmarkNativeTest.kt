@@ -27,8 +27,8 @@ import java.security.MessageDigest
  */
 @RunWith(AndroidJUnit4::class)
 class SubscriptionEfficiencyBenchmarkNativeTest {
-    @get:Rule val selectionState = org.junit.rules.RuleChain.outerRule(ProfileSelectionStateRule())
-        .around(BenchmarkForegroundRule())
+    @get:Rule val selectionState = org.junit.rules.RuleChain.outerRule(BenchmarkForegroundRule())
+        .around(ProfileSelectionStateRule())
 
     private data class Fixture(val body: String, val names: List<String>, val changedNames: Set<String>)
     private data class Counters(val changed: Int, val added: List<String>, val updated: Map<String, String>,
