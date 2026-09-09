@@ -39,7 +39,7 @@ class SubscriptionEfficiencyBenchmarkNativeTest {
             ?.substringBefore(' ')?.toLongOrNull() ?: -1L
     }
     private fun stats(): Map<String, Long> = Debug.getRuntimeStats().mapNotNull { (key, value) ->
-        value.toLongOrNull()?.let { key to it }
+        value?.toLongOrNull()?.let { key to it }
     }.toMap()
 
     private fun fixture(format: String, size: Int, changed: Boolean, reversed: Boolean): Fixture {
