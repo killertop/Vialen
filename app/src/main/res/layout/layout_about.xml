@@ -47,6 +47,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
+                android:textColor="@color/vialen_accent_tint"
                 android:text="@string/vialen_releases" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>

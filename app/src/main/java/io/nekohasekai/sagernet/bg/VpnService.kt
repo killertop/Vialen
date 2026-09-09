@@ -63,7 +63,8 @@ class VpnService : BaseVpnService(),
 
     private fun matchesVpnLink(link: LinkProperties): Boolean {
         val expected = linkExpectation ?: return false
-        return !link.interfaceName.isNullOrEmpty() && link.mtu == expected.mtu &&
+        return !link.interfaceName.isNullOrEmpty() &&
+            (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || link.mtu == expected.mtu) &&
             link.linkAddresses.map { it.address to it.prefixLength }.containsAll(expected.addresses) &&
             link.dnsServers.contains(expected.dns) &&
             link.routes.map { it.destination.address to it.destination.prefixLength }.containsAll(expected.routes)

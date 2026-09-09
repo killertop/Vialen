@@ -13,6 +13,6 @@
     android:paddingBottom="48dp"
     android:scrollbarSize="0dp"
     app:fastScrollAutoHide="true"
-    app:fastScrollThumbColor="?colorPrimary"
-    app:fastScrollThumbInactiveColor="?colorPrimary"
+    app:fastScrollThumbColor="@color/vialen_accent"
+    app:fastScrollThumbInactiveColor="@color/vialen_scroll_thumb"
     tools:listitem="@layout/layout_profile" />

@@ -13,6 +13,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updateLayoutParams
 import androidx.core.widget.addTextChangedListener
 import com.blacksquircle.ui.editorkit.insert
+import com.blacksquircle.ui.editorkit.model.ColorScheme
 import com.blacksquircle.ui.language.json.JsonLanguage
 import com.github.shadowsocks.plugin.Empty
 import com.github.shadowsocks.plugin.fragment.AlertDialogFragment
@@ -21,7 +22,7 @@ import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.databinding.LayoutEditConfigBinding
-import io.nekohasekai.sagernet.ktx.getColorAttr
+import io.nekohasekai.sagernet.ktx.getColour
 import io.nekohasekai.sagernet.ktx.readableMessage
 import io.nekohasekai.sagernet.ktx.toStringPretty
 import io.nekohasekai.sagernet.ui.ThemedActivity
@@ -70,6 +71,7 @@ class ConfigEditActivity : ThemedActivity() {
         }
 
         binding.editor.apply {
+            colorScheme = editorColorScheme()
             language = JsonLanguage()
             setHorizontallyScrolling(true)
             if (useConfigStore) {
@@ -118,7 +120,7 @@ class ConfigEditActivity : ThemedActivity() {
         }
         extendedKeyboard.setHasFixedSize(true)
         extendedKeyboard.submitList("{},:_\"".map { it.toString() })
-        extendedKeyboard.setBackgroundColor(getColorAttr(R.attr.primaryOrTextPrimary))
+        extendedKeyboard.setBackgroundColor(getColour(R.color.vialen_surface))
 
         val keyboardContainer = findViewById<LinearLayout>(R.id.keyboard_container)
         ViewCompat.setOnApplyWindowInsetsListener(keyboardContainer) { v, windowInsets ->
@@ -138,6 +140,45 @@ class ConfigEditActivity : ThemedActivity() {
         }
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.root, ListListener)
+    }
+
+    private fun editorColorScheme(): ColorScheme {
+        val primary = getColour(R.color.vialen_text_primary)
+        val secondary = getColour(R.color.vialen_text_secondary)
+        val surface = getColour(R.color.vialen_surface)
+        val outline = getColour(R.color.vialen_outline)
+        val selected = getColour(R.color.vialen_selected_background)
+        val accent = getColour(R.color.vialen_accent)
+        val success = getColour(R.color.vialen_success)
+        return ColorScheme(
+            textColor = primary,
+            cursorColor = accent,
+            backgroundColor = surface,
+            gutterColor = surface,
+            gutterDividerColor = outline,
+            gutterCurrentLineNumberColor = primary,
+            gutterTextColor = secondary,
+            selectedLineColor = selected,
+            selectionColor = selected,
+            suggestionQueryColor = accent,
+            findResultBackgroundColor = selected,
+            delimiterBackgroundColor = selected,
+            numberColor = accent,
+            operatorColor = secondary,
+            keywordColor = accent,
+            typeColor = accent,
+            langConstColor = accent,
+            preprocessorColor = secondary,
+            variableColor = primary,
+            methodColor = accent,
+            stringColor = success,
+            commentColor = secondary,
+            tagColor = secondary,
+            tagNameColor = accent,
+            attrNameColor = primary,
+            attrValueColor = success,
+            entityRefColor = accent,
+        )
     }
 
     fun formatText(): String? {

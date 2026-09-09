@@ -56,6 +56,27 @@ class VpnNetworkLifecycleTest {
         failure?.let { throw it }
     }
 
+    @Test
+    @Config(sdk = [28])
+    fun preRRequestObservesVpnWithoutUnavailableApis() = runBlocking {
+        val observer = lifecycle(sdk = 28)
+        observer.begin()
+        val request = requests.single()
+        assertTrue(request.hasTransport(NetworkCapabilities.TRANSPORT_VPN))
+        assertFalse(request.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN))
+        assertFalse(request.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED))
+        assertFalse(request.hasCapability(NetworkCapabilities.NET_CAPABILITY_TRUSTED))
+        val current = network()
+        val capabilities = mockk<NetworkCapabilities>()
+        every { capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) } returns true
+        // No ownerUid stub: API 28 must never query the API 30-only accessor.
+        callbacks.single().onAvailable(current)
+        callbacks.single().onCapabilitiesChanged(current, capabilities)
+        callbacks.single().onLinkPropertiesChanged(current, links())
+        observer.markEstablished()
+        assertSame(current, observer.awaitReady())
+    }
+
     private fun lifecycle(sdk: Int = 34, matcher: (LinkProperties) -> Boolean = { it.interfaceName == "tun-ready" }) =
         VpnNetworkLifecycle(connectivity, matcher, sdk, uid).also { owned.add(it) }
     private fun network() = mockk<Network>()

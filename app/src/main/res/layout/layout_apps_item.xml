@@ -7,6 +7,8 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="4dp"
+    app:cardBackgroundColor="@color/vialen_surface"
+    app:strokeColor="@color/vialen_outline"
     app:cardElevation="2dp"
     tools:ignore="SelectableText">
 

@@ -4,16 +4,19 @@
     android:id="@+id/appbar"
     android:layout_width="match_parent"
     android:layout_height="?attr/actionBarSize"
-    android:background="?attr/colorPrimary"
+    android:background="@android:color/transparent"
     android:elevation="4dp">
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="?attr/colorPrimary"
+        android:background="@color/vialen_surface"
         android:theme="?actionBarTheme"
         android:touchscreenBlocksFocus="false"
+        app:titleTextColor="@color/vialen_text_primary"
+        app:subtitleTextColor="@color/vialen_text_secondary"
+        app:navigationIconTint="@color/vialen_toolbar_icon"
         app:popupTheme="@style/ThemeOverlay.AppCompat.DayNight"
         app:title="@string/app_name" />
 </com.google.android.material.appbar.AppBarLayout>

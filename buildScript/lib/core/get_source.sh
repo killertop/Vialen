@@ -29,4 +29,14 @@ popd
 
 ####
 
+if [ ! -d "sing-tun" ]; then
+  git clone --no-checkout https://github.com/sagernet/sing-tun.git
+fi
+pushd sing-tun
+git checkout "$COMMIT_SING_TUN"
+python3 "$vialen_source_root/scripts/ci/artifacts.py" prepare-sing-tun "$PWD"
+popd
+
+####
+
 popd

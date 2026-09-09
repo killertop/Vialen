@@ -7,7 +7,9 @@ import android.widget.TextView
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import com.google.android.material.appbar.AppBarLayout
@@ -34,6 +36,19 @@ abstract class ThemedActivity : AppCompatActivity {
         super.onCreate(savedInstanceState)
 
         uiMode = resources.configuration.uiMode
+
+        val isNight = (uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !isNight
+            isAppearanceLightNavigationBars = !isNight
+        }
+        // Older Android releases only support light system-bar icons.
+        if (Build.VERSION.SDK_INT < 23) {
+            window.statusBarColor = ContextCompat.getColor(this, R.color.vialen_legacy_system_bar)
+        }
+        if (Build.VERSION.SDK_INT < 26) {
+            window.navigationBarColor = ContextCompat.getColor(this, R.color.vialen_legacy_system_bar)
+        }
 
         if (Build.VERSION.SDK_INT >= 35) {
             ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content)) { _, insets ->

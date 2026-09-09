@@ -1,0 +1,115 @@
+--- a/stack_gvisor_filter.go
++++ b/stack_gvisor_filter.go
+@@ -24,6 +24,11 @@
+ }
+ 
+ func (w *LinkEndpointFilter) Attach(dispatcher stack.NetworkDispatcher) {
++	// A nil dispatcher detaches the underlying receiver and waits for it to stop.
++	if dispatcher == nil {
++		w.LinkEndpoint.Attach(nil)
++		return
++	}
+ 	w.LinkEndpoint.Attach(&networkDispatcherFilter{
+ 		NetworkDispatcher:    dispatcher,
+ 		broadcastAddress:     w.BroadcastAddress,
+--- /dev/null
++++ b/stack_gvisor_filter_detach_test.go
+@@ -0,0 +1,50 @@
++//go:build with_gvisor
++
++package tun
++
++import (
++	"net/netip"
++	"testing"
++
++	"github.com/sagernet/gvisor/pkg/tcpip/stack"
++)
++
++type detachRecordingEndpoint struct {
++	stack.LinkEndpoint
++	received []stack.NetworkDispatcher
++}
++
++func (e *detachRecordingEndpoint) Attach(d stack.NetworkDispatcher) {
++	e.received = append(e.received, d)
++}
++
++type detachTestDispatcher struct{ stack.NetworkDispatcher }
++
++func TestLinkEndpointFilterDetachPassesNil(t *testing.T) {
++	endpoint := &detachRecordingEndpoint{}
++	filter := &LinkEndpointFilter{LinkEndpoint: endpoint}
++	filter.Attach(&detachTestDispatcher{})
++	filter.Attach(nil)
++	if len(endpoint.received) != 2 || endpoint.received[1] != nil {
++		t.Fatal("detach must pass a nil interface to the underlying endpoint, not a filter wrapping nil")
++	}
++}
++
++func TestLinkEndpointFilterAttachKeepsFiltering(t *testing.T) {
++	endpoint := &detachRecordingEndpoint{}
++	dispatcher := &detachTestDispatcher{}
++	forwarder := &ForwardDispatcher{}
++	broadcast := netip.MustParseAddr("192.0.2.255")
++	address := netip.MustParseAddr("192.0.2.1")
++	filter := &LinkEndpointFilter{LinkEndpoint: endpoint, BroadcastAddress: broadcast,
++		Dispatcher: forwarder, Inet4Address: address}
++	filter.Attach(dispatcher)
++	if len(endpoint.received) != 1 {
++		t.Fatal("expected one attach")
++	}
++	wrapped, ok := endpoint.received[0].(*networkDispatcherFilter)
++	if !ok || wrapped.NetworkDispatcher != dispatcher || wrapped.dispatcher != forwarder ||
++		wrapped.broadcastAddress != broadcast || wrapped.inet4Address != address {
++		t.Fatal("normal attach must retain packet filtering and its dispatcher/address settings")
++	}
++}
+--- /dev/null
++++ b/stack_gvisor_filter_detach_linux_test.go
+@@ -0,0 +1,45 @@
++//go:build with_gvisor && linux
++
++package tun
++
++import (
++	"testing"
++	"time"
++
++	"github.com/sagernet/gvisor/pkg/tcpip/link/fdbased"
++	"golang.org/x/sys/unix"
++)
++
++func TestLinkEndpointFilterDetachStopsFDBasedReceiver(t *testing.T) {
++	fds, err := unix.Socketpair(unix.AF_UNIX, unix.SOCK_DGRAM|unix.SOCK_NONBLOCK, 0)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer unix.Close(fds[0])
++	defer unix.Close(fds[1])
++	endpoint, err := fdbased.New(&fdbased.Options{FDs: []int{fds[0]}, MTU: 1500, ProcessorsPerChannel: 1})
++	if err != nil {
++		t.Fatal(err)
++	}
++	// Always release the real receiver even when the filter's detach is broken.
++	defer endpoint.Attach(nil)
++	filter := &LinkEndpointFilter{LinkEndpoint: endpoint}
++	filter.Attach(&detachTestDispatcher{})
++	if !endpoint.IsAttached() {
++		t.Fatal("receiver was not attached")
++	}
++	done := make(chan struct{})
++	go func() { filter.Attach(nil); close(done) }()
++	select {
++	case <-done:
++	case <-time.After(2 * time.Second):
++		t.Fatal("detach did not wake and join the idle receiver")
++	}
++	if endpoint.IsAttached() {
++		t.Fatal("filter detach left the real fd receiver attached")
++	}
++	// The borrowed FD must still be owned by the caller after detach.
++	if _, err := unix.FcntlInt(uintptr(fds[0]), unix.F_GETFD, 0); err != nil {
++		t.Fatalf("detach closed the caller's fd: %v", err)
++	}
++}

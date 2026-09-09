@@ -1,0 +1,16 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Match the adaptive foreground geometry in art/icon-b-continuous-v/master.svg. -->
+    <group
+        android:scaleX="0.92"
+        android:scaleY="0.92"
+        android:pivotX="54"
+        android:pivotY="54">
+        <path
+            android:fillColor="@android:color/white"
+            android:pathData="M27,32 L33,32 C37,32 39,34 41,38 L52,61 C53,63 55,63 56,61 L67,38 C69,34 71,32 75,32 L81,32 L64,68 C62,73 59,76 54,76 C49,76 46,73 44,68 Z" />
+    </group>
+</vector>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Widget.Vialen.PlatformSwitch" parent="android:style/Widget.Material.CompoundButton.Switch">
+        <item name="android:thumbTint">@color/vialen_switch_thumb</item>
+        <item name="android:trackTint">@color/vialen_switch_track</item>
+    </style>
+    <style name="Theme.SagerNet" parent="Base.Theme.Vialen">
+        <item name="android:windowLightStatusBar">@bool/vialen_light_system_bars</item>
+    </style>
+    <style name="Theme.SagerNet.Dialog" parent="Base.Theme.Vialen.Dialog">
+        <item name="android:windowLightStatusBar">@bool/vialen_light_system_bars</item>
+    </style>
+    <style name="ThemeOverlay.MaterialComponents.MaterialAlertDialog.SagerNet" parent="ThemeOverlay.Vialen.DialogBase">
+        <item name="android:statusBarColor">@color/vialen_surface</item>
+        <item name="android:windowLightStatusBar">@bool/vialen_light_system_bars</item>
+    </style>
+</resources>

@@ -63,7 +63,7 @@ internal class VpnNetworkLifecycle(
         override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) = synchronized(lock) {
             val candidate = candidateLocked(network) ?: return@synchronized
             candidate.capabilitiesMatch = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) &&
-                (sdk < Build.VERSION_CODES.R || capabilities.ownerUid == ownUid)
+                (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || sdk < Build.VERSION_CODES.R || capabilities.ownerUid == ownUid)
             signalLocked()
         }
 
@@ -98,8 +98,17 @@ internal class VpnNetworkLifecycle(
                     oldNetworks.add(network)
                 }
             }
-            val request = NetworkRequest.Builder().clearCapabilities()
-                .addTransportType(NetworkCapabilities.TRANSPORT_VPN).build()
+            val requestBuilder = NetworkRequest.Builder()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                requestBuilder.clearCapabilities()
+            } else {
+                // Pre-R builders expose these three default requirements individually.
+                // In particular NOT_VPN must be removed to observe our VPN network.
+                requestBuilder.removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED)
+                    .removeCapability(NetworkCapabilities.NET_CAPABILITY_TRUSTED)
+                    .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+            }
+            val request = requestBuilder.addTransportType(NetworkCapabilities.TRANSPORT_VPN).build()
             connectivity.registerNetworkCallback(request, callback)
             registered = true
         } catch (failure: Throwable) {

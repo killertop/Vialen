@@ -160,14 +160,14 @@ def verify_repository_tree(repo, tree, overrides=None):
                     "Dependency differs from pinned tree: " + name)
 
 
-def patched_sing_box(repo, pin, apply=False):
+def patched_dependency(repo, pin, patch_name, apply=False):
     """Accept exactly the reviewed downstream patch over the pinned upstream tree."""
     patch_root = ROOT / "buildScript/lib/core/patches"
-    manifest_path = patch_root / "sing-box-reset.json"
+    manifest_path = patch_root / (patch_name + ".json")
     spec = json.loads(manifest_path.read_text())
     require(spec["schema"] == 1 and spec["base_commit"] == pin,
             "Downstream patch base differs from pinned source")
-    patch = patch_root / "sing-box-reset.patch"
+    patch = patch_root / (patch_name + ".patch")
     require(digest(patch) == spec["patch_sha256"], "Downstream patch digest mismatch")
     require(run("git", "rev-parse", "HEAD", cwd=repo) == pin, "Replace repository pin mismatch")
     tree = repository_tree(repo)
@@ -224,6 +224,14 @@ def patched_sing_box(repo, pin, apply=False):
             "uninitialized_gitlinks": {name: entry["bytes"].decode() for name, entry in tree.items() if entry["gitlink"]}}
 
 
+def patched_sing_box(repo, pin, apply=False):
+    return patched_dependency(repo, pin, "sing-box-reset", apply)
+
+
+def patched_sing_tun(repo, pin, apply=False):
+    return patched_dependency(repo, pin, "sing-tun-detach", apply)
+
+
 def core(folder):
     require(json.loads((folder / "source-manifest.json").read_text()) == source(),
             "Source content changed while building core")
@@ -231,11 +239,13 @@ def core(folder):
     pin_file = (ROOT / "buildScript/lib/core/get_source_env.sh").read_text()
     pins = dict(re.findall(r'export COMMIT_(\w+)="([0-9a-f]{40})"', pin_file))
     repositories = {}
-    for name, key in [("sing-box", "SING_BOX"), ("libneko", "LIBNEKO")]:
+    for name, key in [("sing-box", "SING_BOX"), ("libneko", "LIBNEKO"), ("sing-tun", "SING_TUN")]:
         repo = ROOT.parent / name
         require(run("git", "rev-parse", "HEAD", cwd=repo) == pins[key], "Replace repository pin mismatch")
         if name == "sing-box":
             repositories[name] = patched_sing_box(repo, pins[key])
+        elif name == "sing-tun":
+            repositories[name] = patched_sing_tun(repo, pins[key])
         else:
             tree = repository_tree(repo)
             verify_repository_tree(repo, tree)
@@ -355,7 +365,7 @@ def apk(folder):
 
 
 if __name__ == "__main__":
-    require(len(sys.argv) == 3, "Usage: artifacts.py source|core|verify-core|apk|prepare-sing-box|prepare-libneko <path>")
+    require(len(sys.argv) == 3, "Usage: artifacts.py source|core|verify-core|apk|prepare-sing-box|prepare-sing-tun|prepare-libneko <path>")
     command, location = sys.argv[1], Path(sys.argv[2]).resolve()
     if command == "source":
         write(location, source())
@@ -369,6 +379,10 @@ if __name__ == "__main__":
         pins = dict(re.findall(r'export COMMIT_(\w+)="([0-9a-f]{40})"',
                               (ROOT / "buildScript/lib/core/get_source_env.sh").read_text()))
         print(json.dumps(patched_sing_box(location, pins["SING_BOX"], apply=True), sort_keys=True))
+    elif command == "prepare-sing-tun":
+        pins = dict(re.findall(r'export COMMIT_(\w+)="([0-9a-f]{40})"',
+                              (ROOT / "buildScript/lib/core/get_source_env.sh").read_text()))
+        print(json.dumps(patched_sing_tun(location, pins["SING_TUN"], apply=True), sort_keys=True))
     elif command == "prepare-libneko":
         pins = dict(re.findall(r'export COMMIT_(\w+)="([0-9a-f]{40})"',
                               (ROOT / "buildScript/lib/core/get_source_env.sh").read_text()))

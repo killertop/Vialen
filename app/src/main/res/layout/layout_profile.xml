@@ -8,6 +8,8 @@
     android:layout_margin="4dp"
     android:clickable="true"
     android:focusable="true"
+    app:cardBackgroundColor="@color/vialen_surface"
+    app:strokeColor="@color/vialen_outline"
     app:cardElevation="2dp">
 
     <LinearLayout
@@ -21,7 +23,7 @@
             android:id="@+id/selected_view"
             android:layout_width="4dp"
             android:layout_height="match_parent"
-            android:background="?selectedColorPrimary"
+            android:background="@color/vialen_brand"
             android:orientation="horizontal"
             android:visibility="invisible"
             tools:visibility="visible" />
@@ -68,6 +70,7 @@
                     android:contentDescription="@string/edit"
                     android:focusable="true"
                     android:padding="12dp"
+                    app:tint="@color/vialen_icon_tint"
                     app:srcCompat="@drawable/ic_image_edit" />
 
                 <LinearLayout
@@ -90,6 +93,7 @@
                             android:id="@+id/shareIcon"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            app:tint="@color/vialen_icon_tint"
                             app:srcCompat="@drawable/ic_social_share" />
                     </LinearLayout>
 
@@ -105,6 +109,7 @@
                     android:focusable="true"
                     android:padding="12dp"
                     android:visibility="gone"
+                    app:tint="@color/vialen_icon_tint"
                     app:srcCompat="@drawable/ic_action_delete" />
 
             </LinearLayout>

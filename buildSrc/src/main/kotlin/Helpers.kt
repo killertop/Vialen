@@ -12,16 +12,11 @@ import kotlin.system.exitProcess
 
 private val Project.android get() = extensions.getByName<ApplicationExtension>("android")
 
-private lateinit var metadata: Properties
 private lateinit var localProperties: Properties
 
-fun Project.requireMetadata(): Properties {
-    if (!::metadata.isInitialized) {
-        metadata = Properties().apply {
-            load(rootProject.file("nb4a.properties").inputStream())
-        }
-    }
-    return metadata
+fun Project.requireMetadata(): Properties = Properties().apply {
+    // A Gradle daemon can reuse this class between builds; read the current version each time.
+    rootProject.file("nb4a.properties").inputStream().use { load(it) }
 }
 
 fun Project.requireLocalProperties(): Properties {

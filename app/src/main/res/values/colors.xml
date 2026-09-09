@@ -167,12 +167,12 @@
 
     <color name="white">#FFFFFFFF</color>
 
-    <color name="fab_color_progress">@color/material_light_black</color>
+    <color name="fab_color_progress">@color/vialen_accent</color>
 
 
     <color name="color_ng_black_accent">#9E9E9E</color>
     <color name="color_ng_black_primary">#2B2B2B</color>
 
-    <color name="preference_simple_menu_background">#FAFAFA</color>
+    <color name="preference_simple_menu_background">@color/vialen_surface</color>
 
 </resources>

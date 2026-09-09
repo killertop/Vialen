@@ -11,7 +11,7 @@
         android:id="@+id/appbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/colorPrimary">
+        android:background="@color/vialen_surface">
 
         <com.google.android.material.appbar.CollapsingToolbarLayout
             android:layout_width="match_parent"
@@ -23,11 +23,14 @@
                 android:id="@+id/toolbar"
                 android:layout_width="match_parent"
                 android:layout_height="?attr/actionBarSize"
-                android:background="?attr/colorPrimary"
+                android:background="@color/vialen_surface"
                 android:elevation="4dp"
                 android:theme="?actionBarTheme"
                 android:touchscreenBlocksFocus="false"
                 app:layout_collapseMode="pin"
+                app:titleTextColor="@color/vialen_text_primary"
+                app:subtitleTextColor="@color/vialen_text_secondary"
+                app:navigationIconTint="@color/vialen_toolbar_icon"
                 app:popupTheme="@style/ThemeOverlay.AppCompat.DayNight"
                 app:title="@string/app_name" />
 
@@ -47,6 +50,8 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_margin="4dp"
+                        app:cardBackgroundColor="@color/vialen_surface"
+                        app:strokeColor="@color/vialen_outline"
                         app:cardElevation="2dp">
 
                         <LinearLayout
@@ -110,9 +115,10 @@
         android:scrollbarSize="0dp"
         android:visibility="gone"
         app:fastScrollAutoHide="true"
-        app:fastScrollPopupTextColor="?colorPrimary"
-        app:fastScrollThumbColor="?colorPrimary"
-        app:fastScrollThumbInactiveColor="?colorPrimary"
+        app:fastScrollPopupTextColor="@color/vialen_on_brand"
+        app:fastScrollPopupBgColor="@color/vialen_brand"
+        app:fastScrollThumbColor="@color/vialen_accent"
+        app:fastScrollThumbInactiveColor="@color/vialen_scroll_thumb"
         app:layout_behavior="@string/appbar_scrolling_view_behavior"
         tools:listitem="@layout/layout_apps_item" />
 

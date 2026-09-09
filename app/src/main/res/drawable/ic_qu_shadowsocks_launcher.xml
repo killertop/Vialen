@@ -2,7 +2,7 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item
-        android:drawable="@drawable/ic_app_shortcut_background"
+        android:drawable="@drawable/vialen_brand_shortcut_background"
         android:left="2dp"
         android:top="2dp"
         android:right="2dp"

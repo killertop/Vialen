@@ -62,6 +62,10 @@ jobs:
           # Use the existing source/tool revision checks; do not call the wrapper
           # that can continue to build after a failed init.
           bash buildScript/lib/core/get_source.sh
+          # Exercise the patched receiver lifecycle using the core's exact module graph.
+          (cd libcore && go test -mod=readonly -tags with_gvisor \
+            -run '^TestLinkEndpointFilter(DetachPassesNil|AttachKeepsFiltering|DetachStopsFDBasedReceiver)$' \
+            -count=1 -timeout=30s github.com/sagernet/sing-tun)
           (cd libcore && bash init.sh)
           mkdir -p libcore/.build
           bash buildScript/lib/core/build.sh
