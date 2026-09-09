@@ -1,0 +1,4 @@
+<resources>
+    <string name="group_export_target_missing">要匯出的群組已不存在，請重新選擇群組。</string>
+    <string name="rule_enable_named">啟用規則：%1$s</string>
+</resources>

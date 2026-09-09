@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.DialogInterface
 import android.content.Intent
 import android.os.Bundle
+import androidx.activity.addCallback
 import android.os.Parcelable
 import android.view.Menu
 import android.view.MenuItem
@@ -14,6 +15,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.LayoutRes
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.ViewCompat
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.withResumed
+import kotlinx.coroutines.launch
 import androidx.preference.*
 import com.github.shadowsocks.plugin.Empty
 import com.github.shadowsocks.plugin.fragment.AlertDialogFragment
@@ -27,8 +31,14 @@ import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
 import io.nekohasekai.sagernet.ktx.onMainDispatcher
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
+import io.nekohasekai.sagernet.ui.form.FormDraftState
+import io.nekohasekai.sagernet.ui.form.showFormError
 import io.nekohasekai.sagernet.widget.ListListener
 import io.nekohasekai.sagernet.widget.OutboundPreference
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.withContext
 import kotlinx.parcelize.Parcelize
 import moe.matsuri.nb4a.ui.SimpleMenuPreference
 
@@ -86,8 +96,7 @@ class GroupSettingsActivity(
     }
 
     fun needSave(): Boolean {
-        if (!DataStore.dirty) return false
-        return true
+        return draftReady && DataStore.dirty
     }
 
     fun PreferenceFragmentCompat.createPreferences(
@@ -198,7 +207,9 @@ class GroupSettingsActivity(
 
     @SuppressLint("CommitTransaction")
     override fun onCreate(savedInstanceState: Bundle?) {
+        draftSession = FormDraftState.restore(savedInstanceState) ?: FormDraftState.begin()
         super.onCreate(savedInstanceState)
+        onBackPressedDispatcher.addCallback(this) { requestClose() }
         setSupportActionBar(findViewById(R.id.toolbar))
         supportActionBar?.apply {
             setTitle(R.string.group_settings)
@@ -206,59 +217,79 @@ class GroupSettingsActivity(
             setHomeAsUpIndicator(R.drawable.ic_navigation_close)
         }
 
-        if (savedInstanceState == null) {
+        draftReady = savedInstanceState?.getBoolean("form.ready") == true
+        if (!draftReady) {
             val editingId = intent.getLongExtra(EXTRA_GROUP_ID, 0L)
             DataStore.editingId = editingId
-            runOnDefaultDispatcher {
-                if (editingId == 0L) {
-                    ProxyGroup().init()
-                } else {
-                    val entity = SagerDatabase.groupDao.getById(editingId)
-                    if (entity == null) {
-                        onMainDispatcher {
-                            finish()
-                        }
-                        return@runOnDefaultDispatcher
+            lifecycleScope.launch {
+                try {
+                    val entity = withContext(Dispatchers.IO) {
+                        if (editingId == 0L) ProxyGroup() else
+                            SagerDatabase.groupDao.getById(editingId)
+                                ?: error(getString(R.string.form_missing_record))
                     }
-                    entity.init()
-                }
-
-                onMainDispatcher {
-                    supportFragmentManager.beginTransaction()
-                        .replace(R.id.settings, MyPreferenceFragmentCompat())
-                        .commit()
-
-                    DataStore.dirty = false
-                    DataStore.profileCacheStore.registerChangeListener(this@GroupSettingsActivity)
+                    lifecycle.withResumed {
+                        entity.init()
+                        // Cache initialization and fragment attachment are one main-thread operation.
+                        // A cancelled old Activity never writes a late initialization into this draft.
+                        DataStore.dirty = false
+                        supportFragmentManager.beginTransaction()
+                            .replace(R.id.settings, MyPreferenceFragmentCompat()).commitNow()
+                        DataStore.dirty = false
+                        draftReady = true
+                        DataStore.profileCacheStore.registerChangeListener(this@GroupSettingsActivity)
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    showFormError(e)
                 }
             }
-
+        } else {
+            DataStore.profileCacheStore.registerChangeListener(this)
         }
+    }
 
+    private lateinit var draftSession: String
+    private var draftReady = false
+    private val saveLock = Mutex()
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("form.ready", draftReady)
+        if (draftReady) FormDraftState.save(outState, draftSession)
+        super.onSaveInstanceState(outState)
     }
 
     suspend fun saveAndExit() {
 
-        val editingId = DataStore.editingId
-        if (editingId == 0L) {
-            GroupManager.createGroup(ProxyGroup().apply { serialize() })
-        } else if (needSave()) {
-            val entity = SagerDatabase.groupDao.getById(DataStore.editingId)
-            if (entity == null) {
-                finish()
-                return
+        if (!draftReady || !saveLock.tryLock()) return
+        try {
+            val editingId = DataStore.editingId
+            if (editingId == 0L) {
+                GroupManager.createGroup(ProxyGroup().apply { serialize() })
+            } else if (needSave()) {
+                val entity = SagerDatabase.groupDao.getById(DataStore.editingId)
+                if (entity == null) {
+                    error(getString(R.string.form_missing_record))
+                }
+                val keepUserInfo = (entity.type == GroupType.SUBSCRIPTION &&
+                        DataStore.groupType == GroupType.SUBSCRIPTION &&
+                        entity.subscription?.link == DataStore.subscriptionLink)
+                if (!keepUserInfo) {
+                    entity.subscription?.subscriptionUserinfo = "";
+                }
+                GroupManager.updateGroup(entity.apply { serialize() })
             }
-            val keepUserInfo = (entity.type == GroupType.SUBSCRIPTION &&
-                    DataStore.groupType == GroupType.SUBSCRIPTION &&
-                    entity.subscription?.link == DataStore.subscriptionLink)
-            if (!keepUserInfo) {
-                entity.subscription?.subscriptionUserinfo = "";
-            }
-            GroupManager.updateGroup(entity.apply { serialize() })
+
+            onMainDispatcher { finish() }
+
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            onMainDispatcher { if (!isFinishing && !isDestroyed) showFormError(e) }
+        } finally {
+            saveLock.unlock()
         }
-
-        finish()
-
     }
 
     val child by lazy { supportFragmentManager.findFragmentById(R.id.settings) as MyPreferenceFragmentCompat }
@@ -268,21 +299,29 @@ class GroupSettingsActivity(
         return true
     }
 
-    override fun onOptionsItemSelected(item: MenuItem) = child.onOptionsItemSelected(item)
+    override fun onOptionsItemSelected(item: MenuItem): Boolean =
+        (supportFragmentManager.findFragmentById(R.id.settings) as? MyPreferenceFragmentCompat)
+            ?.onOptionsItemSelected(item) == true || super.onOptionsItemSelected(item)
 
-    override fun onBackPressed() {
+    private fun requestClose() {
+        if (isFinishing || supportFragmentManager.isStateSaved) return
         if (needSave()) {
-            UnsavedChangesDialogFragment().apply { key() }.show(supportFragmentManager, null)
-        } else super.onBackPressed()
+            // Synchronous attachment plus a stable tag also handles two queued Back events.
+            if (supportFragmentManager.findFragmentByTag("form.unsaved") == null) {
+                UnsavedChangesDialogFragment().apply { key() }
+                    .showNow(supportFragmentManager, "form.unsaved")
+            }
+        } else finish()
     }
 
     override fun onSupportNavigateUp(): Boolean {
-        if (!super.onSupportNavigateUp()) finish()
+        requestClose()
         return true
     }
 
     override fun onDestroy() {
         DataStore.profileCacheStore.unregisterChangeListener(this)
+        if (isFinishing) FormDraftState.discard(draftSession)
         super.onDestroy()
     }
 

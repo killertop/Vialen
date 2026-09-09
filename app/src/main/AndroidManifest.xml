@@ -279,8 +279,7 @@
             android:label="@string/tile_title"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
             android:process=":bg"
-            tools:ignore="ForegroundServicePermission"
-            tools:targetApi="n">
+            tools:ignore="ForegroundServicePermission">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
@@ -303,6 +302,27 @@
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
             tools:node="remove" />
+
+        <!-- Work executes beside VPN state, both through GreedyScheduler and SystemJobService.
+             Merge only process placement; retain each library component's permissions/enabled flags. -->
+        <service
+            android:name="androidx.work.multiprocess.RemoteWorkManagerService"
+            android:process=":bg" />
+        <service
+            android:name="androidx.work.impl.background.systemjob.SystemJobService"
+            android:process=":bg" />
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:process=":bg" />
+        <receiver
+            android:name="androidx.work.impl.utils.ForceStopRunnable$BroadcastReceiver"
+            android:process=":bg" />
+        <receiver
+            android:name="androidx.work.impl.background.systemalarm.RescheduleReceiver"
+            android:process=":bg" />
+        <receiver
+            android:name="androidx.work.impl.diagnostics.DiagnosticsReceiver"
+            android:process=":bg" />
 
         <receiver
             android:name="io.nekohasekai.sagernet.BootReceiver"

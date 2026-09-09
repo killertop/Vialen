@@ -1,0 +1,5 @@
+<resources>
+    <string name="form_integer_range">请输入 %1$d 到 %2$d 之间的整数。</string>
+    <string name="form_missing_record">此项目已不存在，您的修改尚未保存。</string>
+    <string name="form_log_buffer_size">日志缓冲区大小（KB）</string>
+</resources>

@@ -398,6 +398,9 @@ data class ProxyEntity(
         @Delete
         fun deleteProxy(proxies: List<ProxyEntity>): Int
 
+        @Query("UPDATE proxy_entities SET userOrder = :order WHERE id = :id")
+        fun updateOrder(id: Long, order: Long): Int
+
         @Update
         fun updateProxy(proxy: ProxyEntity): Int
 

@@ -55,7 +55,6 @@
     <issue id="DiscouragedPrivateApi" severity="ignore" />
     <issue id="Typos" severity="ignore" />
     <issue id="RtlSymmetry" severity="ignore" />
-    <issue id="ContentDescription" severity="ignore" />
     <issue id="UnusedResources" severity="ignore" />
     <issue id="VectorRaster" severity="ignore" />
     <issue id="PrivateResource" severity="ignore" />

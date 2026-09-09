@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.DialogInterface
 import android.content.Intent
 import android.os.Bundle
+import androidx.activity.addCallback
 import android.os.Parcelable
 import android.view.Menu
 import android.view.MenuItem
@@ -15,6 +16,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.LayoutRes
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.ViewCompat
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.withResumed
+import kotlinx.coroutines.launch
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceDataStore
@@ -34,10 +38,16 @@ import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.onMainDispatcher
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
+import io.nekohasekai.sagernet.ui.form.FormDraftState
+import io.nekohasekai.sagernet.ui.form.showFormError
 import io.nekohasekai.sagernet.utils.PackageCache
 import io.nekohasekai.sagernet.widget.AppListPreference
 import io.nekohasekai.sagernet.widget.ListListener
 import io.nekohasekai.sagernet.widget.OutboundPreference
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.withContext
 import kotlinx.parcelize.Parcelize
 import moe.matsuri.nb4a.ui.EditConfigPreference
 
@@ -102,7 +112,7 @@ class RouteSettingsActivity(
     private lateinit var editConfigPreference: EditConfigPreference
 
     fun needSave(): Boolean {
-        return DataStore.dirty
+        return draftReady && DataStore.dirty
     }
 
     fun PreferenceFragmentCompat.createPreferences(
@@ -214,7 +224,9 @@ class RouteSettingsActivity(
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        draftSession = FormDraftState.restore(savedInstanceState) ?: FormDraftState.begin()
         super.onCreate(savedInstanceState)
+        onBackPressedDispatcher.addCallback(this) { requestClose() }
         setSupportActionBar(findViewById(R.id.toolbar))
         supportActionBar?.apply {
             setTitle(R.string.cag_route)
@@ -222,67 +234,89 @@ class RouteSettingsActivity(
             setHomeAsUpIndicator(R.drawable.ic_navigation_close)
         }
 
-        if (savedInstanceState == null) {
+        draftReady = savedInstanceState?.getBoolean("form.ready") == true
+        if (!draftReady) {
             val editingId = intent.getLongExtra(EXTRA_ROUTE_ID, 0L)
             DataStore.editingId = editingId
-            runOnDefaultDispatcher {
-                if (editingId == 0L) {
-                    init(intent.getStringExtra(EXTRA_PACKAGE_NAME))
-                } else {
-                    val ruleEntity = SagerDatabase.rulesDao.getById(editingId)
-                    if (ruleEntity == null) {
-                        onMainDispatcher {
-                            finish()
-                        }
-                        return@runOnDefaultDispatcher
+            lifecycleScope.launch {
+                try {
+                    val entity = withContext(Dispatchers.IO) {
+                        if (editingId == 0L) RuleEntity().apply {
+                            intent.getStringExtra(EXTRA_PACKAGE_NAME)?.takeIf { it.isNotBlank() }?.let {
+                                packages = setOf(it)
+                                name = app.getString(R.string.route_for, PackageCache.loadLabel(it))
+                            }
+                        } else SagerDatabase.rulesDao.getById(editingId)
+                            ?: error(getString(R.string.form_missing_record))
                     }
-                    ruleEntity.init()
-                }
-
-                onMainDispatcher {
-                    supportFragmentManager.beginTransaction()
-                        .replace(R.id.settings, MyPreferenceFragmentCompat())
-                        .commit()
-
-                    DataStore.dirty = false
-                    DataStore.profileCacheStore.registerChangeListener(this@RouteSettingsActivity)
+                    lifecycle.withResumed {
+                        entity.init()
+                        // Cache initialization and fragment attachment are one main-thread operation.
+                        // A cancelled old Activity never writes a late initialization into this draft.
+                        DataStore.dirty = false
+                        supportFragmentManager.beginTransaction()
+                            .replace(R.id.settings, MyPreferenceFragmentCompat()).commitNow()
+                        DataStore.dirty = false
+                        draftReady = true
+                        DataStore.profileCacheStore.registerChangeListener(this@RouteSettingsActivity)
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    showFormError(e)
                 }
             }
-
-
+        } else {
+            DataStore.profileCacheStore.registerChangeListener(this)
         }
+    }
 
+    private lateinit var draftSession: String
+    private var draftReady = false
+    private val saveLock = Mutex()
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("form.ready", draftReady)
+        if (draftReady) FormDraftState.save(outState, draftSession)
+        super.onSaveInstanceState(outState)
     }
 
     suspend fun saveAndExit() {
 
-        if (!needSave()) {
-            onMainDispatcher {
-                MaterialAlertDialogBuilder(this@RouteSettingsActivity).setTitle(R.string.empty_route)
-                    .setMessage(R.string.empty_route_notice)
-                    .setPositiveButton(android.R.string.ok, null)
-                    .show()
-            }
-            return
-        }
-
-        val editingId = DataStore.editingId
-        if (editingId == 0L) {
-            if (intent.hasExtra(EXTRA_PACKAGE_NAME)) {
-                setResult(RESULT_OK, Intent())
-            }
-
-            ProfileManager.createRule(RuleEntity().apply { serialize() })
-        } else {
-            val entity = SagerDatabase.rulesDao.getById(DataStore.editingId)
-            if (entity == null) {
-                finish()
+        if (!draftReady || !saveLock.tryLock()) return
+        try {
+            if (!needSave() && DataStore.editingId == 0L) {
+                onMainDispatcher {
+                    MaterialAlertDialogBuilder(this@RouteSettingsActivity).setTitle(R.string.empty_route)
+                        .setMessage(R.string.empty_route_notice)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
+                }
                 return
             }
-            ProfileManager.updateRule(entity.apply { serialize() })
-        }
-        finish()
 
+            val editingId = DataStore.editingId
+            if (editingId == 0L) {
+                ProfileManager.createRule(RuleEntity().apply { serialize() })
+            } else {
+                val entity = SagerDatabase.rulesDao.getById(DataStore.editingId)
+                if (entity == null) {
+                    error(getString(R.string.form_missing_record))
+                }
+                ProfileManager.updateRule(entity.apply { serialize() })
+            }
+            onMainDispatcher {
+                if (intent.hasExtra(EXTRA_PACKAGE_NAME)) setResult(RESULT_OK, Intent())
+                finish()
+            }
+
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            onMainDispatcher { if (!isFinishing && !isDestroyed) showFormError(e) }
+        } finally {
+            saveLock.unlock()
+        }
     }
 
     val child by lazy { supportFragmentManager.findFragmentById(R.id.settings) as MyPreferenceFragmentCompat }
@@ -292,21 +326,29 @@ class RouteSettingsActivity(
         return true
     }
 
-    override fun onOptionsItemSelected(item: MenuItem) = child.onOptionsItemSelected(item)
+    override fun onOptionsItemSelected(item: MenuItem): Boolean =
+        (supportFragmentManager.findFragmentById(R.id.settings) as? MyPreferenceFragmentCompat)
+            ?.onOptionsItemSelected(item) == true || super.onOptionsItemSelected(item)
 
-    override fun onBackPressed() {
+    private fun requestClose() {
+        if (isFinishing || supportFragmentManager.isStateSaved) return
         if (needSave()) {
-            UnsavedChangesDialogFragment().apply { key() }.show(supportFragmentManager, null)
-        } else super.onBackPressed()
+            // Synchronous attachment plus a stable tag also handles two queued Back events.
+            if (supportFragmentManager.findFragmentByTag("form.unsaved") == null) {
+                UnsavedChangesDialogFragment().apply { key() }
+                    .showNow(supportFragmentManager, "form.unsaved")
+            }
+        } else finish()
     }
 
     override fun onSupportNavigateUp(): Boolean {
-        if (!super.onSupportNavigateUp()) finish()
+        requestClose()
         return true
     }
 
     override fun onDestroy() {
         DataStore.profileCacheStore.unregisterChangeListener(this)
+        if (isFinishing) FormDraftState.discard(draftSession)
         super.onDestroy()
     }
 

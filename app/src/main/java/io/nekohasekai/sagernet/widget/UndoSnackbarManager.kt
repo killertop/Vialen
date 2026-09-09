@@ -22,27 +22,26 @@ class UndoSnackbarManager<in T>(
     }
 
     private val recycleBin = ArrayList<Pair<Int, T>>()
-    private val removedCallback = object : Snackbar.Callback() {
-        override fun onDismissed(transientBottomBar: Snackbar?, event: Int) {
-            if (last === transientBottomBar && event != DISMISS_EVENT_ACTION) {
-                callback.commit(recycleBin)
-                recycleBin.clear()
-                last = null
-            }
-        }
-    }
-
     private var last: Snackbar? = null
+    private var generation = 0L
 
     fun remove(items: Collection<Pair<Int, T>>) {
         recycleBin.addAll(items)
         val count = recycleBin.size
+        val version = ++generation
         activity.snackbar(activity.resources.getQuantityString(R.plurals.removed, count, count))
             .apply {
-                addCallback(removedCallback)
+                addCallback(object : Snackbar.Callback() {
+                    override fun onDismissed(bar: Snackbar?, event: Int) {
+                        if (version == generation && last === bar && event != DISMISS_EVENT_ACTION) flush()
+                    }
+                })
                 setAction(R.string.undo) {
-                    callback.undo(recycleBin.reversed())
-                    recycleBin.clear()
+                    if (version == generation && last === this) {
+                        val actions = recycleBin.reversed()
+                        invalidate()
+                        callback.undo(actions)
+                    }
                 }
                 last = this
                 show()
@@ -51,5 +50,18 @@ class UndoSnackbarManager<in T>(
 
     fun remove(vararg items: Pair<Int, T>) = remove(items.toList())
 
-    fun flush() = last?.dismiss()
+    /** Synchronously retire callbacks before dismiss can dispatch another event. */
+    fun invalidate() {
+        generation++
+        recycleBin.clear()
+        val previous = last
+        last = null
+        previous?.dismiss()
+    }
+
+    fun flush() {
+        val actions = recycleBin.toList()
+        invalidate()
+        if (actions.isNotEmpty()) callback.commit(actions)
+    }
 }

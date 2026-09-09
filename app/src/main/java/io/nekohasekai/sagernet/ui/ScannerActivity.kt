@@ -13,13 +13,16 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.getSystemService
 import androidx.core.net.toUri
+import com.google.zxing.BarcodeFormat
 import com.google.zxing.Result
-import com.king.zxing.CameraScan
-import com.king.zxing.DefaultCameraScan
+import com.google.zxing.ResultPoint
+import com.king.camera.scan.AnalyzeResult
+import com.king.camera.scan.CameraScan
+import com.king.camera.scan.BaseCameraScan
 import com.king.zxing.analyze.QRCodeAnalyzer
 import com.king.zxing.util.CodeUtils
-import com.king.zxing.util.LogUtils
-import com.king.zxing.util.PermissionUtils
+import com.king.camera.scan.util.LogUtils
+import com.king.camera.scan.util.PermissionUtils
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
@@ -31,10 +34,10 @@ import java.util.concurrent.atomic.AtomicInteger
 
 
 class ScannerActivity : ThemedActivity(),
-    CameraScan.OnScanResultCallback {
+    CameraScan.OnScanResultCallback<Result> {
 
     lateinit var binding: LayoutScannerBinding
-    lateinit var cameraScan: CameraScan
+    lateinit var cameraScan: CameraScan<Result>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -109,8 +112,22 @@ class ScannerActivity : ThemedActivity(),
      * @param result 扫码结果
      * @return 返回true表示拦截，将不自动执行后续逻辑，为false表示不拦截，默认不拦截
      */
-    override fun onScanResultCallback(result: Result?): Boolean {
-        return onScanResultCallback(result, false)
+    override fun onScanResultCallback(result: AnalyzeResult<Result>) {
+        if (finished.get()) return
+        val decoded = result.result
+        // Preserve ZXingLite 2.x's successful-QR auto-zoom behavior. CameraScan
+        // 3.x no longer owns this policy; it still exposes the public zoom API.
+        val points = decoded.resultPoints
+        if (decoded.barcodeFormat == BarcodeFormat.QR_CODE && points != null && points.size >= 2) {
+            var distance = ResultPoint.distance(points[0], points[1])
+            if (points.size >= 3) {
+                distance = maxOf(distance, ResultPoint.distance(points[1], points[2]),
+                    ResultPoint.distance(points[0], points[2]))
+            }
+            val metrics = resources.displayMetrics
+            if (distance * 4 < minOf(metrics.widthPixels, metrics.heightPixels)) cameraScan.zoomIn()
+        }
+        onScanResultCallback(decoded, false)
     }
 
     fun onScanResultCallback(result: Result?, multi: Boolean): Boolean {
@@ -156,10 +173,9 @@ class ScannerActivity : ThemedActivity(),
      * 初始化CameraScan
      */
     fun initCameraScan() {
-        cameraScan = DefaultCameraScan(this, binding.previewView)
+        cameraScan = BaseCameraScan<Result>(this, binding.previewView)
         cameraScan.setAnalyzer(QRCodeAnalyzer())
         cameraScan.setOnScanResultCallback(this)
-        cameraScan.setNeedAutoZoom(true)
     }
 
     /**
@@ -190,6 +206,9 @@ class ScannerActivity : ThemedActivity(),
         val isTorch = cameraScan.isTorchEnabled
         cameraScan.enableTorch(!isTorch)
         binding.ivFlashlight.isSelected = !isTorch
+        binding.ivFlashlight.contentDescription = getString(
+            if (isTorch) R.string.scanner_flash_on else R.string.scanner_flash_off
+        )
     }
 
     val CAMERA_PERMISSION_REQUEST_CODE = 0X86

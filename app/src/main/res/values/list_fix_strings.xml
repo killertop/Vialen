@@ -1,0 +1,4 @@
+<resources>
+    <string name="group_export_target_missing">The group selected for export no longer exists. Please select a group again.</string>
+    <string name="rule_enable_named">Enable rule: %1$s</string>
+</resources>

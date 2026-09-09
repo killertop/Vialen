@@ -1,0 +1,4 @@
+<resources>
+    <string name="group_export_target_missing">要导出的分组已不存在，请重新选择分组。</string>
+    <string name="rule_enable_named">启用规则：%1$s</string>
+</resources>

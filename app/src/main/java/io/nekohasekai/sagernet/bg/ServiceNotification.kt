@@ -42,7 +42,7 @@ class ServiceNotification(
     companion object {
         const val notificationId = 1
         val flags =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+            PendingIntent.FLAG_IMMUTABLE
 
         fun genTitle(ent: ProxyEntity): String {
             val gn = if (DataStore.showGroupInNotification)
@@ -143,10 +143,6 @@ class ServiceNotification(
     }
 
     fun destroy() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            (service as Service).stopForeground(Service.STOP_FOREGROUND_REMOVE)
-        } else {
-            (service as Service).stopForeground(true)
-        }
+        (service as Service).stopForeground(Service.STOP_FOREGROUND_REMOVE)
     }
 }

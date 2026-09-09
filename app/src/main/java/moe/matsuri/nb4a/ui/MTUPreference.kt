@@ -1,13 +1,11 @@
 package moe.matsuri.nb4a.ui
 
+import io.nekohasekai.sagernet.ui.form.showIntegerFormDialog
 import android.content.Context
 import android.util.AttributeSet
 import android.view.View
-import android.view.inputmethod.EditorInfo
-import android.widget.EditText
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceViewHolder
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.R
 
 class MTUPreference
@@ -22,24 +20,20 @@ class MTUPreference
         dialogLayoutResource = R.layout.layout_mtu_help
     }
 
+    internal fun showCustomDialog() =
+        context.showIntegerFormDialog("MTU", value.orEmpty(), 1000..10000) { mtu ->
+            val proposed = mtu.toString()
+            if (callChangeListener(proposed)) {
+                value = proposed
+                true
+            } else false
+        }
+
     override fun onBindViewHolder(holder: PreferenceViewHolder) {
         super.onBindViewHolder(holder)
         val itemView: View = holder.itemView
         itemView.setOnLongClickListener {
-            val view = EditText(context).apply {
-                inputType = EditorInfo.TYPE_CLASS_NUMBER
-                setText(preferenceDataStore?.getString(key, "") ?: "")
-            }
-
-            MaterialAlertDialogBuilder(context).setTitle("MTU")
-                .setView(view)
-                .setPositiveButton(android.R.string.ok) { _, _ ->
-                    val mtu = view.text.toString().toInt()
-                    if (mtu < 1000 || mtu > 10000) return@setPositiveButton
-                    value = mtu.toString()
-                }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
+            showCustomDialog()
             true
         }
     }

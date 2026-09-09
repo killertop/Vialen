@@ -2,7 +2,6 @@
 
 plugins {
     id("com.android.application")
-    id("kotlin-android")
     id("com.google.devtools.ksp")
     id("kotlin-parcelize")
 }
@@ -13,8 +12,6 @@ android {
     ndkVersion = "28.1.13356709"
     defaultConfig {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        // AAPT locale filters must include our region-qualified Chinese resources.
-        resourceConfigurations += listOf("en", "zh-rCN", "zh-rHK", "zh-rTW")
     }
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
@@ -31,6 +28,7 @@ android {
         }
     }
     buildFeatures {
+        resValues = true
         buildConfig = true
         viewBinding = true
         aidl = true
@@ -43,11 +41,13 @@ android {
     }
     androidResources {
         generateLocaleConfig = true
+        localeFilters += listOf("en", "zh-rCN", "zh-rHK", "zh-rTW")
     }
     sourceSets {
-        getByName("test").assets.srcDir("$projectDir/schemas")
-        getByName("test").java.srcDir("src/sharedTest/java")
-        getByName("androidTest").java.srcDir("src/sharedTest/java")
+        getByName("test").assets.directories.add("$projectDir/schemas")
+        getByName("androidTest").assets.directories.add("$projectDir/schemas")
+        getByName("test").kotlin.directories.add("src/sharedTest/java")
+        getByName("androidTest").kotlin.directories.add("src/sharedTest/java")
     }
     testOptions {
         unitTests.isIncludeAndroidResources = true
@@ -86,7 +86,7 @@ tasks.configureEach {
     }
 }
 
-val buildRustHost by tasks.registering(Exec::class) {
+val buildRustHost = tasks.register<Exec>("buildRustHost") {
     group = "build"
     description = "Build libvialen_core.dylib for the macOS host JVM (used by unit tests via java.library.path)"
     val rustRoot = rootProject.file("rust/vialen-core")
@@ -103,9 +103,7 @@ val buildRustHost by tasks.registering(Exec::class) {
 
 val rustJniLibsDir = layout.buildDirectory.dir("generated/rustJniLibs")
 
-android.sourceSets.getByName("main").jniLibs.srcDir(rustJniLibsDir)
-
-val buildRustAndroid by tasks.registering(Exec::class) {
+val buildRustAndroid = tasks.register<RustAndroidTask>("buildRustAndroid") {
     group = "build"
     description = "Build the Rust JNI library for arm64-v8a"
     val rustRoot = rootProject.file("rust/vialen-core")
@@ -115,15 +113,15 @@ val buildRustAndroid by tasks.registering(Exec::class) {
     inputs.file(rustRoot.resolve("Cargo.lock"))
     inputs.dir(rustRoot.resolve("src"))
     inputs.file(buildScript)
-    outputs.dir(rustJniLibsDir)
+    outputDirectory.set(rustJniLibsDir)
     commandLine("bash", buildScript.absolutePath, rustJniLibsDir.get().asFile.absolutePath)
 }
 
-tasks.configureEach {
-    if (name.startsWith("merge") &&
-        (name.endsWith("JniLibFolders") || name.endsWith("NativeLibs"))
-    ) {
-        dependsOn(buildRustAndroid)
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.sources.jniLibs?.addGeneratedSourceDirectory(
+            buildRustAndroid, RustAndroidTask::outputDirectory
+        )
     }
 }
 
@@ -131,77 +129,83 @@ dependencies {
 
     implementation(fileTree("libs"))
 
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
-    implementation("androidx.core:core-ktx:1.9.0")
-    implementation("androidx.recyclerview:recyclerview:1.3.0")
-    implementation("androidx.activity:activity-ktx:1.10.1")
-    implementation("androidx.fragment:fragment-ktx:1.5.6")
-    implementation("androidx.browser:browser:1.5.0")
-    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
-    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
-    implementation("androidx.navigation:navigation-fragment-ktx:2.5.3")
-    implementation("androidx.navigation:navigation-ui-ktx:2.5.3")
-    implementation("androidx.preference:preference-ktx:1.2.0")
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("androidx.work:work-runtime-ktx:2.8.1")
-    implementation("androidx.work:work-multiprocess:2.8.1")
+    implementation(libs.coroutines.android)
+    implementation(libs.core.ktx)
+    implementation(libs.recyclerview)
+    implementation(libs.activity.ktx)
+    implementation(libs.fragment.ktx)
+    implementation(libs.browser)
+    implementation(libs.swiperefreshlayout)
+    implementation(libs.constraintlayout)
+    implementation(libs.navigation.fragment.ktx)
+    implementation(libs.navigation.ui.ktx)
+    implementation(libs.preference.ktx)
+    implementation(libs.appcompat)
+    implementation(libs.work.runtime.ktx)
+    implementation(libs.work.multiprocess)
 
-    implementation("com.google.android.material:material:1.8.0")
-    implementation("com.google.code.gson:gson:2.9.0")
+    implementation(libs.material)
+    implementation(libs.gson)
 
-    implementation("com.github.jenly1314:zxing-lite:2.1.1")
-    implementation("com.blacksquircle.ui:editorkit:2.6.0")
-    implementation("com.blacksquircle.ui:language-base:2.6.0")
-    implementation("com.blacksquircle.ui:language-json:2.6.0")
+    implementation(libs.zxing.lite)
+    implementation(libs.editorkit)
+    implementation(libs.language.base)
+    implementation(libs.language.json)
 
-    implementation("com.squareup.okhttp3:okhttp:5.0.0-alpha.3")
-    implementation("com.jakewharton:process-phoenix:2.1.2")
-    implementation("com.esotericsoftware:kryo:5.2.1")
-    implementation("com.google.guava:guava:31.0.1-android")
+    implementation(libs.okhttp)
+    implementation(libs.process.phoenix)
+    implementation(libs.kryo)
+    implementation(libs.guava)
 
-    implementation("com.simplecityapps:recyclerview-fastscroll:2.0.1") {
+    implementation(libs.recyclerview.fastscroll) {
         exclude(group = "androidx.recyclerview")
         exclude(group = "androidx.appcompat")
     }
 
-    implementation("androidx.room:room-runtime:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    implementation("com.github.MatrixDev.Roomigrant:RoomigrantLib:0.3.4")
-    ksp("com.github.MatrixDev.Roomigrant:RoomigrantCompiler:0.3.4")
+    implementation(libs.room.runtime)
+    ksp(libs.room.compiler)
+    implementation(libs.room.ktx)
+    implementation(libs.roomigrant.lib)
+    ksp(libs.roomigrant.compiler)
 
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 
-    testImplementation("org.yaml:snakeyaml:1.30")
-    androidTestImplementation("org.yaml:snakeyaml:1.30")
-    testImplementation("org.ini4j:ini4j:0.5.4")
-    androidTestImplementation("org.ini4j:ini4j:0.5.4")
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.xerial:sqlite-jdbc:3.45.1.0")
-    testImplementation("io.mockk:mockk:1.13.10")
-    testImplementation("androidx.room:room-testing:2.6.1")
-    testImplementation("androidx.test:core:1.5.0")
-    testImplementation("androidx.test.ext:junit:1.1.5")
-    testImplementation("org.robolectric:robolectric:4.11.1")
+    testImplementation(libs.snakeyaml)
+    androidTestImplementation(libs.snakeyaml)
+    testImplementation(libs.ini4j)
+    androidTestImplementation(libs.ini4j)
+    testImplementation(libs.junit)
+    testImplementation(libs.sqlite.jdbc)
+    testImplementation(libs.mockk)
+    testImplementation(libs.room.testing)
+    androidTestImplementation(libs.room.testing)
+    testImplementation(libs.core)
+    testImplementation(libs.test.ext.junit)
+    testImplementation(libs.robolectric)
 
     constraints {
+        // Room migration serializers use interface defaults introduced in 1.8.1.
+        // Instrumentation loads the app APK first, so both APKs need the same ABI.
+        implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:${libs.versions.serialization.get()}") {
+            because("Room migration serializers require GeneratedSerializer interface defaults")
+        }
         // Robolectric and MockK inspect JDK classes in the Java 25 test process.
         // Keep these instrumentation libraries out of the Android runtime.
         for (module in listOf("asm", "asm-commons", "asm-tree")) {
-            testImplementation("org.ow2.asm:$module:9.8") {
-                because("ASM 9.8 supports Java 25 class files (major version 69)")
+            testImplementation("org.ow2.asm:$module:${libs.versions.asm.get()}") {
+                because("ASM supports Java 25 class files (major version 69)")
             }
         }
         for (module in listOf("byte-buddy", "byte-buddy-agent")) {
-            testImplementation("net.bytebuddy:$module:1.17.8") {
+            testImplementation("net.bytebuddy:$module:${libs.versions.byte.buddy.get()}") {
                 because("MockK instrumentation must support the Java 25 host runtime")
             }
         }
     }
 
-    androidTestImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test:core:1.5.0")
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.test:runner:1.5.2")
-    androidTestImplementation("androidx.test:rules:1.5.0")
+    androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.core)
+    androidTestImplementation(libs.test.ext.junit)
+    androidTestImplementation(libs.runner)
+    androidTestImplementation(libs.rules)
 }

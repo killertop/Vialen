@@ -13,16 +13,20 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <com.king.zxing.ViewfinderView
+    <com.king.view.viewfinderview.ViewfinderView
         android:id="@+id/viewfinderView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
     <ImageView
         android:id="@+id/ivFlashlight"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:padding="12dp"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/scanner_flash_on"
         android:layout_gravity="center"
-        android:layout_marginTop="@dimen/zxl_flashlight_margin_top"
-        android:src="@drawable/zxl_flashlight_selector" />
+        android:layout_marginTop="80dp"
+        android:src="@drawable/camera_scan_flashlight_selector" />
 </FrameLayout>

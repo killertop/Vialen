@@ -35,6 +35,22 @@ import java.util.*
 class GroupFragment : ToolbarFragment(R.layout.layout_group),
     Toolbar.OnMenuItemClickListener {
 
+    companion object {
+        private val groupWrites = io.nekohasekai.sagernet.ui.state.OrderedWorkQueue(
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+        ) { Logs.w(it) }
+    }
+    private var viewVersion = 0L
+    private var pendingExportGroupId: Long? = null
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        pendingExportGroupId = savedInstanceState?.getLong("pendingExportGroupId")?.takeIf { it > 0 }
+    }
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        pendingExportGroupId?.let { outState.putLong("pendingExportGroupId", it) }
+    }
+
     lateinit var activity: MainActivity
     lateinit var groupListView: RecyclerView
     lateinit var layoutManager: LinearLayoutManager
@@ -43,6 +59,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        viewVersion++
         activity = requireActivity() as MainActivity
 
         ViewCompat.setOnApplyWindowInsetsListener(view, ListListener)
@@ -130,30 +147,26 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         return true
     }
 
-    private lateinit var selectedGroup: ProxyGroup
-
     private val exportProfiles =
         registerForActivityResult(ActivityResultContracts.CreateDocument()) { data ->
+            val groupId = pendingExportGroupId
+            pendingExportGroupId = null
             if (data != null) {
+                val resolver = app.contentResolver
                 runOnDefaultDispatcher {
-                    val profiles = SagerDatabase.proxyDao.getByGroup(selectedGroup.id)
-                    val links = profiles.joinToString("\n") { it.toStdLink(compact = true) }
                     try {
-                        (requireActivity() as MainActivity).contentResolver.openOutputStream(
-                            data
-                        )!!.bufferedWriter().use {
-                            it.write(links)
+                        requireNotNull(groupId) { app.getString(R.string.group_export_target_missing) }
+                        checkNotNull(SagerDatabase.groupDao.getById(groupId)) {
+                            app.getString(R.string.group_export_target_missing)
                         }
-                        onMainDispatcher {
-                            snackbar(getString(R.string.action_export_msg)).show()
-                        }
+                        val profiles = SagerDatabase.proxyDao.getByGroup(groupId)
+                        val links = profiles.joinToString("\n") { it.toStdLink(compact = true) }
+                        checkNotNull(resolver.openOutputStream(data)).bufferedWriter().use { it.write(links) }
+                        onMainDispatcher { if (isAdded && view != null) snackbar(getString(R.string.action_export_msg)).show() }
                     } catch (e: Exception) {
                         Logs.w(e)
-                        onMainDispatcher {
-                            snackbar(e.readableMessage).show()
-                        }
+                        onMainDispatcher { if (isAdded && view != null) snackbar(e.readableMessage).show() }
                     }
-
                 }
             }
         }
@@ -162,14 +175,19 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         GroupManager.Listener,
         UndoSnackbarManager.Interface<ProxyGroup> {
 
+        private val expectedView = viewVersion
+        private fun alive() = expectedView == viewVersion && view != null
         val groupList = ArrayList<ProxyGroup>()
+        private val reloadGeneration = java.util.concurrent.atomic.AtomicLong()
 
         suspend fun reload() {
+            val request = reloadGeneration.incrementAndGet()
             val groups = SagerDatabase.groupDao.allGroups().toMutableList()
-            if (groups.size > 1 && SagerDatabase.proxyDao.countByGroup(groups.find { it.ungrouped }!!.id) == 0L) groups.removeAll { it.ungrouped }
-            groupList.clear()
-            groupList.addAll(groups)
+            if (groups.size > 1 && SagerDatabase.proxyDao.countByGroup(groups.find { it.ungrouped }?.id ?: 0L) == 0L) groups.removeAll { it.ungrouped }
             groupListView.post {
+                if (!alive() || request != reloadGeneration.get()) return@post
+                groupList.clear()
+                groupList.addAll(groups)
                 notifyDataSetChanged()
             }
         }
@@ -190,6 +208,11 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             holder.bind(groupList[position])
         }
 
+        override fun onViewRecycled(holder: GroupHolder) {
+            holder.invalidate()
+            super.onViewRecycled(holder)
+        }
+
         override fun getItemCount(): Int {
             return groupList.size
         }
@@ -201,39 +224,46 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         private val updated = HashSet<ProxyGroup>()
 
         fun move(from: Int, to: Int) {
-            val first = groupList[from]
-            var previousOrder = first.userOrder
-            val (step, range) = if (from < to) Pair(1, from until to) else Pair(
-                -1, to + 1 downTo from
-            )
-            for (i in range) {
-                val next = groupList[i + step]
-                val order = next.userOrder
-                next.userOrder = previousOrder
-                previousOrder = order
-                groupList[i] = next
-                updated.add(next)
+            if (from !in groupList.indices || to !in groupList.indices || from == to) return
+            reloadGeneration.incrementAndGet()
+            val range = minOf(from, to)..maxOf(from, to)
+            val orders = range.map { groupList[it].userOrder }
+            val moved = groupList.removeAt(from)
+            groupList.add(to, moved)
+            range.forEachIndexed { index, position ->
+                groupList[position].userOrder = orders[index]
+                updated.add(groupList[position])
             }
-            first.userOrder = previousOrder
-            groupList[to] = first
-            updated.add(first)
             notifyItemMoved(from, to)
         }
 
-        fun commitMove() = runOnDefaultDispatcher {
-            updated.forEach { SagerDatabase.groupDao.updateGroup(it) }
+        fun commitMove() {
+            val orders = updated.map { it.id to it.userOrder }
             updated.clear()
+            groupWrites.submit {
+                try { orders.forEach { (id, order) -> SagerDatabase.groupDao.updateOrder(id, order) } }
+                catch (error: Exception) {
+                    if (error is kotlinx.coroutines.CancellationException) throw error
+                    reload()
+                    onMainDispatcher { if (alive()) snackbar(error.readableMessage).show() }
+                }
+            }
         }
 
         fun remove(index: Int) {
+            if (index !in groupList.indices) return
+            reloadGeneration.incrementAndGet()
             groupList.removeAt(index)
             notifyItemRemoved(index)
         }
 
         override fun undo(actions: List<Pair<Int, ProxyGroup>>) {
+            reloadGeneration.incrementAndGet()
             for ((index, item) in actions) {
-                groupList.add(index, item)
-                notifyItemInserted(index)
+                if (groupList.any { it.id == item.id }) continue
+                val position = index.coerceIn(0, groupList.size)
+                groupList.add(position, item)
+                notifyItemInserted(position)
             }
         }
 
@@ -246,68 +276,51 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         }
 
         override suspend fun groupAdd(group: ProxyGroup) {
-            groupList.add(group)
-            delay(300L)
-
+            // Subscription updating is business work and must survive page departure.
+            if (group.type == GroupType.SUBSCRIPTION) GroupUpdater.startUpdate(group, true)
             onMainDispatcher {
+                if (!alive()) return@onMainDispatcher
                 undoManager.flush()
-                notifyItemInserted(groupList.size - 1)
-
-                if (group.type == GroupType.SUBSCRIPTION) {
-                    GroupUpdater.startUpdate(group, true)
+                if (groupList.none { it.id == group.id }) {
+                    reloadGeneration.incrementAndGet()
+                    groupList.add(group)
+                    notifyItemInserted(groupList.lastIndex)
                 }
             }
         }
 
-        override suspend fun groupRemoved(groupId: Long) {
-            val index = groupList.indexOfFirst { it.id == groupId }
-            if (index == -1) return
-            onMainDispatcher {
-                undoManager.flush()
-                if (SagerDatabase.groupDao.allGroups().size <= 2) {
-                    runOnDefaultDispatcher {
-                        reload()
-                    }
-                } else {
-                    groupList.removeAt(index)
-                    notifyItemRemoved(index)
-                }
-            }
-        }
+        override suspend fun groupRemoved(groupId: Long) { reload() }
 
         override suspend fun groupUpdated(group: ProxyGroup) {
-            val index = groupList.indexOfFirst { it.id == group.id }
-            if (index == -1) {
-                reload()
-                return
-            }
-            groupList[index] = group
             onMainDispatcher {
-                undoManager.flush()
-
-                notifyItemChanged(index)
+                if (!alive()) return@onMainDispatcher
+                val index = groupList.indexOfFirst { it.id == group.id }
+                if (index >= 0) {
+                    reloadGeneration.incrementAndGet()
+                    groupList[index] = group
+                    notifyItemChanged(index)
+                }
             }
         }
 
         override suspend fun groupUpdated(groupId: Long) {
-            val index = groupList.indexOfFirst { it.id == groupId }
-            if (index == -1) {
-                reload()
-                return
-            }
             onMainDispatcher {
-                notifyItemChanged(index)
+                if (!alive()) return@onMainDispatcher
+                val index = groupList.indexOfFirst { it.id == groupId }
+                if (index >= 0) notifyItemChanged(index)
             }
         }
 
     }
 
-    override fun onDestroy() {
+    override fun onDestroyView() {
+        viewVersion++
         if (::groupAdapter.isInitialized) {
             GroupManager.removeListener(groupAdapter)
         }
 
-        super.onDestroy()
+        groupListView.adapter = null
+        super.onDestroyView()
 
         if (!::undoManager.isInitialized) return
         undoManager.flush()
@@ -317,6 +330,8 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         RecyclerView.ViewHolder(binding.root),
         PopupMenu.OnMenuItemClickListener {
 
+        private val generation = io.nekohasekai.sagernet.ui.state.BindingGeneration()
+        fun invalidate() { generation.next() }
         lateinit var proxyGroup: ProxyGroup
         val groupName = binding.groupName
         val groupStatus = binding.groupStatus
@@ -328,6 +343,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         val subscriptionUpdateProgress = binding.subscriptionUpdateProgress
 
         override fun onMenuItemClick(item: MenuItem): Boolean {
+            val targetGroup = proxyGroup
 
             fun export(link: String) {
                 val success = SagerNet.trySetPrimaryClip(link)
@@ -338,27 +354,36 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             when (item.itemId) {
                 R.id.action_universal_qr -> {
                     QRCodeDialog(
-                        proxyGroup.toUniversalLink(), proxyGroup.displayName()
+                        targetGroup.toUniversalLink(), targetGroup.displayName()
                     ).showAllowingStateLoss(parentFragmentManager)
                 }
 
                 R.id.action_universal_clipboard -> {
-                    export(proxyGroup.toUniversalLink())
+                    export(targetGroup.toUniversalLink())
                 }
 
                 R.id.action_export_clipboard -> {
                     runOnDefaultDispatcher {
-                        val profiles = SagerDatabase.proxyDao.getByGroup(selectedGroup.id)
-                        val links = profiles.joinToString("\n") { it.toStdLink(compact = true) }
-                        onMainDispatcher {
-                            SagerNet.trySetPrimaryClip(links)
-                            snackbar(getString(R.string.copy_toast_msg)).show()
+                        try {
+                            checkNotNull(SagerDatabase.groupDao.getById(targetGroup.id)) {
+                                app.getString(R.string.group_export_target_missing)
+                            }
+                            val profiles = SagerDatabase.proxyDao.getByGroup(targetGroup.id)
+                            val links = profiles.joinToString("\n") { it.toStdLink(compact = true) }
+                            onMainDispatcher {
+                                SagerNet.trySetPrimaryClip(links)
+                                if (isAdded && view != null) snackbar(getString(R.string.copy_toast_msg)).show()
+                            }
+                        } catch (error: Exception) {
+                            Logs.w(error)
+                            onMainDispatcher { if (isAdded && view != null) snackbar(error.readableMessage).show() }
                         }
                     }
                 }
 
                 R.id.action_export_file -> {
-                    startFilesForResult(exportProfiles, "profiles_${proxyGroup.displayName()}.txt")
+                    pendingExportGroupId = targetGroup.id
+                    startFilesForResult(exportProfiles, "profiles_${targetGroup.displayName()}.txt")
                 }
 
                 R.id.action_clear -> {
@@ -366,7 +391,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                         .setMessage(R.string.clear_profiles_message)
                         .setPositiveButton(R.string.yes) { _, _ ->
                             runOnDefaultDispatcher {
-                                GroupManager.clearGroup(proxyGroup.id)
+                                GroupManager.clearGroup(targetGroup.id)
                             }
                         }
                         .setNegativeButton(android.R.string.cancel, null)
@@ -380,6 +405,12 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
 
         fun bind(group: ProxyGroup) {
             proxyGroup = group
+            val binding = generation.next()
+            val expectedView = viewVersion
+            groupStatus.text = ""
+            groupTraffic.text = ""
+            groupTraffic.isVisible = false
+            groupStatus.setPadding(0, 0, 0, dp2px(4))
 
             itemView.setOnClickListener { }
 
@@ -398,15 +429,15 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             }
 
             optionsButton.setOnClickListener {
-                selectedGroup = proxyGroup
-
                 val popup = PopupMenu(requireContext(), it)
                 popup.menuInflater.inflate(R.menu.group_action_menu, popup.menu)
 
                 if (proxyGroup.type != GroupType.SUBSCRIPTION) {
                     popup.menu.removeItem(R.id.action_share_subscription)
                 }
-                popup.setOnMenuItemClickListener(this)
+                popup.setOnMenuItemClickListener { item ->
+                    if (generation.accepts(binding) && viewVersion == expectedView) onMenuItemClick(item) else true
+                }
                 popup.show()
             }
 
@@ -514,6 +545,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             runOnDefaultDispatcher {
                 val size = SagerDatabase.proxyDao.countByGroup(group.id)
                 onMainDispatcher {
+                    if (!generation.accepts(binding) || expectedView != viewVersion || view == null) return@onMainDispatcher
                     @Suppress("DEPRECATION") when (group.type) {
                         GroupType.BASIC -> {
                             if (size == 0L) {

@@ -6,13 +6,12 @@ import io.nekohasekai.sagernet.fmt.LOCALHOST
 import io.nekohasekai.sagernet.ktx.*
 import moe.matsuri.nb4a.SingBoxOptions
 import moe.matsuri.nb4a.utils.listByLineOrComma
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONObject
 import java.io.File
 import io.nekohasekai.sagernet.fmt.hysteria.*
 
 fun parseHysteria1(url: String): HysteriaBean {
-    val link = url.replace("hysteria://", "https://").toHttpUrlOrNull() ?: error(
+    val link = url.replace("hysteria://", "https://").toLegacyHttpUrlOrNull() ?: error(
         "invalid hysteria link $url"
     )
     return HysteriaBean().apply {
@@ -69,7 +68,7 @@ fun parseHysteria2(url: String): HysteriaBean {
     val link = url
         .replace("hysteria2://", "https://")
         .replace("hy2://", "https://")
-        .toHttpUrlOrNull() ?: error("invalid hysteria link $url")
+        .toLegacyHttpUrlOrNull() ?: error("invalid hysteria link $url")
     return HysteriaBean().apply {
         initializeDefaultValues()
         protocolVersion = 2

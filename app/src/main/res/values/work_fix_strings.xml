@@ -1,0 +1,3 @@
+<resources>
+    <string name="subscription_schedule_failed">Automatic subscription updates could not be scheduled. Try saving the group settings again.</string>
+</resources>

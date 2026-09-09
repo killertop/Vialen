@@ -6,6 +6,7 @@ import io.nekohasekai.sagernet.BuildConfig
 import io.nekohasekai.sagernet.fmt.AbstractBean
 import moe.matsuri.nb4a.utils.NGUtil
 import okhttp3.HttpUrl
+import java.io.Closeable
 import java.net.InetSocketAddress
 import java.net.Socket
 
@@ -64,3 +65,25 @@ fun mkPort(): Int {
 }
 
 const val USER_AGENT = "Vialen/Android/" + BuildConfig.VERSION_NAME + " (Prefer ClashMeta Format)"
+
+/** Release an I/O resource without masking an earlier failure with a close error. */
+fun Closeable.closeQuietly() {
+    try {
+        close()
+    } catch (failure: RuntimeException) {
+        throw failure
+    } catch (_: Exception) {
+        // Match the former OkHttp helper without depending on its internal API.
+    }
+}
+
+/** Preserve Android 10/11 Conscrypt's documented harmless SSL close failure. */
+fun Socket.closeQuietly() {
+    try {
+        close()
+    } catch (failure: RuntimeException) {
+        if (failure.message != "bio == null") throw failure
+    } catch (_: Exception) {
+        // Checked close errors must not replace the connection result.
+    }
+}

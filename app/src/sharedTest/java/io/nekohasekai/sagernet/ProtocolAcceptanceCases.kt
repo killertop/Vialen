@@ -4,6 +4,7 @@ import io.nekohasekai.sagernet.oracle.parseTrojan
 import io.nekohasekai.sagernet.fmt.v2ray.isTLS
 import io.nekohasekai.sagernet.oracle.parseV2Ray
 import io.nekohasekai.sagernet.rust.RustBridge
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -74,6 +75,24 @@ abstract class ProtocolAcceptanceCases {
             }
         }
         compareStandard(uris)
+    }
+
+    @Test fun legacyIdnaDomainContract() {
+        // Fixed published-behavior expectations, independent of either parser.
+        for ((host, expected) in mapOf(
+            "faß.de" to "fass.de",
+            "fa%C3%9F.de" to "fass.de",
+            "fass.de" to "fass.de",
+            "xn--fa-hia.de" to "xn--fa-hia.de",
+            "bücher.example" to "xn--bcher-kva.example"
+        )) {
+            for (scheme in listOf("trojan", "vless", "vmess")) {
+                val uri = "$scheme://user@$host:443?security=tls"
+                val reference = if (scheme == "trojan") parseTrojan(uri) else parseV2Ray(uri)
+                assertEquals(uri, expected, reference.serverAddress)
+                assertEquals(uri, expected, RustBridge.parseProxy(uri).server)
+            }
+        }
     }
 
     @Test fun urlAndDefaultPortMatrix() {

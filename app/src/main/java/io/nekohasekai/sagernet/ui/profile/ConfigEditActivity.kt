@@ -3,6 +3,7 @@ package io.nekohasekai.sagernet.ui.profile
 import android.annotation.SuppressLint
 import android.content.DialogInterface
 import android.os.Bundle
+import androidx.activity.addCallback
 import android.view.Menu
 import android.view.MenuItem
 import android.view.ViewGroup.MarginLayoutParams
@@ -26,12 +27,17 @@ import io.nekohasekai.sagernet.ktx.getColour
 import io.nekohasekai.sagernet.ktx.readableMessage
 import io.nekohasekai.sagernet.ktx.toStringPretty
 import io.nekohasekai.sagernet.ui.ThemedActivity
+import io.nekohasekai.sagernet.ui.form.FormDraftState
+import io.nekohasekai.sagernet.ui.form.showFormError
 import io.nekohasekai.sagernet.widget.ListListener
 import moe.matsuri.nb4a.ui.ExtendedKeyboard
 import org.json.JSONObject
 
 class ConfigEditActivity : ThemedActivity() {
 
+    private lateinit var textToken: String
+    private var resultSent = false
+    private var parentSession: String? = null
     var dirty = false
     var key = Key.SERVER_CONFIG
     var useConfigStore = false
@@ -53,11 +59,22 @@ class ConfigEditActivity : ThemedActivity() {
 
     @SuppressLint("InlinedApi")
     override fun onCreate(savedInstanceState: Bundle?) {
+        textToken = savedInstanceState?.getString("form.textToken") ?: FormDraftState.newTextToken()
         super.onCreate(savedInstanceState)
+        onBackPressedDispatcher.addCallback(this) { requestClose() }
 
         intent?.extras?.apply {
             getString("key")?.let { key = it }
             getString("useConfigStore")?.let { useConfigStore = true }
+        }
+
+        if (!useConfigStore) {
+            parentSession = savedInstanceState?.getString("form.parentSession") ?: FormDraftState.currentSession()
+            // Restore the parent's cache before a recreated child commits into it. The parent
+            // later sees the same live session, so its older snapshot cannot overwrite this result.
+            if (savedInstanceState != null) parentSession?.let { token ->
+                FormDraftState.restore(Bundle().apply { putString("form.session", token) })
+            }
         }
 
         binding = LayoutEditConfigBinding.inflate(layoutInflater)
@@ -71,10 +88,14 @@ class ConfigEditActivity : ThemedActivity() {
         }
 
         binding.editor.apply {
+            // Editorkit freezes its text by default, which can exceed Binder's state limit.
+            isSaveEnabled = false
             colorScheme = editorColorScheme()
             language = JsonLanguage()
             setHorizontallyScrolling(true)
-            if (useConfigStore) {
+            if (savedInstanceState != null) {
+                setTextContent(FormDraftState.readText(textToken))
+            } else if (useConfigStore) {
                 setTextContent(DataStore.configurationStore.getString(key) ?: "")
             } else {
                 setTextContent(DataStore.profileCacheStore.getString(key) ?: "")
@@ -82,10 +103,11 @@ class ConfigEditActivity : ThemedActivity() {
             addTextChangedListener {
                 if (!dirty) {
                     dirty = true
-                    DataStore.dirty = true
                 }
             }
         }
+
+        dirty = savedInstanceState?.getBoolean("form.dirty") ?: false
 
         binding.actionTab.setOnClickListener {
             try {
@@ -195,24 +217,59 @@ class ConfigEditActivity : ThemedActivity() {
         }
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        FormDraftState.saveText(textToken, binding.editor.text.toString())
+        outState.putString("form.textToken", textToken)
+        outState.putString("form.parentSession", parentSession)
+        outState.putInt("form.selection", binding.editor.selectionStart)
+        outState.putBoolean("form.dirty", dirty)
+        super.onSaveInstanceState(outState)
+    }
+
+    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        super.onRestoreInstanceState(savedInstanceState)
+        dirty = savedInstanceState.getBoolean("form.dirty")
+        binding.editor.setSelection(savedInstanceState.getInt("form.selection").coerceIn(0, binding.editor.text.length))
+    }
+
     fun saveAndExit() {
-        formatText()?.let {
+        val formatted = formatText() ?: return
+        try {
             if (useConfigStore) {
-                DataStore.configurationStore.putString(key, it)
+                DataStore.configurationStore.putString(key, formatted)
             } else {
-                DataStore.profileCacheStore.putString(key, it)
+                DataStore.profileCacheStore.putString(key, formatted)
+                DataStore.dirty = true
             }
+            if (intent.getBooleanExtra("form.returnResult", false)) {
+                FormDraftState.saveText(textToken, formatted)
+                setResult(RESULT_OK, android.content.Intent().putExtra("form.result", textToken))
+                resultSent = true
+            } else setResult(RESULT_OK)
             finish()
+        } catch (e: Exception) {
+            showFormError(e)
         }
     }
 
-    override fun onBackPressed() {
-        if (dirty) UnsavedChangesDialogFragment().apply { key() }
-            .show(supportFragmentManager, null) else super.onBackPressed()
+    override fun onDestroy() {
+        if (isFinishing && !resultSent) FormDraftState.discard(textToken)
+        super.onDestroy()
+    }
+
+    private fun requestClose() {
+        if (isFinishing || supportFragmentManager.isStateSaved) return
+        if (dirty) {
+            // Synchronous attachment plus a stable tag also handles two queued Back events.
+            if (supportFragmentManager.findFragmentByTag("form.unsaved") == null) {
+                UnsavedChangesDialogFragment().apply { key() }
+                    .showNow(supportFragmentManager, "form.unsaved")
+            }
+        } else finish()
     }
 
     override fun onSupportNavigateUp(): Boolean {
-        if (!super.onSupportNavigateUp()) finish()
+        requestClose()
         return true
     }
 

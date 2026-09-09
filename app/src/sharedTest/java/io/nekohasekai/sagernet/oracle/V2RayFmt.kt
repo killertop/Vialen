@@ -11,7 +11,6 @@ import moe.matsuri.nb4a.SingBoxOptions.*
 import moe.matsuri.nb4a.utils.NGUtil
 import moe.matsuri.nb4a.utils.listByLineOrComma
 import okhttp3.HttpUrl
-import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
 import io.nekohasekai.sagernet.fmt.v2ray.*
 
@@ -35,7 +34,7 @@ fun parseV2Ray(link: String): StandardV2RayBean {
     // "std" format
 
     val bean = VMessBean().apply { if (link.startsWith("vless://")) alterId = -1 }
-    val url = link.replace("vmess://", "https://").replace("vless://", "https://").toHttpUrl()
+    val url = link.replace("vmess://", "https://").replace("vless://", "https://").toLegacyHttpUrl()
 
     if (url.password.isNotBlank()) {
         // https://github.com/v2fly/v2fly-github-io/issues/26 (rarely use)
@@ -259,7 +258,7 @@ private fun tryResolveVmess4Kitsunebi(server: String): VMessBean {
         encryption = arr21[0]
         if (indexSplit < 0) return@apply
 
-        val url = ("https://localhost/path?" + server.substringAfter("?")).toHttpUrl()
+        val url = ("https://localhost/path?" + server.substringAfter("?")).toLegacyHttpUrl()
         url.queryParameter("remarks")?.apply { name = this }
         url.queryParameter("alterId")?.apply { alterId = this.toInt() }
         url.queryParameter("path")?.apply { path = this }

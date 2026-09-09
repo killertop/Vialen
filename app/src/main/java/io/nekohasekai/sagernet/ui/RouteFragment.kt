@@ -18,11 +18,21 @@ import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.databinding.LayoutEmptyRouteBinding
 import io.nekohasekai.sagernet.databinding.LayoutRouteItemBinding
 import io.nekohasekai.sagernet.ktx.*
+import io.nekohasekai.sagernet.ui.state.OrderedWorkQueue
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import io.nekohasekai.sagernet.widget.ListListener
 import io.nekohasekai.sagernet.widget.UndoSnackbarManager
 
 class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItemClickListener {
 
+    companion object {
+        // Business writes survive view recreation and retain event order across adapters.
+        private val writes = OrderedWorkQueue(CoroutineScope(SupervisorJob() + Dispatchers.Default)) { Logs.w(it) }
+    }
+
+    private var resetDialog: androidx.appcompat.app.AlertDialog? = null
     lateinit var activity: MainActivity
     lateinit var ruleListView: RecyclerView
     lateinit var ruleAdapter: RuleAdapter
@@ -67,6 +77,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
 
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
                 val index = viewHolder.bindingAdapterPosition
+                if (index - 1 !in ruleAdapter.ruleList.indices) return
                 ruleAdapter.remove(index)
                 undoManager.remove(index to (viewHolder as RuleAdapter.RuleHolder).rule)
             }
@@ -93,11 +104,16 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
         }).attachToRecyclerView(ruleListView)
     }
 
-    override fun onDestroy() {
+    override fun onDestroyView() {
+        resetDialog?.dismiss()
+        resetDialog = null
         if (::ruleAdapter.isInitialized) {
             ProfileManager.removeListener(ruleAdapter)
         }
-        super.onDestroy()
+        if (::undoManager.isInitialized) undoManager.flush()
+        ruleAdapter.active = false
+        ruleListView.adapter = null
+        super.onDestroyView()
     }
 
     override fun onMenuItemClick(item: MenuItem): Boolean {
@@ -106,13 +122,21 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                 startActivity(Intent(context, RouteSettingsActivity::class.java))
             }
             R.id.action_reset_route -> {
-                MaterialAlertDialogBuilder(activity).setTitle(R.string.confirm)
+                resetDialog = MaterialAlertDialogBuilder(activity).setTitle(R.string.confirm)
                     .setMessage(R.string.clear_profiles_message)
                     .setPositiveButton(R.string.yes) { _, _ ->
-                        runOnDefaultDispatcher {
+                        undoManager.invalidate()
+                        val target = ruleAdapter
+                        target.version++
+                        target.updated.clear()
+                        target.pendingEnabled.clear()
+                        target.pendingRemovals.clear()
+                        target.ruleList.clear()
+                        target.notifyDataSetChanged()
+                        target.submitMutation {
                             SagerDatabase.rulesDao.reset()
                             DataStore.rulesFirstCreate = false
-                            ruleAdapter.reload()
+                            target.reload()
                         }
                     }
                     .setNegativeButton(R.string.no, null)
@@ -127,20 +151,50 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
 
     inner class RuleAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>(), ProfileManager.RuleListener, UndoSnackbarManager.Interface<RuleEntity> {
 
+        var active = true
+        @Volatile var version = 0L
         val ruleList = ArrayList<RuleEntity>()
+        val pendingEnabled = HashMap<Long, Pair<Long, Boolean>>()
+        val pendingRemovals = HashSet<Long>()
+        private var mutation = 0L
+
+        fun submitMutation(operation: suspend () -> Unit) {
+            val epoch = version
+            writes.submit {
+                try {
+                    operation()
+                } catch (error: Exception) {
+                    if (error is kotlinx.coroutines.CancellationException) throw error
+                    Logs.w(error)
+                    // A failed reset, delete or move must recover from the authoritative database.
+                    if (epoch == version) {
+                        try { reload() } catch (reloadError: Exception) { Logs.w(reloadError) }
+                        onMainDispatcher { if (active) snackbar(error.readableMessage).show() }
+                    }
+                }
+            }
+        }
+        private fun post(block: () -> Unit) {
+            val expected = version
+            ruleListView.post { if (active && expected == version) block() }
+        }
         suspend fun reload() {
+            val expected = version
             val rules = ProfileManager.getRules()
-            ruleListView.post {
+            post {
+                if (expected != version) return@post
                 ruleList.clear()
-                ruleList.addAll(rules)
-                ruleAdapter.notifyDataSetChanged()
+                ruleList.addAll(rules.filter { it.id !in pendingRemovals }.map { rule ->
+                    pendingEnabled[rule.id]?.let { rule.copy(enabled = it.second) } ?: rule
+                })
+                notifyDataSetChanged()
             }
         }
 
         init {
-            runOnDefaultDispatcher {
-                reload()
-            }
+            setHasStableIds(true)
+            val initialEpoch = version
+            writes.submit { if (initialEpoch == version) reload() }
         }
 
         override fun onCreateViewHolder(
@@ -176,87 +230,90 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
             return ruleList[position - 1].id
         }
 
-        private val updated = HashSet<RuleEntity>()
+        val updated = HashSet<RuleEntity>()
         fun move(from: Int, to: Int) {
-            val first = ruleList[from - 1]
-            var previousOrder = first.userOrder
-            val (step, range) = if (from < to) Pair(1, from - 1 until to - 1) else Pair(-1, to downTo from - 1)
-            for (i in range) {
-                val next = ruleList[i + step]
-                val order = next.userOrder
-                next.userOrder = previousOrder
-                previousOrder = order
-                ruleList[i] = next
-                updated.add(next)
+            val source = from - 1
+            val target = to - 1
+            if (source !in ruleList.indices || target !in ruleList.indices || source == target) return
+            val range = minOf(source, target)..maxOf(source, target)
+            val orders = range.map { ruleList[it].userOrder }
+            val moved = ruleList.removeAt(source)
+            ruleList.add(target, moved)
+            range.forEachIndexed { index, position ->
+                ruleList[position].userOrder = orders[index]
+                updated.add(ruleList[position])
             }
-            first.userOrder = previousOrder
-            ruleList[to - 1] = first
-            updated.add(first)
             notifyItemMoved(from, to)
         }
 
-        fun commitMove() = runOnDefaultDispatcher {
-            if (updated.isNotEmpty()) {
-                SagerDatabase.rulesDao.updateRules(updated.toList())
-                updated.clear()
-                needReload()
+        fun commitMove() {
+            val orders = updated.map { it.id to it.userOrder }
+            updated.clear()
+            if (orders.isEmpty()) return
+            submitMutation {
+                orders.forEach { (id, order) -> SagerDatabase.rulesDao.updateOrder(id, order) }
+                onMainDispatcher { if (active) needReload() }
             }
         }
 
         fun remove(index: Int) {
-            ruleList.removeAt(index - 1)
+            if (index - 1 !in ruleList.indices) return
+            pendingRemovals.add(ruleList.removeAt(index - 1).id)
             notifyItemRemoved(index)
         }
 
         override fun undo(actions: List<Pair<Int, RuleEntity>>) {
+            if (!active) return
             for ((index, item) in actions) {
-                ruleList.add(index - 1, item)
-                notifyItemInserted(index)
+                if (!pendingRemovals.remove(item.id) || ruleList.any { it.id == item.id }) continue
+                val position = (index - 1).coerceIn(0, ruleList.size)
+                ruleList.add(position, item)
+                notifyItemInserted(position + 1)
             }
         }
 
         override fun commit(actions: List<Pair<Int, RuleEntity>>) {
             val rules = actions.map { it.second }
-            runOnDefaultDispatcher {
-                ProfileManager.deleteRules(rules)
+            submitMutation {
+                try { ProfileManager.deleteRules(rules) }
+                finally { onMainDispatcher { rules.forEach { pendingRemovals.remove(it.id) } } }
             }
         }
 
         override suspend fun onAdd(rule: RuleEntity) {
-            ruleListView.post {
+            post {
+                if (rule.id in pendingRemovals || ruleList.any { it.id == rule.id }) return@post
                 ruleList.add(rule)
-                ruleAdapter.notifyItemInserted(ruleList.size)
+                notifyItemInserted(ruleList.size)
                 needReload()
             }
         }
 
         override suspend fun onUpdated(rule: RuleEntity) {
-            val index = ruleList.indexOfFirst { it.id == rule.id }
-            if (index == -1) return
-            ruleListView.post {
-                ruleList[index] = rule
-                ruleAdapter.notifyItemChanged(index + 1)
+            post {
+                val index = ruleList.indexOfFirst { it.id == rule.id }
+                if (index < 0) return@post
+                ruleList[index] = pendingEnabled[rule.id]?.let { rule.copy(enabled = it.second) } ?: rule
+                notifyItemChanged(index + 1)
                 needReload()
             }
         }
 
         override suspend fun onRemoved(ruleId: Long) {
-            val index = ruleList.indexOfFirst { it.id == ruleId }
-            if (index == -1) {
-                onMainDispatcher {
-                    needReload()
+            post {
+                val index = ruleList.indexOfFirst { it.id == ruleId }
+                if (index >= 0) {
+                    ruleList.removeAt(index)
+                    notifyItemRemoved(index + 1)
                 }
-            } else ruleListView.post {
-                ruleList.removeAt(index)
-                ruleAdapter.notifyItemRemoved(index + 1)
                 needReload()
             }
         }
 
         override suspend fun onCleared() {
-            ruleListView.post {
+            post {
                 ruleList.clear()
-                ruleAdapter.notifyDataSetChanged()
+                notifyDataSetChanged()
                 needReload()
             }
         }
@@ -287,19 +344,55 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                 itemView.setOnClickListener {
                     enableSwitch.performClick()
                 }
-                enableSwitch.isChecked = rule.enabled
+                enableSwitch.contentDescription = getString(R.string.rule_enable_named, ruleEntity.displayName())
+                enableSwitch.setOnCheckedChangeListener(null)
+                enableSwitch.isChecked = ruleEntity.enabled
                 enableSwitch.setOnCheckedChangeListener { _, isChecked ->
-                    runOnDefaultDispatcher {
-                        rule.enabled = isChecked
-                        SagerDatabase.rulesDao.updateRule(rule)
-                        onMainDispatcher {
-                            needReload()
+                    val id = ruleEntity.id
+                    val enabled = isChecked
+                    val ticket = ++mutation
+                    val epoch = version
+                    pendingEnabled[id] = ticket to enabled
+                    ruleEntity.enabled = enabled
+                    writes.submit {
+                        try {
+                            val changed = SagerDatabase.rulesDao.updateEnabled(id, enabled)
+                            onMainDispatcher {
+                                if (epoch != version || pendingEnabled[id]?.first != ticket) return@onMainDispatcher
+                                pendingEnabled.remove(id)
+                                if (active) {
+                                    val index = ruleList.indexOfFirst { it.id == id }
+                                    if (index >= 0) {
+                                        if (changed == 0) {
+                                            ruleList.removeAt(index)
+                                            notifyItemRemoved(index + 1)
+                                        } else {
+                                            ruleList[index].enabled = enabled
+                                            notifyItemChanged(index + 1)
+                                        }
+                                    }
+                                    needReload()
+                                }
+                            }
+                        } catch (error: Exception) {
+                            if (error is kotlinx.coroutines.CancellationException) throw error
+                            Logs.w(error)
+                            val latest = onMainDispatcher {
+                                if (epoch == version && pendingEnabled[id]?.first == ticket) {
+                                    pendingEnabled.remove(id)
+                                    true
+                                } else false
+                            }
+                            if (latest) {
+                                try { reload() } catch (reloadError: Exception) { Logs.w(reloadError) }
+                            }
+                            onMainDispatcher { if (active) snackbar(error.readableMessage).show() }
                         }
                     }
                 }
                 editButton.setOnClickListener {
                     startActivity(Intent(it.context, RouteSettingsActivity::class.java).apply {
-                        putExtra(RouteSettingsActivity.EXTRA_ROUTE_ID, rule.id)
+                        putExtra(RouteSettingsActivity.EXTRA_ROUTE_ID, ruleEntity.id)
                     })
                 }
             }

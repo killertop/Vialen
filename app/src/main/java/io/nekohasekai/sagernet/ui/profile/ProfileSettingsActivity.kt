@@ -5,6 +5,7 @@ import android.content.DialogInterface
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import androidx.activity.addCallback
 import android.os.Parcelable
 import android.view.Menu
 import android.view.MenuItem
@@ -22,6 +23,9 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.withResumed
+import kotlinx.coroutines.launch
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceDataStore
@@ -39,9 +43,15 @@ import io.nekohasekai.sagernet.databinding.LayoutGroupItemBinding
 import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.ui.ThemedActivity
+import io.nekohasekai.sagernet.ui.form.FormDraftState
+import io.nekohasekai.sagernet.ui.form.showFormError
 import io.nekohasekai.sagernet.widget.ListListener
-import kotlinx.parcelize.Parcelize
 import kotlin.properties.Delegates
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.withContext
+import kotlinx.parcelize.Parcelize
 
 @Suppress("UNCHECKED_CAST")
 abstract class ProfileSettingsActivity<T : AbstractBean>(
@@ -91,7 +101,9 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
     protected var isSubscription by Delegates.notNull<Boolean>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        draftSession = FormDraftState.restore(savedInstanceState) ?: FormDraftState.begin()
         super.onCreate(savedInstanceState)
+        onBackPressedDispatcher.addCallback(this) { requestClose() }
         setSupportActionBar(findViewById(R.id.toolbar))
         supportActionBar?.apply {
             setTitle(R.string.profile_config)
@@ -99,55 +111,81 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
             setHomeAsUpIndicator(R.drawable.ic_navigation_close)
         }
 
-        if (savedInstanceState == null) {
+        draftReady = savedInstanceState?.getBoolean("form.ready") == true
+        if (!draftReady) {
             val editingId = intent.getLongExtra(EXTRA_PROFILE_ID, 0L)
-            isSubscription = intent.getBooleanExtra(EXTRA_IS_SUBSCRIPTION, false)
             DataStore.editingId = editingId
-            runOnDefaultDispatcher {
-                if (editingId == 0L) {
-                    DataStore.editingGroup = DataStore.selectedGroupForImport()
-                    createEntity().applyDefaultValues().init()
-                } else {
-                    if (proxyEntity == null) {
-                        onMainDispatcher {
-                            finish()
-                        }
-                        return@runOnDefaultDispatcher
+            lifecycleScope.launch {
+                try {
+                    val entity = withContext(Dispatchers.IO) {
+                        if (editingId == 0L) null else SagerDatabase.proxyDao.getById(editingId)
+                            ?: error(getString(R.string.form_missing_record))
                     }
-                    DataStore.editingGroup = proxyEntity!!.groupId
-                    (proxyEntity!!.requireBean() as T).init()
-                }
-
-                onMainDispatcher {
-                    supportFragmentManager.beginTransaction()
-                        .replace(R.id.settings, MyPreferenceFragmentCompat())
-                        .commit()
+                    lifecycle.withResumed {
+                        DataStore.editingGroup = entity?.groupId ?: DataStore.selectedGroupForImport()
+                        val bean = if (entity == null) createEntity().applyDefaultValues()
+                            else entity.requireBean() as T
+                        bean.init()
+                        DataStore.serverCustom = bean.customConfigJson.orEmpty()
+                        DataStore.serverCustomOutbound = bean.customOutboundJson.orEmpty()
+                        // Cache initialization and fragment attachment are one main-thread operation.
+                        // A cancelled old Activity never writes a late initialization into this draft.
+                        DataStore.dirty = false
+                        supportFragmentManager.beginTransaction()
+                            .replace(R.id.settings, MyPreferenceFragmentCompat()).commitNow()
+                        DataStore.dirty = false
+                        draftReady = true
+                        DataStore.profileCacheStore.registerChangeListener(this@ProfileSettingsActivity)
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    showFormError(e)
                 }
             }
-
-
+        } else {
+            DataStore.profileCacheStore.registerChangeListener(this)
         }
+        isSubscription = intent.getBooleanExtra(EXTRA_IS_SUBSCRIPTION, false)
+    }
 
+    private lateinit var draftSession: String
+    private var draftReady = false
+    private val saveLock = Mutex()
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("form.ready", draftReady)
+        if (draftReady) FormDraftState.save(outState, draftSession)
+        super.onSaveInstanceState(outState)
     }
 
     open suspend fun saveAndExit() {
 
-        val editingId = DataStore.editingId
-        if (editingId == 0L) {
-            val editingGroup = DataStore.editingGroup
-            ProfileManager.createProfile(editingGroup, createEntity().apply { serialize() })
-        } else {
-            if (proxyEntity == null) {
-                finish()
-                return
+        if (!draftReady || !saveLock.tryLock()) return
+        try {
+            val editingId = DataStore.editingId
+            fun T.serializeDraft() {
+                serialize()
+                customConfigJson = DataStore.serverCustom
+                customOutboundJson = DataStore.serverCustomOutbound
             }
-            if (proxyEntity!!.id == DataStore.selectedProxy) {
-                SagerNet.stopService()
+            if (editingId == 0L) {
+                ProfileManager.createProfile(DataStore.editingGroup, createEntity().apply { serializeDraft() })
+            } else {
+                val entity = SagerDatabase.proxyDao.getById(editingId)
+                    ?: error(getString(R.string.form_missing_record))
+                if (entity.id == DataStore.selectedProxy) SagerNet.stopService()
+                ProfileManager.updateProfile(entity.apply { (requireBean() as T).serializeDraft() })
             }
-            ProfileManager.updateProfile(proxyEntity!!.apply { (requireBean() as T).serialize() })
-        }
-        finish()
+            onMainDispatcher { finish() }
 
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            onMainDispatcher { if (!isFinishing && !isDestroyed) showFormError(e) }
+        } finally {
+            saveLock.unlock()
+        }
     }
 
     val child by lazy { supportFragmentManager.findFragmentById(R.id.settings) as MyPreferenceFragmentCompat }
@@ -172,20 +210,29 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
         return true
     }
 
-    override fun onOptionsItemSelected(item: MenuItem) = child.onOptionsItemSelected(item)
+    override fun onOptionsItemSelected(item: MenuItem): Boolean =
+        (supportFragmentManager.findFragmentById(R.id.settings) as? MyPreferenceFragmentCompat)
+            ?.onOptionsItemSelected(item) == true || super.onOptionsItemSelected(item)
 
-    override fun onBackPressed() {
-        if (DataStore.dirty) UnsavedChangesDialogFragment().apply { key() }
-            .show(supportFragmentManager, null) else super.onBackPressed()
+    private fun requestClose() {
+        if (isFinishing || supportFragmentManager.isStateSaved) return
+        if (draftReady && DataStore.dirty) {
+            // Synchronous attachment plus a stable tag also handles two queued Back events.
+            if (supportFragmentManager.findFragmentByTag("form.unsaved") == null) {
+                UnsavedChangesDialogFragment().apply { key() }
+                    .showNow(supportFragmentManager, "form.unsaved")
+            }
+        } else finish()
     }
 
     override fun onSupportNavigateUp(): Boolean {
-        if (!super.onSupportNavigateUp()) finish()
+        requestClose()
         return true
     }
 
     override fun onDestroy() {
         DataStore.profileCacheStore.unregisterChangeListener(this)
+        if (isFinishing) FormDraftState.discard(draftSession)
         super.onDestroy()
     }
 
@@ -234,24 +281,31 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
 
             activity?.apply {
                 viewCreated(view, savedInstanceState)
-                DataStore.dirty = false
-                DataStore.profileCacheStore.registerChangeListener(this)
             }
         }
 
-        var callbackCustom: ((String) -> Unit)? = null
-        var callbackCustomOutbound: ((String) -> Unit)? = null
-
         val resultCallbackCustom = registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
-        ) { (_, _) ->
-            callbackCustom?.let { it(DataStore.serverCustom) }
+        ) { result ->
+            if (result.resultCode == android.app.Activity.RESULT_OK) {
+                result.data?.getStringExtra("form.result")?.let {
+                    DataStore.serverCustom = FormDraftState.readText(it)
+                    FormDraftState.discard(it)
+                }
+                DataStore.dirty = true
+            }
         }
 
         val resultCallbackCustomOutbound = registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
-        ) { (_, _) ->
-            callbackCustomOutbound?.let { it(DataStore.serverCustomOutbound) }
+        ) { result ->
+            if (result.resultCode == android.app.Activity.RESULT_OK) {
+                result.data?.getStringExtra("form.result")?.let {
+                    DataStore.serverCustomOutbound = FormDraftState.readText(it)
+                    FormDraftState.discard(it)
+                }
+                DataStore.dirty = true
+            }
         }
 
         @SuppressLint("CheckResult")
@@ -280,32 +334,28 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
             }
 
             R.id.action_custom_outbound_json -> {
-                activity?.proxyEntity?.apply {
-                    val bean = requireBean()
-                    DataStore.serverCustomOutbound = bean.customOutboundJson
-                    callbackCustomOutbound = { bean.customOutboundJson = it }
+                activity?.apply {
                     resultCallbackCustomOutbound.launch(
                         Intent(
                             requireContext(),
                             ConfigEditActivity::class.java
                         ).apply {
                             putExtra("key", Key.SERVER_CUSTOM_OUTBOUND)
+                            putExtra("form.returnResult", true)
                         })
                 }
                 true
             }
 
             R.id.action_custom_config_json -> {
-                activity?.proxyEntity?.apply {
-                    val bean = requireBean()
-                    DataStore.serverCustom = bean.customConfigJson
-                    callbackCustom = { bean.customConfigJson = it }
+                activity?.apply {
                     resultCallbackCustom.launch(
                         Intent(
                             requireContext(),
                             ConfigEditActivity::class.java
                         ).apply {
                             putExtra("key", Key.SERVER_CUSTOM)
+                            putExtra("form.returnResult", true)
                         })
                 }
                 true

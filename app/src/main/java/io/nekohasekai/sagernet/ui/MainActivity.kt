@@ -1,6 +1,5 @@
 package io.nekohasekai.sagernet.ui
 
-import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -9,6 +8,9 @@ import android.view.KeyEvent
 import android.view.MenuItem
 import androidx.activity.addCallback
 import androidx.annotation.IdRes
+import androidx.core.view.GravityCompat
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentManager
 import androidx.preference.PreferenceDataStore
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationView
@@ -49,6 +51,14 @@ class MainActivity : ThemedActivity(),
 
     lateinit var binding: LayoutMainBinding
     lateinit var navigation: NavigationView
+    private var renderedState = BaseService.State.Idle
+    private var pendingPage: Int? = null
+
+    private val pageCallbacks = object : FragmentManager.FragmentLifecycleCallbacks() {
+        override fun onFragmentResumed(fm: FragmentManager, fragment: Fragment) {
+            if (fragment.id == R.id.fragment_holder) syncPageControls(fragment)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,12 +76,17 @@ class MainActivity : ThemedActivity(),
             binding.drawerLayout.removeView(binding.navView)
         }
         navigation.setNavigationItemSelectedListener(this)
+        supportFragmentManager.registerFragmentLifecycleCallbacks(pageCallbacks, false)
 
         if (savedInstanceState == null) {
             displayFragmentWithId(R.id.nav_configuration)
         }
         onBackPressedDispatcher.addCallback {
-            if (supportFragmentManager.findFragmentById(R.id.fragment_holder) is ConfigurationFragment) {
+            if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                binding.drawerLayout.closeDrawers()
+            } else if ((supportFragmentManager.findFragmentById(R.id.fragment_holder) as? WebviewFragment)?.consumeBack() == true) {
+                // The panel consumes Back while its browser history has an entry.
+            } else if (supportFragmentManager.findFragmentById(R.id.fragment_holder) is ConfigurationFragment) {
                 moveTaskToBack(true)
             } else {
                 displayFragmentWithId(R.id.nav_configuration)
@@ -86,6 +101,7 @@ class MainActivity : ThemedActivity(),
         binding.stats.setOnClickListener { if (DataStore.serviceState.connected) binding.stats.testConnection() }
 
         setContentView(binding.root)
+        syncPageControls(supportFragmentManager.findFragmentById(R.id.fragment_holder))
         changeState(BaseService.State.Idle)
         connection.connect(this, this)
         DataStore.configurationStore.registerChangeListener(this)
@@ -235,23 +251,45 @@ class MainActivity : ThemedActivity(),
     }
 
 
-    @SuppressLint("CommitTransaction")
-    fun displayFragment(fragment: ToolbarFragment) {
-        if (fragment is ConfigurationFragment) {
-            binding.stats.allowShow = true
-            binding.fab.show()
-        } else if (!DataStore.showBottomBar) {
-            binding.stats.allowShow = false
-            binding.stats.performHide()
-            binding.fab.hide()
-        }
+    private fun displayFragment(fragment: ToolbarFragment) {
+        syncPageControls(fragment)
         supportFragmentManager.beginTransaction()
             .replace(R.id.fragment_holder, fragment)
-            .commitAllowingStateLoss()
+            .commit()
         binding.drawerLayout.closeDrawers()
     }
 
+    private fun syncPageControls(fragment: Fragment?) {
+        if (fragment == null || !::binding.isInitialized) return
+        val showControls = fragment is ConfigurationFragment || DataStore.showBottomBar
+        binding.stats.allowShow = showControls
+        binding.fab.pageAllowsControls = showControls
+        if (showControls) binding.fab.show() else binding.fab.hide()
+        val id = when (fragment) {
+            is ConfigurationFragment -> R.id.nav_configuration
+            is GroupFragment -> R.id.nav_group
+            is RouteFragment -> R.id.nav_route
+            is SettingsFragment -> R.id.nav_settings
+            is WebviewFragment -> R.id.nav_traffic
+            is AboutFragment -> R.id.nav_about
+            else -> return
+        }
+        navigation.setCheckedItem(id)
+    }
+
+    override fun onPostResume() {
+        super.onPostResume()
+        val requestedPage = pendingPage
+        pendingPage = null
+        if (requestedPage != null) displayFragmentWithId(requestedPage)
+        else syncPageControls(supportFragmentManager.findFragmentById(R.id.fragment_holder))
+    }
+
     fun displayFragmentWithId(@IdRes id: Int): Boolean {
+        if (supportFragmentManager.isStateSaved) {
+            pendingPage = id
+            return true
+        }
         when (id) {
             R.id.nav_configuration -> {
                 displayFragment(ConfigurationFragment())
@@ -275,9 +313,10 @@ class MainActivity : ThemedActivity(),
         msg: String? = null,
         animate: Boolean = false,
     ) {
+        val previousState = renderedState
+        renderedState = state
         DataStore.serviceState = state
-
-        binding.fab.changeState(state, DataStore.serviceState, animate)
+        binding.fab.changeState(state, previousState, animate)
         binding.stats.changeState(state)
         if (msg != null) snackbar(getString(R.string.vpn_error, msg)).show()
     }
@@ -327,6 +366,7 @@ class MainActivity : ThemedActivity(),
     }
 
     override fun cbSelectorUpdate(id: Long) {
+        binding.stats.invalidateConnectionTest()
         val old = DataStore.selectedProxy
         DataStore.selectedProxy = id
         DataStore.currentProfile = id
@@ -338,6 +378,9 @@ class MainActivity : ThemedActivity(),
 
     override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {
         when (key) {
+            Key.SHOW_BOTTOM_BAR -> runOnUiThread {
+                syncPageControls(supportFragmentManager.findFragmentById(R.id.fragment_holder))
+            }
             Key.SERVICE_MODE -> onBinderDied()
             Key.PROXY_APPS, Key.BYPASS_MODE, Key.INDIVIDUAL -> {
                 if (DataStore.serviceState.canStop) {
@@ -360,6 +403,7 @@ class MainActivity : ThemedActivity(),
     }
 
     override fun onDestroy() {
+        supportFragmentManager.unregisterFragmentLifecycleCallbacks(pageCallbacks)
         super.onDestroy()
         GroupManager.userInterface = null
         DataStore.configurationStore.unregisterChangeListener(this)

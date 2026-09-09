@@ -36,7 +36,6 @@ import moe.matsuri.nb4a.proxy.shadowtls.buildSingBoxOutboundShadowTLSBean
 import moe.matsuri.nb4a.utils.JavaUtil.gson
 import moe.matsuri.nb4a.utils.Util
 import moe.matsuri.nb4a.utils.listByLineOrComma
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 fun buildLegacyConfig(
     proxy: ProxyEntity, forTest: Boolean = false, forExport: Boolean = false
@@ -624,7 +623,7 @@ fun buildLegacyConfig(
             if (address.contains("://")) {
                 address = address.substringAfter("://")
             }
-            "https://$address".toHttpUrlOrNull()?.apply {
+            "https://$address".toLegacyHttpUrlOrNull()?.apply {
                 if (!host.isIpAddress()) {
                     domainListDNSDirectForce.add("full:$host")
                 }

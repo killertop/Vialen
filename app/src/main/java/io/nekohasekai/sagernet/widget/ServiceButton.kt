@@ -2,15 +2,16 @@ package io.nekohasekai.sagernet.widget
 
 import android.content.Context
 import android.graphics.drawable.Drawable
-import android.os.Build
 import android.util.AttributeSet
 import android.view.PointerIcon
 import android.view.View
 import androidx.annotation.DrawableRes
 import androidx.appcompat.widget.TooltipCompat
+import androidx.core.view.ViewCompat
 import androidx.dynamicanimation.animation.DynamicAnimation
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.withStarted
 import androidx.vectordrawable.graphics.drawable.Animatable2Compat
 import androidx.vectordrawable.graphics.drawable.AnimatedVectorDrawableCompat
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -19,6 +20,7 @@ import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.bg.BaseService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.*
 
 class ServiceButton @JvmOverloads constructor(
@@ -62,11 +64,7 @@ class ServiceButton @JvmOverloads constructor(
     private val iconConnecting by lazy {
         AnimatedState(R.drawable.ic_service_connecting) {
             hideProgress()
-            delayedAnimation = (context as LifecycleOwner).lifecycleScope.launchWhenStarted {
-                delay(context.resources.getInteger(android.R.integer.config_mediumAnimTime) + 1000L)
-                isIndeterminate = true
-                show()
-            }
+            scheduleProgress()
         }
     }
     private val iconConnected by lazy {
@@ -79,8 +77,32 @@ class ServiceButton @JvmOverloads constructor(
     private val animationQueue = ArrayDeque<AnimatedState>()
 
     private var checked = false
+    private var renderedState = BaseService.State.Idle
     private var delayedAnimation: Job? = null
     private lateinit var progress: BaseProgressIndicator<*>
+    var pageAllowsControls = true
+        set(value) {
+            if (field == value) return
+            field = value
+            if (::progress.isInitialized) {
+                hideProgress()
+                if (value && renderedState == BaseService.State.Connecting) scheduleProgress()
+            }
+        }
+
+    private fun scheduleProgress() {
+        if (!pageAllowsControls) return
+        delayedAnimation?.cancel()
+        delayedAnimation = (context as LifecycleOwner).lifecycleScope.launch {
+            delay(context.resources.getInteger(android.R.integer.config_mediumAnimTime) + 1000L)
+            (context as LifecycleOwner).lifecycle.withStarted {
+                if (pageAllowsControls && renderedState == BaseService.State.Connecting && isAttachedToWindow) {
+                    progress.isIndeterminate = true
+                    progress.show()
+                }
+            }
+        }
+    }
     fun initProgress(progress: BaseProgressIndicator<*>) {
         this.progress = progress
         progress.progressDrawable?.addSpringAnimationEndListener(this)
@@ -108,22 +130,32 @@ class ServiceButton @JvmOverloads constructor(
     }
 
     fun changeState(state: BaseService.State, previousState: BaseService.State, animate: Boolean) {
-        when (state) {
-            BaseService.State.Connecting -> changeState(iconConnecting, animate)
-            BaseService.State.Connected -> changeState(iconConnected, animate)
-            BaseService.State.Stopping -> {
-                changeState(iconStopping, animate && previousState == BaseService.State.Connected)
+        val shouldRender = state != renderedState || !animate
+        renderedState = state
+        if (shouldRender) {
+            when (state) {
+                BaseService.State.Connecting -> changeState(iconConnecting, animate)
+                BaseService.State.Connected -> changeState(iconConnected, animate)
+                BaseService.State.Stopping -> {
+                    changeState(iconStopping, animate && previousState == BaseService.State.Connected)
+                }
+                else -> changeState(iconStopped, animate)
             }
-            else -> changeState(iconStopped, animate)
         }
         checked = state == BaseService.State.Connected
         refreshDrawableState()
         val description = context.getText(if (state.canStop) R.string.stop else R.string.connect)
         contentDescription = description
+        ViewCompat.setStateDescription(this, context.getText(when (state) {
+            BaseService.State.Connected -> R.string.vpn_connected
+            BaseService.State.Connecting -> R.string.connecting
+            BaseService.State.Stopping -> R.string.stopping
+            else -> R.string.not_connected
+        }))
         TooltipCompat.setTooltipText(this, description)
         val enabled = state.canStop || state == BaseService.State.Stopped
         isEnabled = enabled
-        if (Build.VERSION.SDK_INT >= 24) pointerIcon = PointerIcon.getSystemIcon(
+        pointerIcon = PointerIcon.getSystemIcon(
             context,
             if (enabled) PointerIcon.TYPE_HAND else PointerIcon.TYPE_WAIT
         )
@@ -146,5 +178,16 @@ class ServiceButton @JvmOverloads constructor(
             icon.start()    // force ensureAnimatorSet to be called so that stop() will work
             icon.stop()
         }
+    }
+
+    override fun onDetachedFromWindow() {
+        delayedAnimation?.cancel()
+        animationQueue.peekFirst()?.stop()
+        animationQueue.clear()
+        if (::progress.isInitialized) {
+            progress.progressDrawable?.removeSpringAnimationEndListener(this)
+            progress.hide()
+        }
+        super.onDetachedFromWindow()
     }
 }

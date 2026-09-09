@@ -1,0 +1,3 @@
+<resources>
+    <string name="subscription_schedule_failed">無法安排訂閱自動更新，請嘗試重新儲存分組設定。</string>
+</resources>

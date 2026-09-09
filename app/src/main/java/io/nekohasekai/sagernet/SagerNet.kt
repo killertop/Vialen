@@ -107,11 +107,12 @@ class SagerNet : Application(),
         updateNotificationChannels()
     }
 
-    override fun getWorkManagerConfiguration(): WorkConfiguration {
-        return WorkConfiguration.Builder()
+    override val workManagerConfiguration: WorkConfiguration
+        get() = WorkConfiguration.Builder()
+            // Subscription workers must share the VPN process's in-memory serviceState.
+            // The WorkManager services/receivers are explicitly assigned :bg in the manifest.
             .setDefaultProcessName("${BuildConfig.APPLICATION_ID}:bg")
             .build()
-    }
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
@@ -136,7 +137,7 @@ class SagerNet : Application(),
                     Intent(
                         application, MainActivity::class.java
                     ).setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+                    PendingIntent.FLAG_IMMUTABLE
                 )
             }
         }

@@ -326,11 +326,9 @@ class VpnService : BaseVpnService(),
     }
 
     fun updateUnderlyingNetwork(builder: Builder? = null) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
-            SagerNet.underlyingNetwork?.let {
-                builder?.setUnderlyingNetworks(arrayOf(SagerNet.underlyingNetwork))
-                    ?: setUnderlyingNetworks(arrayOf(SagerNet.underlyingNetwork))
-            }
+        SagerNet.underlyingNetwork?.let {
+            builder?.setUnderlyingNetworks(arrayOf(SagerNet.underlyingNetwork))
+                ?: setUnderlyingNetworks(arrayOf(SagerNet.underlyingNetwork))
         }
     }
 

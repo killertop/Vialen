@@ -42,24 +42,19 @@ abstract class ThemedActivity : AppCompatActivity {
             isAppearanceLightStatusBars = !isNight
             isAppearanceLightNavigationBars = !isNight
         }
-        // Older Android releases only support light system-bar icons.
-        if (Build.VERSION.SDK_INT < 23) {
-            window.statusBarColor = ContextCompat.getColor(this, R.color.vialen_legacy_system_bar)
-        }
+        // Android 7 supports dark status icons but only light navigation-bar icons.
         if (Build.VERSION.SDK_INT < 26) {
             window.navigationBarColor = ContextCompat.getColor(this, R.color.vialen_legacy_system_bar)
         }
 
-        if (Build.VERSION.SDK_INT >= 35) {
-            ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content)) { _, insets ->
-                val top = insets.getInsets(WindowInsetsCompat.Type.systemBars()).top
+        if (!isDialog && Build.VERSION.SDK_INT >= 35) {
+            ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content)) { content, insets ->
+                val safe = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+                // The content owns lateral safety; lists and editors own their bottom/IME inset.
+                content.updatePadding(left = safe.left, right = safe.right)
                 findViewById<AppBarLayout>(R.id.appbar)?.apply {
-                    updatePadding(top = top)
-//                Logs.w("appbar $top")
+                    updatePadding(top = safe.top)
                 }
-//            findViewById<NavigationView>(R.id.nav_view)?.apply {
-//                updatePadding(top = top)
-//            }
                 insets
             }
         }

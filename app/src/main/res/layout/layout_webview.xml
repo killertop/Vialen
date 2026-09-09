@@ -2,15 +2,38 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
-
-    <include
-        layout="@layout/layout_appbar"
+    <include layout="@layout/layout_appbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
-
-    <WebView
-        android:id="@+id/webview"
+    <ProgressBar android:id="@+id/panel_progress"
+        style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
+        android:layout_height="wrap_content"
+        android:indeterminate="true"
+        android:contentDescription="@string/panel_loading" />
+    <FrameLayout android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+        <WebView android:id="@+id/webview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+        <LinearLayout android:id="@+id/panel_error"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="24dp"
+            android:visibility="gone">
+            <TextView android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:accessibilityLiveRegion="polite"
+                android:text="@string/panel_load_failed" />
+            <Button android:id="@+id/panel_retry"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/panel_retry" />
+        </LinearLayout>
+    </FrameLayout>
 </LinearLayout>

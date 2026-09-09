@@ -7,12 +7,11 @@ import io.nekohasekai.sagernet.ktx.toLink
 import io.nekohasekai.sagernet.ktx.urlSafe
 import moe.matsuri.nb4a.SingBoxOptions
 import moe.matsuri.nb4a.utils.listByLineOrComma
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import io.nekohasekai.sagernet.fmt.tuic.*
 
 fun parseTuic(url: String): TuicBean {
     // https://github.com/daeuniverse/dae/discussions/182
-    val link = url.replace("tuic://", "https://").toHttpUrlOrNull() ?: error(
+    val link = url.replace("tuic://", "https://").toLegacyHttpUrlOrNull() ?: error(
         "invalid tuic link $url"
     )
     return TuicBean().apply {

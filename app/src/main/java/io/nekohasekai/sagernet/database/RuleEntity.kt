@@ -92,6 +92,12 @@ data class RuleEntity(
         @Insert
         fun createRule(rule: RuleEntity): Long
 
+        @Query("UPDATE rules SET enabled = :enabled WHERE id = :ruleId")
+        fun updateEnabled(ruleId: Long, enabled: Boolean): Int
+
+        @Query("UPDATE rules SET userOrder = :order WHERE id = :ruleId")
+        fun updateOrder(ruleId: Long, order: Long): Int
+
         @Update
         fun updateRule(rule: RuleEntity)
 

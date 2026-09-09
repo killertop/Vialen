@@ -1,12 +1,9 @@
 import com.android.build.api.dsl.ApplicationExtension
-import com.android.build.gradle.AbstractAppExtension
-import com.android.build.gradle.internal.api.BaseVariantOutputImpl
+import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import org.gradle.api.JavaVersion
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.getByName
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
 import java.util.Base64
 import java.util.Properties
 import kotlin.system.exitProcess
@@ -37,10 +34,10 @@ fun Project.requireLocalProperties(): Properties {
 
 fun Project.setupCommon() {
     android.apply {
-        buildToolsVersion = "35.0.1"
-        compileSdk = 35
+        buildToolsVersion = "36.0.0"
+        compileSdk = 37
         defaultConfig {
-            minSdk = 21
+            minSdk = 24
             targetSdk = 35
         }
         buildTypes {
@@ -49,19 +46,15 @@ fun Project.setupCommon() {
             }
         }
         compileOptions {
-            sourceCompatibility = JavaVersion.VERSION_1_8
-            targetCompatibility = JavaVersion.VERSION_1_8
+            sourceCompatibility = JavaVersion.VERSION_11
+            targetCompatibility = JavaVersion.VERSION_11
         }
-        project.extensions.configure<KotlinAndroidProjectExtension> {
-            compilerOptions.jvmTarget.set(JvmTarget.JVM_1_8)
-        }
+        // AGP built-in Kotlin inherits targetCompatibility for its JVM target.
         lint {
             showAll = true
             checkAllWarnings = true
             checkReleaseBuilds = true
             warningsAsErrors = true
-            textOutput = project.file("build/lint.txt")
-            htmlOutput = project.file("build/lint.html")
         }
         packaging {
             resources.excludes.addAll(
@@ -80,28 +73,18 @@ fun Project.setupCommon() {
                 )
             )
         }
-        (this as? AbstractAppExtension)?.apply {
-            buildTypes {
-                getByName("release") {
-                    isShrinkResources = true
-                    if (System.getenv("nkmr_minify") == "0") {
-                        isShrinkResources = false
-                        isMinifyEnabled = false
-                    }
-                }
-                getByName("debug") {
-                    applicationIdSuffix = "debug"
-                    debuggable(true)
-                    jniDebuggable(true)
+        buildTypes {
+            getByName("release") {
+                isShrinkResources = true
+                if (System.getenv("nkmr_minify") == "0") {
+                    isShrinkResources = false
+                    isMinifyEnabled = false
                 }
             }
-            applicationVariants.forEach { variant ->
-                variant.outputs.forEach {
-                    it as BaseVariantOutputImpl
-                    it.outputFileName = it.outputFileName.replace(
-                        "app", "${project.name}-" + variant.versionName
-                    ).replace("-release", "")
-                }
+            getByName("debug") {
+                applicationIdSuffix = "debug"
+                isDebuggable = true
+                isJniDebuggable = true
             }
         }
     }
@@ -152,9 +135,19 @@ fun Project.setupApp() {
     }
     setupAppCommon()
 
-    android.apply {
-        this as AbstractAppExtension
+    extensions.configure<ApplicationAndroidComponentsExtension> {
+        onVariants(selector().all()) { variant ->
+            variant.outputs.forEach { output ->
+                val debugSuffix = if (variant.buildType == "debug") "-debug" else ""
+                val unsignedSuffix = if (android.buildTypes.getByName(variant.buildType!!).signingConfig == null) "-unsigned" else ""
+                output.outputFileName.set(output.versionName.map { version ->
+                    "Vialen-$version$debugSuffix-arm64-v8a$unsignedSuffix.apk"
+                })
+            }
+        }
+    }
 
+    android.apply {
         buildTypes {
             getByName("debug") {
                 resValue("string", "app_package_id", "${pkgName}.debug")
@@ -167,17 +160,14 @@ fun Project.setupApp() {
             }
         }
 
-        applicationVariants.all {
-            outputs.all {
-                this as BaseVariantOutputImpl
-                val debugSuffix = if (buildType.name == "debug") "-debug" else ""
-                val unsignedSuffix = if (outputFileName.contains("unsigned")) "-unsigned" else ""
-                outputFileName = "Vialen-$versionName$debugSuffix-arm64-v8a$unsignedSuffix.apk"
-            }
-        }
-
         sourceSets.getByName("main").apply {
-            jniLibs.srcDir("executableSo")
+            jniLibs.directories.add("executableSo")
         }
     }
+}
+
+/** Public generated-source wiring preserves producer dependencies for native packaging. */
+abstract class RustAndroidTask : org.gradle.api.tasks.Exec() {
+    @get:org.gradle.api.tasks.OutputDirectory
+    abstract val outputDirectory: org.gradle.api.file.DirectoryProperty
 }

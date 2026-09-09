@@ -1,0 +1,5 @@
+<resources>
+    <string name="form_integer_range">Enter a whole number from %1$d to %2$d.</string>
+    <string name="form_missing_record">This item no longer exists. Your changes have not been saved.</string>
+    <string name="form_log_buffer_size">Log buffer size (KB)</string>
+</resources>

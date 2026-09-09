@@ -65,7 +65,7 @@
     <item
         android:id="@+id/action_misc"
         android:icon="@drawable/ic_baseline_more_vert_24"
-        android:title=""
+        android:title="@string/more_profile_types"
         app:showAsAction="always">
         <menu>
             <item

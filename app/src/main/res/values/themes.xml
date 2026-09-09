@@ -161,9 +161,16 @@
         <item name="checkedIconTint">@color/vialen_accent</item>
         <item name="rippleColor">@color/chip_ripple_color</item>
     </style>
-    <style name="Theme.SagerNet" parent="Base.Theme.Vialen" />
-    <style name="Theme.SagerNet.Dialog" parent="Base.Theme.Vialen.Dialog" />
-    <style name="ThemeOverlay.MaterialComponents.MaterialAlertDialog.SagerNet" parent="ThemeOverlay.Vialen.DialogBase" />
+    <style name="Theme.SagerNet" parent="Base.Theme.Vialen">
+        <item name="android:windowLightStatusBar">@bool/vialen_light_system_bars</item>
+    </style>
+    <style name="Theme.SagerNet.Dialog" parent="Base.Theme.Vialen.Dialog">
+        <item name="android:windowLightStatusBar">@bool/vialen_light_system_bars</item>
+    </style>
+    <style name="ThemeOverlay.MaterialComponents.MaterialAlertDialog.SagerNet" parent="ThemeOverlay.Vialen.DialogBase">
+        <item name="android:statusBarColor">@color/vialen_surface</item>
+        <item name="android:windowLightStatusBar">@bool/vialen_light_system_bars</item>
+    </style>
     <style name="Theme.SagerNet.Black" />
     <style name="Theme.SagerNet.Dialog.Black" />
     <style name="Theme.Start" parent="Theme.MaterialComponents.DayNight">
@@ -187,6 +194,7 @@
     </style>
     <style name="Widget.Vialen.PlatformSwitch" parent="android:style/Widget.Material.CompoundButton.Switch">
         <item name="android:thumbTint">@color/vialen_switch_thumb</item>
+        <item name="android:trackTint">@color/vialen_switch_track</item>
     </style>
     <style name="Widget.Vialen.Snackbar" parent="Widget.MaterialComponents.Snackbar">
         <item name="backgroundTint">@color/vialen_snackbar_background</item>
