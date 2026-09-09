@@ -69,7 +69,7 @@ class TrafficLooper internal constructor(
 
     fun onConsumersChanged() { wake.trySend(Unit) }
 
-    fun isSelected(id: Long) = synchronized(lock) { !stopped && selectedId == id }
+    fun isSelected(id: Long) = synchronized(lock) { !stopped && (interval <= 0 || selectedId == id) }
 
     /** Flush the old selection before assigning its shared counter to the new one. */
     fun selectMain(id: Long) = synchronized(lock) {

@@ -66,4 +66,66 @@ class CancellableUrlTestLifecycleTest {
         job.cancelAndJoin()
         assertEquals(0, initialized.get())
     }
+    @Test fun closeFailureAfterCallerCancellationRemainsObservable() = runBlocking {
+        supervisorScope {
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val cleanup = IllegalStateException("close after cancellation")
+            val completion = java.util.concurrent.atomic.AtomicReference<Throwable>()
+            val closed = AtomicInteger()
+            val pending = async(Dispatchers.Default) {
+                runCancellableUrlTest(
+                    cancel = { release.countDown() }, initialize = {}, start = {},
+                    test = { entered.countDown(); check(release.await(3, TimeUnit.SECONDS)); 10 },
+                    close = { closed.incrementAndGet(); throw cleanup },
+                )
+            }
+            pending.invokeOnCompletion { completion.set(it) }
+            check(entered.await(3, TimeUnit.SECONDS))
+            pending.cancelAndJoin()
+            assertEquals(1, closed.get())
+            assertSame("Cleanup failure must survive an already cancelled continuation", cleanup, completion.get())
+        }
+    }
+
+    @Test fun cancellationExceptionCannotHideSuppressedCleanupFailure() = runBlocking {
+        supervisorScope {
+            val cleanup = IllegalStateException("cleanup")
+            val pending = async {
+                runCancellableUrlTest({}, {}, {}, { throw CancellationException("body") }, { throw cleanup })
+            }
+            try {
+                pending.await()
+                fail("Expected cleanup failure")
+            } catch (failure: IllegalStateException) {
+                assertSame(cleanup, failure)
+            }
+        }
+    }
+
+    @Test fun requestAbortErrorWithSuccessfulCleanupRemainsCancellation() = runBlocking {
+        supervisorScope {
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val completion = java.util.concurrent.atomic.AtomicReference<Throwable>()
+            val closed = AtomicInteger()
+            val pending = async(Dispatchers.Default) {
+                runCancellableUrlTest(
+                    cancel = { release.countDown() }, initialize = {}, start = {},
+                    test = {
+                        entered.countDown(); check(release.await(3, TimeUnit.SECONDS))
+                        throw IllegalStateException("Go context canceled")
+                    },
+                    close = { closed.incrementAndGet() },
+                )
+            }
+            pending.invokeOnCompletion { completion.set(it) }
+            check(entered.await(3, TimeUnit.SECONDS))
+            pending.cancelAndJoin()
+            assertEquals(1, closed.get())
+            assertTrue(completion.get() is CancellationException)
+            assertTrue(completion.get().suppressed.isEmpty())
+        }
+    }
+
 }
