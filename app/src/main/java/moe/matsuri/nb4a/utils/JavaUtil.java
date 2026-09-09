@@ -1,7 +1,7 @@
 package moe.matsuri.nb4a.utils;
 
 import android.annotation.SuppressLint;
-import android.annotation.TargetApi;
+import androidx.annotation.RequiresApi;
 import android.app.Application;
 import android.content.Context;
 import android.os.Build;
@@ -110,7 +110,7 @@ public class JavaUtil {
         }
     }
 
-    @TargetApi(Build.VERSION_CODES.P)
+    @RequiresApi(Build.VERSION_CODES.P)
     private static void tryLockOrRecreateFile(File file) {
         try {
             FileLock tryLock = new RandomAccessFile(file, "rw").getChannel().tryLock();

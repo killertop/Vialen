@@ -5,6 +5,25 @@
          correctness warnings still fail the build via warningsAsErrors. -->
     <issue id="GradleDependency" severity="informational" />
 
+    <!-- KTX wrappers are a style preference, not a Java 25 compatibility defect. -->
+    <issue id="UseKtx" severity="informational" />
+    <!-- CrashHandler deliberately replaces the system handler with the existing
+         ProcessPhoenix crash-report/restart flow. Delegation would change that flow. -->
+    <issue id="DefaultUncaughtExceptionDelegation">
+        <ignore path="app/src/main/java/io/nekohasekai/sagernet/SagerNet.kt" />
+    </issue>
+    <!-- API 33+ supplies RECEIVER_EXPORTED; the older overload is confined to
+         the pre-33 branch. Both paths require the existing signature permission. -->
+    <issue id="UnspecifiedRegisterReceiverFlag">
+        <ignore path="app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt" />
+    </issue>
+    <!-- These existing TargetApi annotations apply to expressions inside the
+         cross-version listener. RequiresApi is a declaration-level contract;
+         retain the expression annotations without raising the caller API floor. -->
+    <issue id="UseRequiresApi">
+        <ignore path="app/src/main/java/io/nekohasekai/sagernet/utils/DefaultNetworkListener.kt" />
+    </issue>
+
     <!-- This signature-only permission name is also consumed by the existing
          receiver contract; changing the spelling provides no security benefit. -->
     <issue id="PermissionNamingConvention">

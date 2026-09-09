@@ -22,6 +22,8 @@ android {
     ksp {
         arg("room.incremental", "true")
         arg("room.schemaLocation", "$projectDir/schemas")
+        // Kotlin DAO implementations preserve suspend generics with KSP2.
+        arg("room.generateKotlin", "true")
     }
     bundle {
         language {
@@ -181,6 +183,21 @@ dependencies {
     testImplementation("androidx.test:core:1.5.0")
     testImplementation("androidx.test.ext:junit:1.1.5")
     testImplementation("org.robolectric:robolectric:4.11.1")
+
+    constraints {
+        // Robolectric and MockK inspect JDK classes in the Java 25 test process.
+        // Keep these instrumentation libraries out of the Android runtime.
+        for (module in listOf("asm", "asm-commons", "asm-tree")) {
+            testImplementation("org.ow2.asm:$module:9.8") {
+                because("ASM 9.8 supports Java 25 class files (major version 69)")
+            }
+        }
+        for (module in listOf("byte-buddy", "byte-buddy-agent")) {
+            testImplementation("net.bytebuddy:$module:1.17.8") {
+                because("MockK instrumentation must support the Java 25 host runtime")
+            }
+        }
+    }
 
     androidTestImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:core:1.5.0")

@@ -14,7 +14,7 @@ export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.1.13356709"
 export NDK="$ANDROID_NDK_HOME"
 export PATH="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$ANDROID_HOME/build-tools/35.0.1:$PATH"
 [[ "$(go env GOVERSION)" == go1.26.5 ]]
-java -version 2>&1 | head -n 1 | grep -F '"17.0.18"' >/dev/null
+java -version 2>&1 | head -n 1 | grep -F '"25.0.2"' >/dev/null
 rustup run 1.97.1 rustc --version | grep -E '^rustc 1\.97\.1 ' >/dev/null
 rustup target list --toolchain 1.97.1 --installed | grep -Fx aarch64-linux-android >/dev/null
 grep -Eq '^Pkg.Revision *= *28\.1\.13356709' "$ANDROID_NDK_HOME/source.properties"

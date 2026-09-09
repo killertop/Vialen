@@ -28,7 +28,7 @@ Vialen 提供节点与订阅管理、分组、路由和 VPN 连接，采用简�
 
 ### 开发与构建
 
-应用层使用 Kotlin，原生组件包含 Rust。构建需要 Android SDK/NDK、Rust 工具链及已准备好的原生依赖。发布构建还需配置签名。
+应用层使用 Kotlin，原生组件包含 Rust。构建使用 JDK 25（CI 固定 25.0.2），并需要 Android SDK/NDK、Rust 工具链及已准备好的原生依赖。将 `JAVA_HOME` 指向 JDK 25；Gradle、编译器与 JVM 测试直接运行在该 JDK 上。发布构建还需配置签名。
 
 ```sh
 ./gradlew :app:assembleRelease
@@ -64,7 +64,7 @@ Download the signed APK from [Releases](https://github.com/killertop/Vialen/rele
 
 ### Development and building
 
-The application layer uses Kotlin, with native components including Rust. Building requires the Android SDK/NDK, the Rust toolchain, and prepared native dependencies. Release signing must be configured separately.
+The application layer uses Kotlin, with native components including Rust. Builds use JDK 25 (CI pins 25.0.2), the Android SDK/NDK, the Rust toolchain, and prepared native dependencies. Set `JAVA_HOME` to JDK 25; Gradle, compilers, and JVM tests run directly on that JDK. Release signing must be configured separately.
 
 ```sh
 ./gradlew :app:assembleRelease
