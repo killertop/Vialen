@@ -14,7 +14,16 @@ import org.junit.runners.model.Statement
 class BenchmarkForegroundRule : TestRule {
     override fun apply(base: Statement, description: Description): Statement = object : Statement() {
         override fun evaluate() {
-            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val instrumentation = InstrumentationRegistry.getInstrumentation()
+            val context = instrumentation.targetContext
+            // Some vendor builds suppress app-originated background Activity launches,
+            // even under instrumentation. Shell starts this debug-only inert host first.
+            // No app-op, power policy or system setting is modified.
+            val component = "${context.packageName}/io.nekohasekai.sagernet.BenchmarkHostActivity"
+            val launch = instrumentation.uiAutomation.executeShellCommand("am start -W -n $component")
+            val output = android.os.ParcelFileDescriptor.AutoCloseInputStream(launch)
+                .bufferedReader().use { it.readText() }
+            check(!output.contains("Error:") && !output.contains("Exception")) { output }
             val intent = Intent().setClassName(context.packageName,
                 "io.nekohasekai.sagernet.BenchmarkHostActivity")
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

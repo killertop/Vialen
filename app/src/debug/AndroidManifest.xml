@@ -3,7 +3,7 @@
     <application>
         <activity
             android:name="io.nekohasekai.sagernet.BenchmarkHostActivity"
-            android:exported="false"
+            android:exported="true"
             android:excludeFromRecents="true"
             android:theme="@android:style/Theme.Material.Light.NoActionBar" />
     </application>
