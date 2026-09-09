@@ -8,6 +8,9 @@ import io.nekohasekai.sagernet.bg.proto.ProxyInstance
 import io.nekohasekai.sagernet.bg.proto.TrafficLooper
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
+import io.nekohasekai.sagernet.database.preference.KeyValuePair
+import io.nekohasekai.sagernet.database.preference.PublicDatabase
+import moe.matsuri.nb4a.TempDatabase
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.fmt.ConfigBuildResult
 import io.nekohasekai.sagernet.fmt.TAG_PROXY
@@ -42,6 +45,14 @@ class TrafficEfficiencyLifecycleTest {
     private var looper:TrafficLooper?=null
 
     @Before fun setup() {
+        // DataStore's static initializer captures BOTH DAOs. Install them before
+        // touching DataStore, as in ProfileAutoSelectionConcurrencyTest, so this
+        // fixture cannot initialize the app's real Room singleton or require SagerNet.application.
+        val preferences=mockk<KeyValuePair.Dao>(relaxed=true)
+        every { preferences.get(any()) } returns null
+        mockkObject(PublicDatabase.Companion,TempDatabase.Companion)
+        every { PublicDatabase.kvPairDao } returns preferences
+        every { TempDatabase.profileCacheDao } returns preferences
         mockkObject(DataStore,ProfileManager)
         every { DataStore.speedInterval } returns 20
         every { DataStore.profileTrafficStatistics } returns true
@@ -63,8 +74,13 @@ class TrafficEfficiencyLifecycleTest {
         every { data.state } returns BaseService.State.Connected
     }
     @After fun cleanup() {
-        runBlocking { looper?.stop() }
-        unmockkAll()
+        try {
+            // Join actual sampler/writer work while its DAO/ProfileManager mocks still exist.
+            runBlocking { looper?.stop() }
+        } finally {
+            looper=null
+            unmockkAll()
+        }
     }
     private fun start(selector:Boolean=false):TrafficLooper {
         val rows=(1L..2L).map { id -> ProxyEntity(id=id,rx=id*100,tx=id*10).apply {
