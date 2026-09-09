@@ -84,6 +84,7 @@ class BaseService {
             if (state == s && msg == null) return
             state = s
             DataStore.serviceState = s
+            proxy?.looper?.onConsumersChanged()
             binder.stateChanged(s, msg)
         }
     }
@@ -93,10 +94,12 @@ class BaseService {
         private val callbacks = object : RemoteCallbackList<ISagerNetServiceCallback>() {
             override fun onCallbackDied(callback: ISagerNetServiceCallback?, cookie: Any?) {
                 super.onCallbackDied(callback, cookie)
+                if (callback != null) callbackIdMap.remove(callback)
+                data?.proxy?.looper?.onConsumersChanged()
             }
         }
 
-        val callbackIdMap = mutableMapOf<ISagerNetServiceCallback, Int>()
+        val callbackIdMap = java.util.concurrent.ConcurrentHashMap<ISagerNetServiceCallback, Int>()
 
         override val coroutineContext = Dispatchers.Main.immediate + Job()
 
@@ -112,6 +115,7 @@ class BaseService {
                 callbacks.register(cb)
             }
             callbackIdMap[cb] = id
+            data?.proxy?.looper?.onConsumersChanged()
         }
 
         private val broadcastMutex = Mutex()
@@ -136,6 +140,7 @@ class BaseService {
         override fun unregisterCallback(cb: ISagerNetServiceCallback) {
             callbackIdMap.remove(cb)
             callbacks.unregister(cb)
+            data?.proxy?.looper?.onConsumersChanged()
         }
 
         override fun urlTest(): Int {
@@ -158,6 +163,8 @@ class BaseService {
 
         override fun close() {
             callbacks.kill()
+            callbackIdMap.clear()
+            data?.proxy?.looper?.onConsumersChanged()
             cancel()
             data = null
         }

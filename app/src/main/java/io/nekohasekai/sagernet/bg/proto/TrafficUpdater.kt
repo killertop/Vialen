@@ -1,12 +1,13 @@
 package io.nekohasekai.sagernet.bg.proto
 
-class TrafficUpdater(
-    private val box: libcore.BoxInstance,
-    val items: List<TrafficLooperData>, // contain "bypass"
-) {
+import android.os.SystemClock
 
+class TrafficUpdater(
+    private val queryStats: (String, String) -> Long,
+    val items: List<TrafficLooperData>,
+    private val clock: () -> Long = SystemClock::elapsedRealtime,
+) {
     class TrafficLooperData(
-        // Don't associate proxyEntity
         var tag: String,
         var tx: Long = 0,
         var rx: Long = 0,
@@ -18,53 +19,36 @@ class TrafficUpdater(
         var ignore: Boolean = false,
     )
 
-    private fun updateOne(item: TrafficLooperData): TrafficLooperData {
-        // last update
-        val now = System.currentTimeMillis()
-        val interval = now - item.lastUpdate
-        item.lastUpdate = now
-        if (interval <= 0) return item.apply {
-            rxRate = 0
-            txRate = 0
-        }
+    private data class Sample(val tx: Long, val rx: Long, val txRate: Long, val rxRate: Long)
+    private val samples = HashMap<String, Sample>()
 
-        // query
-        val tx = box.queryStats(item.tag, "uplink")
-        val rx = box.queryStats(item.tag, "downlink")
+    init { val now = clock(); items.forEach { it.lastUpdate = now } }
 
-        // add diff
-        item.rx += rx
-        item.tx += tx
-        item.rxRate = rx * 1000 / interval
-        item.txRate = tx * 1000 / interval
-
-        // return diff
-        return TrafficLooperData(
-            tag = item.tag,
-            rx = rx,
-            tx = tx,
-            rxRate = item.rxRate,
-            txRate = item.txRate,
-        )
+    fun resetRate(item: TrafficLooperData) {
+        item.lastUpdate = clock()
+        item.txRate = 0
+        item.rxRate = 0
     }
 
-    suspend fun updateAll() {
-        val updated = mutableMapOf<String, TrafficLooperData>() // diffs
+    /** Caller serializes sampling with selection and shutdown. Query each resetting counter once. */
+    fun updateAll() {
+        val now = clock()
+        samples.clear()
         items.forEach { item ->
             if (item.ignore) return@forEach
-            var diff = updated[item.tag]
-            // query a tag only once
-            if (diff == null) {
-                diff = updateOne(item)
-                updated[item.tag] = diff
-            } else {
-                item.rx += diff.rx
-                item.tx += diff.tx
-                item.rxRate = diff.rxRate
-                item.txRate = diff.txRate
+            val sample = samples.getOrPut(item.tag) {
+                val tx = queryStats(item.tag, "uplink")
+                val rx = queryStats(item.tag, "downlink")
+                val elapsed = now - item.lastUpdate
+                // Still drain bytes when selection/stop occurs in the same millisecond.
+                Sample(tx, rx, if (elapsed > 0) tx * 1000 / elapsed else 0,
+                    if (elapsed > 0) rx * 1000 / elapsed else 0)
             }
+            item.tx += sample.tx
+            item.rx += sample.rx
+            item.txRate = sample.txRate
+            item.rxRate = sample.rxRate
+            item.lastUpdate = now
         }
-//        Logs.d(JavaUtil.gson.toJson(items))
-//        Logs.d(JavaUtil.gson.toJson(updated))
     }
 }

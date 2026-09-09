@@ -13,7 +13,6 @@ import io.nekohasekai.sagernet.fmt.v2ray.VMessBean
 import io.nekohasekai.sagernet.rust.RustBridge
 import io.nekohasekai.sagernet.utils.PackageCache
 import moe.matsuri.nb4a.proxy.config.ConfigBean
-import moe.matsuri.nb4a.utils.JavaUtil.gson
 
 /** IO boundary. Database records and settings are each read in one store transaction;
  * the stores have separate transaction domains. No IO occurs during generate().
@@ -115,6 +114,7 @@ internal class ConfigSnapshot private constructor(
                 )
             })
             val entities = LinkedHashMap<Long, ProxyEntity>()
+            val pending = java.util.ArrayDeque<ProxyEntity>()
             val groups = LinkedHashMap<Long, ProxyGroup?>()
             var rules: List<RuleEntity> = emptyList()
             var selectorIds: List<Long> = emptyList()
@@ -122,7 +122,9 @@ internal class ConfigSnapshot private constructor(
             SagerDatabase.instance.runInTransaction(Runnable {
                 fun retain(entity: ProxyEntity) {
                     if (!entities.containsKey(entity.id)) {
-                        entities[entity.id] = entity.copy().apply { putBean(copyBean(entity.requireBean())) }
+                        val copy = entity.copy().apply { putBean(copyBean(entity.requireBean())) }
+                        entities[entity.id] = copy
+                        pending.addLast(copy)
                     }
                 }
                 retain(proxy)
@@ -137,10 +139,10 @@ internal class ConfigSnapshot private constructor(
                     val rows = SagerDatabase.proxyDao.getEntities(rules.mapNotNull { r -> r.outbound.takeIf { it > 0 && it != proxy.id } }.toHashSet().toList())
                     rows.forEach(::retain); extraIds = rows.map { it.id }
                 }
-                val visited = HashSet<Long>()
-                while (true) {
-                    val row = entities.values.firstOrNull { it.id !in visited } ?: break
-                    visited.add(row.id)
+                // FIFO matches the old first-unvisited LinkedHashMap scan: initial
+                // rows precede discoveries, and each retained ID is visited once.
+                while (pending.isNotEmpty()) {
+                    val row = pending.removeFirst()
                     if (row.groupId !in groups) groups[row.groupId] = SagerDatabase.groupDao.getById(row.groupId)
                     groups[row.groupId]?.let { g ->
                         for (id in listOf(g.frontProxy, g.landingProxy)) {
@@ -165,7 +167,7 @@ internal class ConfigSnapshot private constructor(
                 val bean = row.requireBean()
                 val full = if (bean is ConfigBean && bean.type == 0) bean.config else null
                 val profile = if (bean is ChainBean || (row.id == proxy.id && full != null)) null else
-                    checkNotNull(RustOutboundConfig.capture(bean, settings["global_insecure"].asBoolean)) { "Unsupported profile snapshot" }.profileJson()
+                    checkNotNull(RustOutboundConfig.captureProfileJson(bean)) { "Unsupported profile snapshot" }
                 val muxBean = when (bean) { is VMessBean -> bean; is TrojanBean -> bean; else -> null }
                 val mux = muxBean?.let { obj("enabled" to it.enableMux,"padding" to it.muxPadding,"concurrency" to it.muxConcurrency,"kind" to it.muxType) }
                 val uot = runCatching { bean.javaClass.getField("sUoT").get(bean) == true }.getOrDefault(false)

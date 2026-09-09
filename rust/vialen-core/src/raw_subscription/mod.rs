@@ -118,47 +118,57 @@ enum Links {
 fn links(text: &str, invalid_universal: &[String]) -> Links {
     let lines: Vec<_> = text.split('\n').map(trim).collect();
     let tokens: Vec<_> = lines.iter().flat_map(|s| s.split(' ')).collect();
-    let mut views = Vec::new();
-    for inputs in [&tokens, &lines] {
-        let mut nodes = vec![];
-        for &uri in inputs.iter() {
-            if uri.starts_with("clash://install-config?") || uri.starts_with("sn://subscription?") {
-                return Links::Subscription(uri.into());
-            }
-            if uri.starts_with("sn://") {
-                if invalid_universal.iter().any(|v| v == uri) {
-                    continue;
-                }
-                if let Ok(node) = universal(uri) {
-                    nodes.push(node);
-                }
-            } else if uri.starts_with("http://") || uri.starts_with("https://") {
-                match http(uri, false) {
-                    Ok(n) => nodes.push(n),
-                    Err(_) => return Links::Subscription(subscription_url(uri)),
-                }
-            } else if uri.starts_with("anytls://") {
-                if let Ok(n) = http(uri, true) {
-                    nodes.push(n);
-                }
-            } else if let Ok(node) = parse_proxy(uri) {
-                nodes.push(Node::new(
-                    "Canonical",
-                    json!({"wire":serialize_canonical_node(&node)}),
-                    true,
-                ));
-            }
-        }
-        views.push(nodes);
+    let first = match links_view(&tokens, invalid_universal) {
+        Links::Subscription(link) => return Links::Subscription(link),
+        Links::Nodes(nodes) => nodes,
+    };
+    // Exact ordered equality only: spaces in names and equal-count later views
+    // must retain the legacy two-view selection behavior.
+    if tokens == lines {
+        return Links::Nodes(first);
     }
-    let last = views.pop().unwrap();
-    let first = views.pop().unwrap();
-    Links::Nodes(if first.len() > last.len() {
-        first
-    } else {
-        last
-    })
+    match links_view(&lines, invalid_universal) {
+        Links::Subscription(link) => Links::Subscription(link),
+        Links::Nodes(last) => Links::Nodes(if first.len() > last.len() {
+            first
+        } else {
+            last
+        }),
+    }
 }
+fn links_view(inputs: &[&str], invalid_universal: &[String]) -> Links {
+    let mut nodes = vec![];
+    for &uri in inputs {
+        if uri.starts_with("clash://install-config?") || uri.starts_with("sn://subscription?") {
+            return Links::Subscription(uri.into());
+        }
+        if uri.starts_with("sn://") {
+            if invalid_universal.iter().any(|v| v == uri) {
+                continue;
+            }
+            if let Ok(node) = universal(uri) {
+                nodes.push(node);
+            }
+        } else if uri.starts_with("http://") || uri.starts_with("https://") {
+            match http(uri, false) {
+                Ok(n) => nodes.push(n),
+                Err(_) => return Links::Subscription(subscription_url(uri)),
+            }
+        } else if uri.starts_with("anytls://") {
+            if let Ok(n) = http(uri, true) {
+                nodes.push(n);
+            }
+        } else if let Ok(node) = parse_proxy(uri) {
+            nodes.push(Node::new(
+                "Canonical",
+                json!({"wire":serialize_canonical_node(&node)}),
+                true,
+            ));
+        }
+    }
+    Links::Nodes(nodes)
+}
+
 fn parse(req: Input) -> Result<Value> {
     if req.version != 1 {
         return Err("UNSUPPORTED_VERSION");
@@ -219,4 +229,73 @@ pub fn generate(input: &[u8]) -> Vec<u8> {
         Err(e) => json!({"version":1,"status":"ERROR","error":e}),
     };
     serde_json::to_vec(&value).expect("serializable result")
+}
+
+#[cfg(test)]
+mod efficiency_tests {
+    use super::*;
+
+    fn value(links: Links) -> Value {
+        match links {
+            Links::Nodes(nodes) => json!({"nodes": nodes}),
+            Links::Subscription(link) => json!({"subscription": link}),
+        }
+    }
+
+    // Frozen legacy selection policy, deliberately evaluating both views.
+    fn legacy(text: &str, invalid: &[String]) -> Links {
+        let lines: Vec<_> = text.split('\n').map(trim).collect();
+        let tokens: Vec<_> = lines.iter().flat_map(|line| line.split(' ')).collect();
+        let first = match links_view(&tokens, invalid) {
+            Links::Subscription(link) => return Links::Subscription(link),
+            Links::Nodes(nodes) => nodes,
+        };
+        match links_view(&lines, invalid) {
+            Links::Subscription(link) => Links::Subscription(link),
+            Links::Nodes(last) => Links::Nodes(if first.len() > last.len() {
+                first
+            } else {
+                last
+            }),
+        }
+    }
+
+    #[test]
+    fn exact_view_fastpath_matches_legacy_edge_cases() {
+        let cases = [
+            "",
+            "\n\n",
+            "not-a-uri",
+            "ss://invalid",
+            "sn://socks:AQ==",
+            "http://example.com:80#node",
+            "http://example.com/path",
+            "clash://install-config?url=https://example.com/a",
+            "sn://subscription?url=https://example.com/a",
+            "anytls://secret@example.com:443#name",
+            "http://example.com:80#space in name",
+            "http://a:80 http://b:81",
+            "http://a:80  http://b:81",
+            " \t http://example.com:80#name \r\n\n",
+            "http://a:80#one\nhttp://b:81#two",
+            "http://a:80#one\nhttps://b/path with spaces",
+            "http://a:80#one\ninvalid\nsn://socks:AQ==",
+            "http://a:80#one\nsn://subscription?url=x y",
+        ];
+        for text in cases {
+            for invalid in [vec![], vec!["sn://socks:AQ==".to_string()]] {
+                assert_eq!(
+                    value(links(text, &invalid)),
+                    value(legacy(text, &invalid)),
+                    "{text:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn equal_count_keeps_complete_space_containing_name() {
+        let actual = value(links("http://example.com:80#space in name", &[]));
+        assert_eq!(actual["nodes"][0]["fields"]["name"], "space in name");
+    }
 }

@@ -22,9 +22,21 @@ import moe.matsuri.nb4a.proxy.config.ConfigBean
 import moe.matsuri.nb4a.utils.JavaUtil.gson
 import org.json.JSONArray
 import org.json.JSONObject
+import java.lang.reflect.Field
+import java.lang.reflect.Type
+import java.util.concurrent.ConcurrentHashMap
 
 /** Android Bean codec only. Format parsing, mapping and fallback live in Rust. */
 internal object RustRawSubscription {
+    private class StoredField(val field: Field, val type: Type = field.genericType)
+    private class Projection(type: Class<out AbstractBean>) {
+        val constructor = type.getDeclaredConstructor()
+        // Resolve via getField to preserve its inherited/shadowed-field selection.
+        val fields = type.fields.associate { it.name to StoredField(type.getField(it.name)) }
+    }
+    // Keys come only from the fixed supported-type switch below; Beans are never cached.
+    private val projections = ConcurrentHashMap<Class<out AbstractBean>, Projection>()
+
     private fun decodeUniversal(fields: JsonObject): AbstractBean {
         val data = fields["data"].asJsonArray
         val bytes = ByteArray(data.size()) { index ->
@@ -45,34 +57,45 @@ internal object RustRawSubscription {
                 else -> JsonNull.INSTANCE
             })
         }
+        return parseWithCodecs(input, RustBridge::parseRawSubscription, ::decodeUniversal)
+    }
+
+    // Keep decoded mutable Beans local to a response position and retry iteration.
+    internal fun parseWithCodecs(
+        input: JsonObject,
+        parseResponse: (ByteArray) -> ByteArray,
+        decode: (JsonObject) -> AbstractBean,
+    ): List<AbstractBean>? {
         val invalid = linkedSetOf<String>()
+        var universalBeans: Array<AbstractBean?>
         var result: JsonObject
         while (true) {
             input.add("invalid_universal", gson.toJsonTree(invalid))
             val bytes = input.toString().encodeToByteArray(throwOnInvalidSequence = true)
-            result = JsonParser.parseString(RustBridge.parseRawSubscription(bytes).decodeToString(throwOnInvalidSequence = true)).asJsonObject
+            result = JsonParser.parseString(parseResponse(bytes).decodeToString(throwOnInvalidSequence = true)).asJsonObject
             check(result["version"]?.toString() == "1") { "Invalid subscription result version" }
             check(result["status"]?.asString == "SUCCESS") { "Subscription parsing failed: ${result["error"]?.asString}" }
             result["subscription"]?.let { throw SubscriptionFoundException(it.asString) }
             val nodes = checkNotNull(result["nodes"]) { "Missing subscription result" }
             if (nodes.isJsonNull) return null
-            val rejected = nodes.asJsonArray.mapNotNull { encoded ->
+            universalBeans = arrayOfNulls(nodes.asJsonArray.size())
+            val rejected = nodes.asJsonArray.mapIndexedNotNull { index, encoded ->
                 val node = encoded.asJsonObject
                 if (node["kind"].asString != "Universal") null else {
                     val link = node["fields"].asJsonObject["link"].asString
-                    if (runCatching { decodeUniversal(node["fields"].asJsonObject) }.isFailure) link else null
+                    if (runCatching { universalBeans[index] = decode(node["fields"].asJsonObject) }.isFailure) link else null
                 }
             }
             if (rejected.isEmpty()) break
             check(invalid.addAll(rejected)) { "Invalid universal codec retry" }
         }
-        return result["nodes"].asJsonArray.map { encoded ->
+        return result["nodes"].asJsonArray.mapIndexed { index, encoded ->
             val node = encoded.asJsonObject
             val fields = node["fields"].asJsonObject
             val kind = node["kind"].asString
             val bean = when (kind) {
                 "Canonical" -> RustProxyParser.toBean(RustBridge.decodeProxyResponse(fields["wire"].asString))
-                "Universal" -> decodeUniversal(fields)
+                "Universal" -> checkNotNull(universalBeans[index])
                 else -> {
                     val type = when (kind) {
                         "SOCKS" -> SOCKSBean::class.java
@@ -87,13 +110,14 @@ internal object RustRawSubscription {
                         "Config" -> ConfigBean::class.java
                         else -> error("Invalid subscription node type")
                     }
-                    val bean = type.getDeclaredConstructor().newInstance()
+                    val projection = projections.computeIfAbsent(type) { Projection(it) }
+                    val bean = projection.constructor.newInstance()
                     if (bean is ConfigBean) bean.initializeDefaultValues()
                     // Named public Bean fields are the stable Android storage projection.
                     fields.entrySet().forEach { (key, value) ->
-                        val field = type.getField(key)
-                        check(!java.lang.reflect.Modifier.isStatic(field.modifiers))
-                        field.set(bean, gson.fromJson(value, field.genericType))
+                        val stored = projection.fields[key] ?: throw NoSuchFieldException(key)
+                        check(!java.lang.reflect.Modifier.isStatic(stored.field.modifiers))
+                        stored.field.set(bean, gson.fromJson(value, stored.type))
                     }
                     if (bean is ConfigBean) bean.config = gson.toJson(JsonParser.parseString(bean.config))
                     bean

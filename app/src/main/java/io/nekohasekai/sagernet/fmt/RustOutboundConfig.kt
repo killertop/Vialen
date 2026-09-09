@@ -1,5 +1,6 @@
 package io.nekohasekai.sagernet.fmt
 
+import com.google.gson.JsonElement
 import com.google.gson.Gson
 import io.nekohasekai.sagernet.fmt.http.HttpBean
 import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
@@ -145,7 +146,6 @@ object RustOutboundConfig {
     )
 
     class Snapshot internal constructor(private val wire: String, private val custom: Boolean = false) {
-        internal fun profileJson() = JsonParser.parseString(wire).asJsonObject.get("profile").deepCopy()
         fun generate(): CustomSingBoxOption = decode(
             RustBridge.generateOutbound(wire.toByteArray(Charsets.UTF_8)), custom
         )
@@ -153,8 +153,8 @@ object RustOutboundConfig {
     }
 
     /** Null means an explicit, not-yet-migrated input; native errors never silently fall back. */
-    fun capture(bean: AbstractBean, globalAllowInsecure: Boolean): Snapshot? {
-        val profile = when (bean.javaClass) {
+    private fun captureProfile(bean: AbstractBean): Profile? {
+        return when (bean.javaClass) {
             SOCKSBean::class.java -> (bean as SOCKSBean).let {
                 Profile.Socks(it.serverAddress ?: return null, it.serverPort ?: return null,
                     it.protocol ?: return null, it.username ?: return null, it.password ?: return null)
@@ -262,17 +262,41 @@ object RustOutboundConfig {
             }
             else -> return null
         }
+    }
+
+    /** A fresh tree owned by the full-config request, with no reusable mutable snapshot alias. */
+    internal fun captureProfileJson(bean: AbstractBean): JsonElement? {
+        val profile = captureProfile(bean) ?: return null
+        val tree = gson.toJsonTree(profile)
+        // Gson's tree adapter preserves Java strings just like its text adapter.
+        // Validate before the enclosing request is encoded, preserving capture's null fallback.
+        fun valid(value: JsonElement): Boolean = when {
+            value.isJsonObject -> value.asJsonObject.entrySet().all { valid(it.value) }
+            value.isJsonArray -> value.asJsonArray.all { valid(it) }
+            value.isJsonPrimitive && value.asJsonPrimitive.isString -> validUtf16(value.asString)
+            else -> true
+        }
+        return tree.takeIf(::valid)
+    }
+
+    fun capture(bean: AbstractBean, globalAllowInsecure: Boolean): Snapshot? {
+        val profile = captureProfile(bean) ?: return null
         val wire = gson.toJson(Request(VERSION, globalAllowInsecure, profile))
+        if (!validUtf16(wire)) return null
+        return Snapshot(wire, profile is Profile.Custom)
+    }
+
+    private fun validUtf16(wire: String): Boolean {
         // Java permits unpaired surrogates, Rust JSON strings do not. Preserve
         // legacy behavior explicitly instead of changing credentials by UTF-8 replacement.
         var i = 0
         while (i < wire.length) {
             val c = wire[i++]
             if (c.isHighSurrogate()) {
-                if (i == wire.length || !wire[i++].isLowSurrogate()) return null
-            } else if (c.isLowSurrogate()) return null
+                if (i == wire.length || !wire[i++].isLowSurrogate()) return false
+            } else if (c.isLowSurrogate()) return false
         }
-        return Snapshot(wire, profile is Profile.Custom)
+        return true
     }
 
     internal fun decode(bytes: ByteArray, custom: Boolean = false): CustomSingBoxOption {
