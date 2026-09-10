@@ -22,6 +22,7 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class OutboundConfigNativeTest : RemainingOutboundConfigCases() {
+    @get:org.junit.Rule(order = Int.MIN_VALUE) val benchmarkForeground = BenchmarkForegroundRule()
     @Test fun generatedOutboundsInitializeInPackagedCoreWithoutNetwork() {
         val beans: List<AbstractBean> = listOf(
             SOCKSBean().applyDefaultValues(),

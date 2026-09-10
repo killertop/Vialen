@@ -13,6 +13,7 @@ import java.util.Base64
 
 @RunWith(AndroidJUnit4::class)
 class SubscriptionEndToEndNativeTest {
+    @get:org.junit.Rule(order = Int.MIN_VALUE) val benchmarkForeground = BenchmarkForegroundRule()
     @get:Rule val selectionState = ProfileSelectionStateRule()
 
     @Test fun completeFormatsReachRealHttpAndRoomPersistence() = runBlocking {

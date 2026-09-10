@@ -12,6 +12,7 @@ import java.lang.reflect.Modifier
 /** Synthetic parser-only checks: production Rust is the oracle; no HTTP or Room writes. */
 @RunWith(AndroidJUnit4::class)
 class HybridRawSubscriptionNativeTest {
+    @get:org.junit.Rule(order = Int.MIN_VALUE) val benchmarkForeground = BenchmarkForegroundRule()
     private val ss = """{"method":"aes-128-gcm","server":"node.example","server_port":443,"password":"p","remarks":"中文🔥"}"""
 
     private fun beans(expected: List<AbstractBean>?, actual: List<AbstractBean>?) {

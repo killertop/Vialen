@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 @RunWith(AndroidJUnit4::class)
 class TrafficEfficiencyNativeTest {
+    @get:org.junit.Rule(order = Int.MIN_VALUE) val benchmarkForeground = BenchmarkForegroundRule()
     @get:Rule val profileState=ProfileSelectionStateRule()
     private class FakeService:BaseService.Interface {
         override val data=BaseService.Data(this)

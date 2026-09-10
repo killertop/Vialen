@@ -15,6 +15,7 @@ import org.junit.runner.RunWith
 /** Exercises listener ownership without starting a VPN, service, notification or Activity. */
 @RunWith(AndroidJUnit4::class)
 class ListenerLifecycleNativeTest {
+    @get:org.junit.Rule(order = Int.MIN_VALUE) val benchmarkForeground = BenchmarkForegroundRule()
     private class FakeService : BaseService.Interface {
         override val data = BaseService.Data(this)
         override val tag = "ListenerLifecycleFake"

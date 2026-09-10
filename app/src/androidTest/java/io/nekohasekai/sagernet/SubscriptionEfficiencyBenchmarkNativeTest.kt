@@ -11,7 +11,7 @@ import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
 import io.nekohasekai.sagernet.fmt.toUniversalLink
 import io.nekohasekai.sagernet.group.RawUpdater
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
 import moe.matsuri.nb4a.utils.JavaUtil.gson
 import org.junit.Assert.*
 import org.junit.Rule
@@ -27,6 +27,11 @@ import java.security.MessageDigest
  */
 @RunWith(AndroidJUnit4::class)
 class SubscriptionEfficiencyBenchmarkNativeTest {
+    // Keep the suspend lambda type at Kotlin call sites; Java selects the legacy JVM
+    // runBlocking(context, block) method retained by both baseline and current runtime.
+    private fun <T> legacyRunBlocking(block: suspend CoroutineScope.() -> T): T =
+        LegacyCoroutineBridge.runBlocking(block)
+
     @get:Rule val selectionState = org.junit.rules.RuleChain.outerRule(BenchmarkForegroundRule())
         .around(ProfileSelectionStateRule())
 
@@ -76,7 +81,7 @@ class SubscriptionEfficiencyBenchmarkNativeTest {
         return Fixture((if (format == "CLASH") "proxies:\n" else "") + ordered.joinToString("\n") { it.second }, names, changedNames)
     }
 
-    @Test fun completeHttpUpdatePersistenceSamples() = runBlocking {
+    @Test fun completeHttpUpdatePersistenceSamples() = legacyRunBlocking {
         val args = InstrumentationRegistry.getArguments()
         val size = args.getString("subscriptionBenchSize")?.toInt() ?: 1000
         val warmups = args.getString("subscriptionBenchWarmups")?.toInt() ?: 2

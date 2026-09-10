@@ -45,6 +45,9 @@ class ScannerActivity : ThemedActivity(),
         if (Build.VERSION.SDK_INT >= 25) getSystemService<ShortcutManager>()!!.reportShortcutUsed("scan")
         binding = LayoutScannerBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        // The preview extends behind the status inset. Keep that inset on the same
+        // opaque surface as the toolbar so day/night system icons retain contrast.
+        findViewById<android.view.View>(R.id.appbar).setBackgroundResource(R.color.vialen_surface)
         setSupportActionBar(findViewById(R.id.toolbar))
         supportActionBar?.apply {
             setDisplayHomeAsUpEnabled(true)

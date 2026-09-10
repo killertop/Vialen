@@ -9,6 +9,8 @@ import android.view.ViewGroup
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.webkit.WebResourceError
 import android.widget.EditText
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.GravityCompat
@@ -88,24 +90,111 @@ class WebPanelNativeTest {
     private fun KeyValuePair.deepCopy() = KeyValuePair(key).also { it.valueType = valueType; it.value = value.copyOf() }
     private fun panel(activity: MainActivity) = activity.supportFragmentManager.findFragmentById(R.id.fragment_holder) as WebviewFragment
     private fun browser(activity: MainActivity) = panel(activity).requireView().findViewById<WebView>(R.id.webview)
+    private val tracedBrowsers = java.util.Collections.newSetFromMap(java.util.IdentityHashMap<WebView, Boolean>())
+    private fun panelState(fragment: WebviewFragment, web: WebView): String = runCatching {
+        fun field(name: String) = WebviewFragment::class.java.getDeclaredField(name)
+            .apply { isAccessible = true }.get(fragment)
+        val history = web.copyBackForwardList()
+        "currentUrl=${field("currentUrl")} failed=${field("failed")} historySize=${history.size} " +
+            "historyIndex=${history.currentIndex} history=${(0 until history.size).map { history.getItemAtIndex(it).url }}"
+    }.getOrElse { "stateProbeFailed=${it.javaClass.simpleName}" }
+
+    /** Observe every production override without changing its return value or callback ordering. */
+    private fun traceClient(activity: MainActivity) {
+        if (Build.VERSION.SDK_INT < 26) return // Public original-client getter was added in API 26.
+        val web = browser(activity)
+        if (!tracedBrowsers.add(web)) return
+        val fragment = panel(activity)
+        val original = web.webViewClient
+        fun trace(event: String) {
+            runCatching {
+                android.util.Log.i("WebPanelTrace", "ns=${System.nanoTime()} web=${System.identityHashCode(web)} " +
+                    "$event actualUrl=${web.url} title=${web.title} ${panelState(fragment, web)}")
+            }
+        }
+        trace("install original=${original.javaClass.name}")
+        web.webViewClient = object : WebViewClient() {
+            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                trace("before onPageStarted url=$url")
+                original.onPageStarted(view, url, favicon)
+                trace("after onPageStarted url=$url")
+            }
+            override fun onPageFinished(view: WebView?, url: String?) {
+                trace("before onPageFinished url=$url")
+                original.onPageFinished(view, url)
+                trace("after onPageFinished url=$url")
+            }
+            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                trace("before shouldOverride request=${request?.url} main=${request?.isForMainFrame}")
+                return original.shouldOverrideUrlLoading(view, request).also { trace("after shouldOverride result=$it") }
+            }
+            @Deprecated("Delegate the production legacy callback")
+            override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                trace("before legacyShouldOverride url=$url")
+                return original.shouldOverrideUrlLoading(view, url).also { trace("after legacyShouldOverride result=$it") }
+            }
+            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+                trace("before onReceivedError url=${request?.url} main=${request?.isForMainFrame} code=${error?.errorCode}")
+                original.onReceivedError(view, request, error)
+                trace("after onReceivedError")
+            }
+            @Deprecated("Delegate the production legacy callback")
+            override fun onReceivedError(view: WebView?, code: Int, description: String?, url: String?) {
+                trace("before legacyError url=$url code=$code")
+                original.onReceivedError(view, code, description, url)
+                trace("after legacyError")
+            }
+            override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, response: WebResourceResponse?) {
+                trace("before onReceivedHttpError url=${request?.url} main=${request?.isForMainFrame} status=${response?.statusCode}")
+                original.onReceivedHttpError(view, request, response)
+                trace("after onReceivedHttpError")
+            }
+            override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                trace("before history url=$url reload=$isReload")
+                original.doUpdateVisitedHistory(view, url, isReload)
+                trace("after history")
+            }
+            override fun onPageCommitVisible(view: WebView?, url: String?) {
+                trace("before commitVisible url=$url")
+                original.onPageCommitVisible(view, url)
+                trace("after commitVisible")
+            }
+        }
+    }
     private fun open(scenario: ActivityScenario<MainActivity>) {
-        scenario.onActivity { it.displayFragmentWithId(R.id.nav_traffic); it.supportFragmentManager.executePendingTransactions() }
+        scenario.onActivity {
+            it.displayFragmentWithId(R.id.nav_traffic); it.supportFragmentManager.executePendingTransactions()
+            traceClient(it)
+        }
         awaitUi(scenario) { browser(it).title == "one" && panel(it).requireView().findViewById<View>(R.id.panel_progress).visibility != View.VISIBLE }
     }
     private fun awaitUi(scenario: ActivityScenario<MainActivity>, condition: (MainActivity) -> Boolean) {
         val done = CountDownLatch(1)
         val failure = AtomicReference<Throwable?>()
+        val diagnostic = AtomicReference("No UI probe has executed")
         val handler = Handler(Looper.getMainLooper())
         lateinit var check: Runnable
         scenario.onActivity { activity ->
             check = Runnable {
                 try {
+                    val web = browser(activity)
+                    traceClient(activity)
+                    diagnostic.set("url=${web.url} title=${web.title} lifecycle=${activity.lifecycle.currentState} " +
+                        "focus=${activity.hasWindowFocus()} finishing=${activity.isFinishing} " +
+                        "browserShown=${web.isShown} visibility=${web.visibility} canGoBack=${web.canGoBack()} " +
+                        panelState(panel(activity), web))
                     if (condition(activity)) done.countDown() else handler.postDelayed(check, 25)
                 } catch (error: Throwable) { failure.set(error); done.countDown() }
             }
             handler.post(check)
         }
-        try { assertTrue("WebView reached expected UI state", done.await(15, TimeUnit.SECONDS)) }
+        try {
+            val completed = done.await(15, TimeUnit.SECONDS)
+            if (!completed) instrumentation.sendStatus(0, android.os.Bundle().apply {
+                putString("webPanelTimeout", diagnostic.get())
+            })
+            assertTrue("WebView reached expected UI state; last probe: ${diagnostic.get()}", completed)
+        }
         finally { handler.removeCallbacks(check) }
         failure.get()?.let { throw it }
     }
@@ -116,21 +205,75 @@ class WebPanelNativeTest {
         is ViewGroup -> (0 until view.childCount).firstNotNullOfOrNull { input(view.getChildAt(it)) }
         else -> null
     }
-    private fun changeUrl(activity: MainActivity, url: String) {
-        val fragment = panel(activity)
-        fragment.onMenuItemClick(fragment.toolbar.menu.findItem(R.id.action_set_url))
-        val dialog = dialog(fragment)
-        requireNotNull(input(dialog.window!!.decorView)).setText(url)
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+    private fun changeUrl(scenario: ActivityScenario<MainActivity>, url: String) {
+        scenario.onActivity { activity ->
+            val fragment = panel(activity)
+            fragment.onMenuItemClick(fragment.toolbar.menu.findItem(R.id.action_set_url))
+            requireNotNull(input(dialog(fragment).window!!.decorView)).setText(url)
+        }
+        // Dialog's OnShow callback installs the validating button listener asynchronously.
+        instrumentation.waitForIdleSync()
+        scenario.onActivity { dialog(panel(it)).getButton(AlertDialog.BUTTON_POSITIVE).performClick() }
+    }
+
+    private fun tapNextLink(scenario: ActivityScenario<MainActivity>) {
+        val ready = CountDownLatch(1)
+        val point = AtomicReference<FloatArray?>()
+        val failure = AtomicReference<Throwable?>()
+        scenario.onActivity { activity ->
+            val web = browser(activity)
+            assertTrue("Navigation tap requires a focused visible WebView", activity.hasWindowFocus() && web.isShown)
+            // Read geometry only. A synthetic JS click is not a Chromium user gesture
+            // and can leave the history entry ineligible for browser Back.
+            web.evaluateJavascript("""(() => {
+                const rect = document.getElementById('next').getBoundingClientRect();
+                return {x: rect.left + rect.width / 2, y: rect.top + rect.height / 2,
+                        width: window.innerWidth};
+            })()""") { value ->
+                try {
+                    val geometry = org.json.JSONObject(value)
+                    val width = geometry.getDouble("width")
+                    check(width > 0 && web.width > 0)
+                    val scale = web.width / width
+                    val x = geometry.getDouble("x") * scale
+                    val y = geometry.getDouble("y") * scale
+                    check(x >= 0 && x < web.width && y >= 0 && y < web.height) { "Link center is outside WebView" }
+                    val location = IntArray(2)
+                    web.getLocationOnScreen(location)
+                    point.set(floatArrayOf((location[0] + x).toFloat(), (location[1] + y).toFloat()))
+                } catch (error: Throwable) { failure.set(error) }
+                finally { ready.countDown() }
+            }
+        }
+        assertTrue("Link geometry callback completed", ready.await(5, TimeUnit.SECONDS))
+        failure.get()?.let { throw it }
+        val coordinates = checkNotNull(point.get())
+        val downTime = android.os.SystemClock.uptimeMillis()
+        fun inject(action: Int) {
+            val event = android.view.MotionEvent.obtain(downTime, android.os.SystemClock.uptimeMillis(),
+                action, coordinates[0], coordinates[1], 0)
+            try {
+                event.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
+                assertTrue("Injected link pointer event $action", instrumentation.uiAutomation.injectInputEvent(event, true))
+            } finally { event.recycle() }
+        }
+        inject(android.view.MotionEvent.ACTION_DOWN)
+        try { CountDownLatch(1).await(50, TimeUnit.MILLISECONDS) }
+        finally { inject(android.view.MotionEvent.ACTION_UP) }
     }
 
     @Test fun invalidUrlStaysEditableWithoutOverwritingSavedTarget() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             open(scenario)
+            var original = ""
             scenario.onActivity { activity ->
-                val original = DataStore.yacdURL
+                original = DataStore.yacdURL
                 val fragment = panel(activity)
                 fragment.onMenuItemClick(fragment.toolbar.menu.findItem(R.id.action_set_url))
+            }
+            instrumentation.waitForIdleSync()
+            scenario.onActivity { activity ->
+                val fragment = panel(activity)
                 val dialog = dialog(fragment)
                 val field = requireNotNull(input(dialog.window!!.decorView))
                 for (bad in listOf("", "https://", "javascript:alert(1)", "http://host:99999")) {
@@ -150,13 +293,16 @@ class WebPanelNativeTest {
     fun httpFailureRetryAndLateCallbacksUseCurrentNavigation() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             open(scenario)
-            scenario.onActivity { changeUrl(it, "$baseUrl/fail") }
+            changeUrl(scenario, "$baseUrl/fail")
             awaitUi(scenario) { panel(it).requireView().findViewById<View>(R.id.panel_error).visibility == View.VISIBLE }
             scenario.onActivity { activity ->
                 val web = browser(activity)
                 val client = web.webViewClient
                 client.onPageStarted(web, "$baseUrl/one", null)
                 client.onPageFinished(web, "$baseUrl/one")
+                client.onPageStarted(web, "$baseUrl/fail", null)
+                assertEquals("Late same-URL start must preserve the HTTP error", View.VISIBLE,
+                    panel(activity).requireView().findViewById<View>(R.id.panel_error).visibility)
                 client.onPageFinished(web, "$baseUrl/fail")
                 assertEquals(View.VISIBLE, panel(activity).requireView().findViewById<View>(R.id.panel_error).visibility)
                 fail.set(false)
@@ -183,7 +329,7 @@ class WebPanelNativeTest {
     @Test fun recreationRestoresHistoryDrawerWinsBackAndCloseReleasesView() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             open(scenario)
-            scenario.onActivity { browser(it).evaluateJavascript("document.getElementById('next').click()", null) }
+            tapNextLink(scenario)
             awaitUi(scenario) { browser(it).title == "two" && browser(it).canGoBack() }
             scenario.recreate()
             awaitUi(scenario) { browser(it).title == "two" && browser(it).canGoBack() }

@@ -16,6 +16,7 @@ import org.junit.runner.RunWith
 /** Graph validity and actual core start, deliberately independent of the Kotlin oracle. */
 @RunWith(AndroidJUnit4::class)
 class ChainTagIntegrityNativeTest {
+    @get:org.junit.Rule(order = Int.MIN_VALUE) val benchmarkForeground = BenchmarkForegroundRule()
     @Test fun reusedGlobalNodesAreReferencedByExistingTagsAndStartInPackagedCore() {
         val db = SagerDatabase.instance
         val oldMode = DataStore.serviceMode; val oldDirect = DataStore.directDns

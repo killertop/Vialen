@@ -18,6 +18,7 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class FullConfigSnapshotNativeTest {
+    @get:org.junit.Rule(order = Int.MIN_VALUE) val benchmarkForeground = BenchmarkForegroundRule()
     @Test fun realRoomSnapshotMatchesLegacyAndRemainsFrozenAcrossWrites() {
         val db=SagerDatabase.instance
         val oldRemote=DataStore.remoteDns;val oldDirect=DataStore.directDns

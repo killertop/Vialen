@@ -1,5 +1,7 @@
 package io.nekohasekai.sagernet
 
+import android.app.Activity
+import android.app.Application
 import android.os.Binder
 import android.os.Bundle
 import android.view.View
@@ -31,6 +33,10 @@ import java.util.concurrent.TimeUnit
 /** Synthetic service results exercise production UI; never a VPN/connectivity acceptance test. */
 @RunWith(AndroidJUnit4::class)
 class MainUiRecoveryNativeTest {
+    companion object {
+        @Volatile private var cleanupFailed = false
+    }
+
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private lateinit var config: List<KeyValuePair>
     private lateinit var cache: List<KeyValuePair>
@@ -44,6 +50,7 @@ class MainUiRecoveryNativeTest {
     @Before fun preserveState() {
         Assume.assumeTrue("Opt in on a physical device with -e vialenMainUi true",
             InstrumentationRegistry.getArguments().getString("vialenMainUi") == "true")
+        check(!cleanupFailed) { "Previous Main UI cleanup failed; externally force-stop and restore the isolated Debug target before retrying" }
         check(DataStore.serviceState == State.Idle || DataStore.serviceState == State.Stopped) {
             "Stop VPN before running this isolated UI test"
         }
@@ -56,6 +63,7 @@ class MainUiRecoveryNativeTest {
     @After fun restoreState() {
         releases.forEach { it.countDown() }
         if (::config.isInitialized) {
+            check(!cleanupFailed) { "Main UI cleanup failed; externally force-stop and restore the isolated Debug target; live snapshot restoration refused" }
             PublicDatabase.kvPairDao.reset(); config.forEach { PublicDatabase.kvPairDao.put(it) }
             TempDatabase.profileCacheDao.reset(); cache.forEach { TempDatabase.profileCacheDao.put(it) }
             DataStore.serviceState = oldState
@@ -63,20 +71,60 @@ class MainUiRecoveryNativeTest {
     }
 
     private fun withMain(block: (ActivityScenario<MainActivity>) -> Unit) {
-        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        val scenario = try {
+            ActivityScenario.launch(MainActivity::class.java)
+        } catch (error: Throwable) {
+            // Launch may time out after creating an Activity without returning its owner.
+            cleanupFailed = true
+            println("MAIN_UI_LAUNCH recovery=external_force_stop_and_restore_isolated_debug")
+            throw error
+        }
+        var failure: Throwable? = null
         try {
             isolate(scenario)
             block(scenario)
+        } catch (error: Throwable) {
+            failure = error
         } finally {
             // Release blocking fake calls before lifecycle teardown, including assertion failures.
             releases.forEach { it.countDown() }
-            scenario.onActivity {
-                it.connection.disconnect(it)
-                it.stateChanged(State.Stopped, null, null)
+            var owner: MainActivity? = null
+            val destroyed = CountDownLatch(1)
+            val application = instrumentation.targetContext.applicationContext as Application
+            val callbacks = object : Application.ActivityLifecycleCallbacks {
+                override fun onActivityDestroyed(activity: Activity) {
+                    if (activity === owner) destroyed.countDown()
+                }
+                override fun onActivityCreated(activity: Activity, state: Bundle?) {}
+                override fun onActivityStarted(activity: Activity) {}
+                override fun onActivityResumed(activity: Activity) {}
+                override fun onActivityPaused(activity: Activity) {}
+                override fun onActivityStopped(activity: Activity) {}
+                override fun onActivitySaveInstanceState(activity: Activity, state: Bundle) {}
             }
-            instrumentation.waitForIdleSync()
-            scenario.close()
+            application.registerActivityLifecycleCallbacks(callbacks)
+            try {
+                scenario.onActivity {
+                    owner = it
+                    it.connection.disconnect(it)
+                    it.stateChanged(State.Stopped, null, null)
+                    println("MAIN_UI_TEARDOWN finishAndRemoveTask owner=${System.identityHashCode(it)}")
+                    it.finishAndRemoveTask()
+                }
+                check(destroyed.await(10, TimeUnit.SECONDS)) { "MainActivity did not reach DESTROYED" }
+                // The owner is already destroyed: close only unregisters ActivityScenario.
+                scenario.close()
+                println("MAIN_UI_TEARDOWN destroyed=true scenario_closed=true")
+            } catch (error: Throwable) {
+                cleanupFailed = true
+                println("MAIN_UI_TEARDOWN recovery=external_force_stop_and_restore_isolated_debug")
+                println("MAIN_UI_TEARDOWN failed=${error.javaClass.simpleName} destroyed=${destroyed.count == 0L}")
+                if (failure == null) failure = error else failure!!.addSuppressed(error)
+            } finally {
+                application.unregisterActivityLifecycleCallbacks(callbacks)
+            }
         }
+        failure?.let { throw it }
     }
 
     private fun isolate(scenario: ActivityScenario<MainActivity>) {

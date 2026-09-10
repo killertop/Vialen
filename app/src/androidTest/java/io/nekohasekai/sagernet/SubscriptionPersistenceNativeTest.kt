@@ -15,6 +15,7 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class SubscriptionPersistenceNativeTest {
+    @get:org.junit.Rule(order = Int.MIN_VALUE) val benchmarkForeground = BenchmarkForegroundRule()
     private fun bean(name: String, host: String = name) = TrojanBean().apply {
         initializeDefaultValues(); this.name = name; serverAddress = host; serverPort = 443
     }

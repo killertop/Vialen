@@ -19,6 +19,7 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.Toolbar
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.RecyclerView
 import androidx.fragment.app.FragmentActivity
@@ -255,9 +256,9 @@ class FocusedUiVisualNativeTest {
             }
             shot("nodes", activity)
             main { nodeList.scrollToPosition(7) }
-            awaitFixtureRows("nodes-bottom", activity, "示例节点 8 · Example")
+            awaitFixtureRows("nodes-bottom", activity, "示例节点 8 · Example", nodeList)
             main { nodeList.scrollBy(0, nodeList.height) }
-            awaitFixtureRows("nodes-bottom-settled", activity, "示例节点 8 · Example")
+            awaitFixtureRows("nodes-bottom-settled", activity, "示例节点 8 · Example", nodeList)
             main {
                 val row = checkNotNull(nodeList.findViewHolderForAdapterPosition(7)).itemView
                 val visible = Rect()
@@ -300,6 +301,14 @@ class FocusedUiVisualNativeTest {
             main { appbar("settings", activity); hiddenConnectionControls("settings", activity) }
             shot("settings", activity)
             captureListBottom("settings-bottom", activity)
+        } catch (error: Throwable) {
+            // Capture before finally closes the activity; never substitute another foreground window.
+            try {
+                if (main { !activity.isDestroyed && activity.window.decorView.hasWindowFocus() }) {
+                    shot("main-surfaces-failure", activity)
+                }
+            } catch (captureError: Throwable) { error.addSuppressed(captureError) }
+            throw error
         } finally { close(activity) }
     }
 
@@ -309,15 +318,17 @@ class FocusedUiVisualNativeTest {
     }
 
     /** Adapter counts can precede binding and item/fragment fade-in animations. */
-    private fun awaitFixtureRows(name: String, activity: Activity, fixture: String): RecyclerView {
+    private fun awaitFixtureRows(name: String, activity: Activity, fixture: String, diagnosticList: RecyclerView? = null): RecyclerView {
         var ready: RecyclerView? = null
         var stablePolls = 0
         var previousBounds: List<Rect>? = null
-        await("$name fixture rendered") {
-            val list = descendants(activity.window.decorView).filterIsInstance<RecyclerView>().firstOrNull { candidate ->
-                candidate.isShown && descendants(candidate).filterIsInstance<TextView>().any { it.text.toString() == fixture }
-            }
-            val text = list?.let { descendants(it).filterIsInstance<TextView>().firstOrNull { it.text.toString() == fixture } }
+        try { await("$name fixture rendered") {
+            val text = descendants(activity.window.decorView).filterIsInstance<TextView>()
+                .firstOrNull { it.isShown && it.text.toString() == fixture }
+            // ViewPager2 has an outer RecyclerView too. Scroll the fixture row's nearest
+            // owning list, rather than treating the pager's group positions as node positions.
+            val list = generateSequence(text?.parent as? View) { it.parent as? View }
+                .filterIsInstance<RecyclerView>().firstOrNull()
             val rows = list?.let { (0 until it.childCount).map(it::getChildAt) }
                 .orEmpty().filter { it.getGlobalVisibleRect(Rect()) }
             val currentBounds = rows.map(::bounds)
@@ -329,6 +340,37 @@ class FocusedUiVisualNativeTest {
             previousBounds = currentBounds
             ready = list
             settled && stablePolls >= 3
+        } } catch (error: Throwable) {
+            try { main {
+                fun viewState(view: View): JSONObject {
+                    val visible = Rect()
+                    val hasVisibleRect = view.getGlobalVisibleRect(visible)
+                    return JSONObject().put("shown", view.isShown).put("alpha", view.alpha.toDouble())
+                        .put("bounds", rectJson(bounds(view))).put("hasVisibleRect", hasVisibleRect)
+                        .put("visibleRect", rectJson(visible)).put("opaque", visiblyOpaque(view))
+                }
+                val list = diagnosticList ?: ready
+                val rows = JSONArray()
+                list?.let { recycler ->
+                    for (i in 0 until recycler.childCount) {
+                        val row = recycler.getChildAt(i)
+                        rows.put(viewState(row).put("adapterPosition", recycler.getChildAdapterPosition(row)))
+                    }
+                }
+                val matches = JSONArray()
+                descendants(activity.window.decorView).filterIsInstance<TextView>()
+                    .filter { it.text.toString() == fixture }.forEach { matches.put(viewState(it)) }
+                record("$name-timeout-diagnostic", "INFO", JSONObject()
+                    .put("adapterClass", list?.adapter?.javaClass?.name ?: JSONObject.NULL)
+                    .put("itemCount", list?.adapter?.itemCount ?: -1)
+                    .put("scrollState", list?.scrollState ?: -1)
+                    .put("layoutRequested", list?.isLayoutRequested ?: false)
+                    .put("computingLayout", list?.isComputingLayout ?: false)
+                    .put("pendingAdapterUpdates", list?.hasPendingAdapterUpdates() ?: false)
+                    .put("animatorRunning", list?.itemAnimator?.isRunning ?: false)
+                    .put("attachedRows", rows).put("matchingTextViews", matches))
+            } } catch (diagnosticError: Throwable) { error.addSuppressed(diagnosticError) }
+            throw error
         }
         main { contract("$name-fixture-visible", ready != null) }
         return checkNotNull(ready)
@@ -417,6 +459,38 @@ class FocusedUiVisualNativeTest {
                 }
             }
             main { keyboard.scrollToPosition(0) }
+            main {
+                (activity.getSystemService(Activity.INPUT_METHOD_SERVICE) as InputMethodManager)
+                    .hideSoftInputFromWindow(activity.window.decorView.windowToken, 0)
+            }
+            var previousInitialInsets: Pair<Int, Int>? = null
+            var initialStableSince = android.os.SystemClock.uptimeMillis()
+            await("editor initial IME hidden and insets settled") {
+                val decor = activity.window.decorView
+                val insets = ViewCompat.getRootWindowInsets(decor)
+                val current = insets?.let {
+                    it.getInsets(WindowInsetsCompat.Type.ime()).bottom to
+                        it.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+                }
+                val ready = insets != null && !insets.isVisible(WindowInsetsCompat.Type.ime()) &&
+                    current?.first == 0 && decor.hasWindowFocus() &&
+                    !activity.findViewById<View>(R.id.keyboard_container).isLayoutRequested
+                if (!ready || current != previousInitialInsets) {
+                    previousInitialInsets = current
+                    initialStableSince = android.os.SystemClock.uptimeMillis()
+                }
+                ready && android.os.SystemClock.uptimeMillis() - initialStableSince >= 350
+            }
+            main {
+                val decor = activity.window.decorView
+                val insets = checkNotNull(ViewCompat.getRootWindowInsets(decor))
+                record("editor-initial-window-state", "INFO", JSONObject()
+                    .put("lightNavigationBars", WindowCompat.getInsetsController(activity.window, decor).isAppearanceLightNavigationBars)
+                    .put("imeVisible", insets.isVisible(WindowInsetsCompat.Type.ime()))
+                    .put("imeBottomPx", insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
+                    .put("navigationBottomPx", insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom)
+                    .put("windowFocus", decor.hasWindowFocus()))
+            }
             shot("editor", activity)
             main {
                 activity.binding.editor.requestFocus()
@@ -430,7 +504,18 @@ class FocusedUiVisualNativeTest {
                 record("editor-ime", "UNVERIFIED", JSONObject().put("reason", "Software IME did not become visible; no permission or keyboard setting was changed"))
                 shot("editor-ime-unavailable", activity)
             } else {
-                await("IME toolbar layout") { !activity.findViewById<View>(R.id.keyboard_container).isLayoutRequested }
+                var previousImeBottom = -1
+                var stableSince = android.os.SystemClock.uptimeMillis()
+                await("IME toolbar layout and animation settled") {
+                    val bottom = ViewCompat.getRootWindowInsets(activity.window.decorView)
+                        ?.getInsets(WindowInsetsCompat.Type.ime())?.bottom ?: 0
+                    if (bottom != previousImeBottom) {
+                        previousImeBottom = bottom
+                        stableSince = android.os.SystemClock.uptimeMillis()
+                    }
+                    bottom > 0 && !activity.findViewById<View>(R.id.keyboard_container).isLayoutRequested &&
+                        android.os.SystemClock.uptimeMillis() - stableSince >= 350
+                }
                 main {
                     val decor = activity.window.decorView
                     val insets = checkNotNull(ViewCompat.getRootWindowInsets(decor))
@@ -476,6 +561,11 @@ class FocusedUiVisualNativeTest {
         val activity = launch(ScannerActivity::class.java)
         try {
             await("scanner toolbar") { activity.findViewById<Toolbar>(R.id.toolbar)?.menu?.size() == 1 }
+            val streaming = await("camera preview streaming", timeoutMs = 6000, required = false) {
+                activity.binding.previewView.previewStreamState.value == androidx.camera.view.PreviewView.StreamState.STREAMING
+            }
+            record("scanner-preview", if (streaming) "PASS" else "UNVERIFIED", JSONObject().put(
+                "scope", "CameraX preview stream state only; QR decoding and the scene still need separate verification"))
             main {
                 val toolbar = activity.findViewById<Toolbar>(R.id.toolbar)
                 val controls = descendants(toolbar).filter { it.isClickable && it.isShown && it.width > 0 && it !is ViewGroup }

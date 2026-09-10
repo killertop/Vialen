@@ -24,6 +24,7 @@ import org.junit.runner.RunWith
 /** Production TestInstance -> Go HTTP RTT -> actual sing-box SOCKS outbound; no VPN service. */
 @RunWith(AndroidJUnit4::class)
 class CancellableUrlTestNativeTest {
+    @get:org.junit.Rule(order = Int.MIN_VALUE) val benchmarkForeground = BenchmarkForegroundRule()
     @get:Rule val profileState = ProfileSelectionStateRule()
 
     @Test fun cancelHeldRequestThenRetryInSameProcess() = runBlocking {

@@ -42,9 +42,10 @@ class WebviewFragment : ToolbarFragment(R.layout.layout_webview), Toolbar.OnMenu
         browser.settings.javaScriptEnabled = true
         browser.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                if (webView !== view || !PanelUrl.sameTarget(url, currentUrl)) return
+                // Chromium can report HTTP failure before onPageStarted for the same
+                // navigation. Only explicit load/navigation/retry resets that failure.
+                if (webView !== view || failed || !PanelUrl.sameTarget(url, currentUrl)) return
                 currentUrl = url
-                failed = false
                 showLoading()
             }
             override fun onPageFinished(view: WebView?, url: String?) {

@@ -14,6 +14,7 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ProfileAutoSelectionNativeTest {
+    @get:org.junit.Rule(order = Int.MIN_VALUE) val benchmarkForeground = BenchmarkForegroundRule()
     @get:Rule val selectionState = ProfileSelectionStateRule()
     private val groups = mutableListOf<Long>()
     private var oldState = BaseService.State.Idle
