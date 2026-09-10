@@ -172,28 +172,33 @@ class WorkUpgradeNativeTest {
         val existing = manager.getWorkInfoById(id).get(10, TimeUnit.SECONDS)
         assertNotNull("Old runtime WorkSpec survives replacement install", existing)
         assertFalse(existing!!.state.isFinished)
+        assertEquals("Old periodic already ran; a fresh old-runtime WorkSpec is required. Cleanup + UPDATE prepare does not reset its run count",
+            0, periodicRunCount(id))
         stage("verify: reconfigure begin")
         runBlocking { SubscriptionUpdater.reconfigureUpdaterOrThrow() }
         stage("verify: reconfigure complete")
         val after = manager.getWorkInfosForUniqueWork(uniqueName).get(10, TimeUnit.SECONDS).filterNot { it.state.isFinished }
         assertEquals("Reconfigure UPDATE preserves the unique periodic identity", listOf(id), after.map { it.id })
         val server = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))
-        val served = CountDownLatch(1)
+        val served = List(2) { CountDownLatch(1) }
         val serverFailure = java.util.concurrent.atomic.AtomicReference<Throwable?>()
         val serverThread = thread(name = "work-upgrade-local-http", isDaemon = true) {
             try {
-                server.accept().use { socket ->
-                    socket.soTimeout = 15_000
-                    val input = socket.getInputStream().bufferedReader()
-                    while (!input.readLine().isNullOrEmpty()) { /* Consume request headers. */ }
-                    val body = "proxies:\n  - name: WorkUpgradeFixture\n    type: socks5\n    server: 127.0.0.1\n    port: 1080\n".toByteArray()
-                    socket.getOutputStream().apply {
-                        write("HTTP/1.1 200 OK\r\nContent-Type: text/yaml\r\nContent-Length: ${body.size}\r\nConnection: close\r\n\r\n".toByteArray())
-                        write(body); flush()
+                repeat(2) { attempt ->
+                    server.accept().use { socket ->
+                        socket.soTimeout = 15_000
+                        val input = socket.getInputStream().bufferedReader()
+                        while (!input.readLine().isNullOrEmpty()) { /* Consume request headers. */ }
+                        val name = if (attempt == 0) "WorkUpgradeFixture" else "WorkUpgradePeriodicFixture"
+                        val body = "proxies:\n  - name: $name\n    type: socks5\n    server: 127.0.0.1\n    port: 1080\n".toByteArray()
+                        socket.getOutputStream().apply {
+                            write("HTTP/1.1 200 OK\r\nContent-Type: text/yaml\r\nContent-Length: ${body.size}\r\nConnection: close\r\n\r\n".toByteArray())
+                            write(body); flush()
+                        }
                     }
+                    served[attempt].countDown()
                 }
-                served.countDown()
-            } catch (e: Throwable) { serverFailure.set(e); served.countDown() }
+            } catch (e: Throwable) { serverFailure.set(e); served.forEach { it.countDown() } }
         }
         // Save the previous ID before replacing it, so another force-stop remains recoverable.
         state.put("priorOneTimeIds", JSONArray(fixtureRequestIds(state).map { it.toString() }))
@@ -210,7 +215,7 @@ class WorkUpgradeNativeTest {
             remote.enqueue(request).get(10, TimeUnit.SECONDS)
             stage("verify: await fixture worker")
             assertEquals(WorkInfo.State.SUCCEEDED, awaitFinished(request.id).state)
-            assertTrue("Worker fetched local fixture", served.await(1, TimeUnit.SECONDS))
+            assertTrue("Worker fetched local fixture", served[0].await(1, TimeUnit.SECONDS))
             serverFailure.get()?.let { throw AssertionError("Local server failed", it) }
             val node = SagerDatabase.proxyDao.getByGroup(fixture.id).single().requireBean()
             assertEquals("WorkUpgradeFixture", node.name)
@@ -218,6 +223,44 @@ class WorkUpgradeNativeTest {
             assertEquals(1080, node.serverPort)
             assertTrue(SagerDatabase.groupDao.getById(fixture.id)!!.subscription!!.lastUpdated > 0)
             assertFalse(manager.getWorkInfoById(id).get(10, TimeUnit.SECONDS)!!.state.isFinished)
+
+            // Only the preserved periodic remains runnable now: the one-time worker succeeded.
+            assertEquals("First-run override requires a fresh unexecuted old-runtime WorkSpec; cleanup + UPDATE prepare cannot reset a used UUID",
+                0, periodicRunCount(id))
+            fixture.subscription!!.lastUpdated = 0
+            SagerDatabase.groupDao.updateGroup(fixture)
+            try {
+                val periodic = PeriodicWorkRequest.Builder(SubscriptionUpdater.UpdateTask::class.java,
+                    1440, TimeUnit.MINUTES)
+                    .setNextScheduleTimeOverride(System.currentTimeMillis()).build()
+                remote.enqueueUniquePeriodicWork(uniqueName, ExistingPeriodicWorkPolicy.UPDATE, periodic)
+                    .get(10, TimeUnit.SECONDS)
+                val deadline = android.os.SystemClock.elapsedRealtime() + 45_000
+                stage("verify: await old periodic body id=$id")
+                while (true) {
+                    val info = manager.getWorkInfoById(id).get(5, TimeUnit.SECONDS)
+                    assertNotNull("Old periodic UUID must survive UPDATE", info)
+                    assertFalse("Periodic work must remain active", info!!.state.isFinished)
+                    if (periodicRunCount(id) > 0 && info.state == WorkInfo.State.ENQUEUED) break
+                    check(android.os.SystemClock.elapsedRealtime() < deadline) { "Old periodic body did not complete" }
+                    CountDownLatch(1).await(100, TimeUnit.MILLISECONDS)
+                }
+                probeMainThread()
+                assertTrue("Old periodic fetched its distinct fixture", served[1].await(1, TimeUnit.SECONDS))
+                serverFailure.get()?.let { throw AssertionError("Periodic HTTP fixture failed", it) }
+                val periodicNode = SagerDatabase.proxyDao.getByGroup(fixture.id).single().requireBean()
+                assertEquals("WorkUpgradePeriodicFixture", periodicNode.name)
+                assertEquals("127.0.0.1", periodicNode.serverAddress)
+                assertEquals(1080, periodicNode.serverPort)
+                assertTrue(SagerDatabase.groupDao.getById(fixture.id)!!.subscription!!.lastUpdated > 0)
+                val live = manager.getWorkInfosForUniqueWork(uniqueName).get(10, TimeUnit.SECONDS)
+                    .filterNot { it.state.isFinished }
+                assertEquals(listOf(id), live.map { it.id })
+                assertEquals(WorkInfo.State.ENQUEUED, live.single().state)
+                stage("verify: old periodic body completed id=$id period_count=${periodicRunCount(id)}")
+            } finally {
+                clearPeriodicOverride(id)
+            }
             state.put("verified", true).put("newVersion", context.packageManager.getPackageInfo(context.packageName, 0).versionName)
             save(state)
         } finally {
@@ -228,6 +271,30 @@ class WorkUpgradeNativeTest {
                 serverThread.join(2000)
             }
         }
+    }
+
+    /** Read the actual migrated database without initializing another WorkManager runtime or writing SQL. */
+    private fun periodicRunCount(id: UUID): Int {
+        val file = File(context.noBackupFilesDir, "androidx.work.workdb")
+        check(file.isFile) { "Migrated WorkManager database not found: $file" }
+        return android.database.sqlite.SQLiteDatabase.openDatabase(file.path, null,
+            android.database.sqlite.SQLiteDatabase.OPEN_READONLY).use { db ->
+            db.rawQuery("SELECT period_count FROM WorkSpec WHERE id = ?", arrayOf(id.toString())).use { cursor ->
+                check(cursor.moveToFirst()) { "Old periodic WorkSpec missing: $id" }
+                cursor.getInt(0)
+            }
+        }
+    }
+
+    private fun clearPeriodicOverride(id: UUID) {
+        val live = manager.getWorkInfosForUniqueWork(uniqueName).get(10, TimeUnit.SECONDS)
+            .filterNot { it.state.isFinished }
+        check(live.map { it.id } == listOf(id)) { "Refuse to create or replace missing old periodic during recovery" }
+        val request = PeriodicWorkRequest.Builder(SubscriptionUpdater.UpdateTask::class.java,
+            1440, TimeUnit.MINUTES).setInitialDelay(1, TimeUnit.DAYS)
+            .clearNextScheduleTimeOverride().build()
+        remote.enqueueUniquePeriodicWork(uniqueName, ExistingPeriodicWorkPolicy.UPDATE, request)
+            .get(10, TimeUnit.SECONDS)
     }
 
     private fun dumpThreads(reason: String) {
@@ -297,7 +364,23 @@ class WorkUpgradeNativeTest {
 
     private fun cleanup() {
         val state = load()
-        cancelFixtureRequests(state)
+        var recoveryFailure: Exception? = null
+        fun recordFailure(error: Exception) {
+            stage("cleanup: ${error.message}; continuing fixture and preference restoration")
+            val previous = recoveryFailure
+            if (previous == null) recoveryFailure = error else previous.addSuppressed(error)
+        }
+        val periodicId = state.optString("periodicId").takeIf { it.isNotEmpty() }?.let(UUID::fromString)
+        var ownsPeriodic = false
+        // A lost/cancelled/replaced UUID must not cause UPDATE to create or modify another
+        // task, and must not prevent restoration of user data below.
+        try {
+            if (periodicId != null) {
+                clearPeriodicOverride(periodicId) // Checks active unique identity before UPDATE.
+                ownsPeriodic = true
+            } else stage("cleanup: no recorded periodic UUID; leaving scheduling unchanged")
+        } catch (error: Exception) { recordFailure(error) }
+        try { cancelFixtureRequests(state) } catch (error: Exception) { recordFailure(error) }
         val fixtureId = state.getLong("groupId")
         if (fixtureId > 0) {
             SagerDatabase.proxyDao.deleteByGroup(fixtureId)
@@ -319,10 +402,22 @@ class WorkUpgradeNativeTest {
                 it.valueType = row.getInt("type"); it.value = decode(row.getString("bytes"))
             })
         }
-        runBlocking { SubscriptionUpdater.reconfigureUpdaterOrThrow() }
+        if (ownsPeriodic) {
+            try {
+                // Recheck after data restoration: never reconfigure a replacement task.
+                val live = manager.getWorkInfosForUniqueWork(uniqueName).get(10, TimeUnit.SECONDS)
+                    .filterNot { it.state.isFinished }
+                check(live.map { it.id } == listOf(periodicId)) {
+                    "Old periodic disappeared or was replaced during cleanup; leaving scheduling unchanged"
+                }
+                runBlocking { SubscriptionUpdater.reconfigureUpdaterOrThrow() }
+            } catch (error: Exception) { recordFailure(error) }
+        }
         context.packageManager.setComponentEnabledSetting(
             android.content.ComponentName(context, BootReceiver::class.java), state.getInt("receiverState"),
             android.content.pm.PackageManager.DONT_KILL_APP)
+        // Retain recovery material if scheduling/cancellation still needs attention.
+        recoveryFailure?.let { throw it }
         checkpoint.delete()
     }
 }
