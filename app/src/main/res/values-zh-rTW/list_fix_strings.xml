@@ -1,4 +1,6 @@
 <resources>
+    <string name="profile_export_target_missing">要匯出的設定已不存在，請重新選擇設定。</string>
+    <string name="profile_import_target_missing">要匯入的群組已不存在，請重新選擇群組。</string>
     <string name="group_export_target_missing">要匯出的群組已不存在，請重新選擇群組。</string>
     <string name="rule_enable_named">啟用規則：%1$s</string>
 </resources>

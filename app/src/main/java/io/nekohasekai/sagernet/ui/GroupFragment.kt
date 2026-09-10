@@ -148,7 +148,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
     }
 
     private val exportProfiles =
-        registerForActivityResult(ActivityResultContracts.CreateDocument()) { data ->
+        registerForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { data ->
             val groupId = pendingExportGroupId
             pendingExportGroupId = null
             if (data != null) {
@@ -161,7 +161,9 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                         }
                         val profiles = SagerDatabase.proxyDao.getByGroup(groupId)
                         val links = profiles.joinToString("\n") { it.toStdLink(compact = true) }
-                        checkNotNull(resolver.openOutputStream(data)).bufferedWriter().use { it.write(links) }
+                        requireNotNull(resolver.openOutputStream(data)) {
+                            app.getString(R.string.action_export_err)
+                        }.bufferedWriter().use { it.write(links) }
                         onMainDispatcher { if (isAdded && view != null) snackbar(getString(R.string.action_export_msg)).show() }
                     } catch (e: Exception) {
                         Logs.w(e)
@@ -371,8 +373,10 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                             val profiles = SagerDatabase.proxyDao.getByGroup(targetGroup.id)
                             val links = profiles.joinToString("\n") { it.toStdLink(compact = true) }
                             onMainDispatcher {
-                                SagerNet.trySetPrimaryClip(links)
-                                if (isAdded && view != null) snackbar(getString(R.string.copy_toast_msg)).show()
+                                val copied = SagerNet.trySetPrimaryClip(links)
+                                if (isAdded && view != null) {
+                                    snackbar(if (copied) R.string.copy_toast_msg else R.string.action_export_err).show()
+                                }
                             }
                         } catch (error: Exception) {
                             Logs.w(error)
@@ -383,7 +387,9 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
 
                 R.id.action_export_file -> {
                     pendingExportGroupId = targetGroup.id
-                    startFilesForResult(exportProfiles, "profiles_${targetGroup.displayName()}.txt")
+                    if (!startFilesForResult(exportProfiles, "profiles_${targetGroup.displayName()}.txt")) {
+                        pendingExportGroupId = null
+                    }
                 }
 
                 R.id.action_clear -> {

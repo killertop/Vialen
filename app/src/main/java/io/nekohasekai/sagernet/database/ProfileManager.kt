@@ -86,6 +86,35 @@ object ProfileManager {
         return profile
     }
 
+    /**
+     * Imports must not leave profiles behind if the destination group is deleted while a
+     * multi-profile document is being parsed. Keep the existence check and every row write in
+     * one database transaction; listener callbacks deliberately run after commit.
+     */
+    suspend fun createProfilesForImport(groupId: Long, beans: List<AbstractBean>): List<ProxyEntity> {
+        if (beans.isEmpty()) return emptyList()
+        val profiles = SagerDatabase.instance.runInTransaction<List<ProxyEntity>> {
+            checkNotNull(SagerDatabase.groupDao.getById(groupId)) {
+                app.getString(R.string.profile_import_target_missing)
+            }
+            var nextOrder = SagerDatabase.proxyDao.nextOrder(groupId) ?: 1L
+            beans.map { bean ->
+                bean.applyDefaultValues()
+                ProxyEntity(groupId = groupId).apply {
+                    id = 0
+                    putBean(bean)
+                    userOrder = nextOrder++
+                    id = SagerDatabase.proxyDao.addProxy(this)
+                }
+            }
+        }
+        for (profile in profiles) {
+            selectFirstIfNeeded(groupId)
+            iterator { onAdd(profile) }
+        }
+        return profiles
+    }
+
     /** Use only the persisted import target; never borrow a node from another group. */
     @Synchronized
     fun selectFirstIfNeeded(groupId: Long) {

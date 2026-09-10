@@ -175,10 +175,17 @@ fun String.unUrlSafe(): String {
 }
 
 fun RecyclerView.scrollTo(index: Int, force: Boolean = false) {
-    if (force) post {
-        scrollToPosition(index)
-    }
-    postDelayed({
+    if (force) {
+        // LayoutManager keeps this request for the next layout. A delayed second
+        // scroll could otherwise overwrite a user's newer scroll or drag.
+        stopScroll()
+        val manager = layoutManager
+        if (manager is androidx.recyclerview.widget.LinearLayoutManager) {
+            manager.scrollToPositionWithOffset(index, 0)
+        } else {
+            scrollToPosition(index)
+        }
+    } else {
         try {
             layoutManager?.startSmoothScroll(object : LinearSmoothScroller(context) {
                 init {
@@ -191,7 +198,7 @@ fun RecyclerView.scrollTo(index: Int, force: Boolean = false) {
             })
         } catch (ignored: IllegalArgumentException) {
         }
-    }, 300L)
+    }
 }
 
 val app get() = SagerNet.application
@@ -220,24 +227,28 @@ fun Fragment.snackbar(text: CharSequence) = (requireActivity() as MainActivity).
 
 fun ThemedActivity.startFilesForResult(
     launcher: ActivityResultLauncher<String>, input: String
-) {
+): Boolean {
     try {
-        return launcher.launch(input)
+        launcher.launch(input)
+        return true
     } catch (_: ActivityNotFoundException) {
     } catch (_: SecurityException) {
     }
     snackbar(getString(R.string.file_manager_missing)).show()
+    return false
 }
 
 fun Fragment.startFilesForResult(
     launcher: ActivityResultLauncher<String>, input: String
-) {
+): Boolean {
     try {
-        return launcher.launch(input)
+        launcher.launch(input)
+        return true
     } catch (_: ActivityNotFoundException) {
     } catch (_: SecurityException) {
     }
     (requireActivity() as ThemedActivity).snackbar(getString(R.string.file_manager_missing)).show()
+    return false
 }
 
 fun Fragment.needReload() {

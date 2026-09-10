@@ -15,6 +15,7 @@ import io.nekohasekai.sagernet.database.preference.PublicDatabase
 import io.nekohasekai.sagernet.ui.ConfigurationFragment
 import io.nekohasekai.sagernet.group.GroupUpdater
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
+import io.nekohasekai.sagernet.ktx.scrollTo
 import io.nekohasekai.sagernet.ui.GroupFragment
 import io.nekohasekai.sagernet.ui.MainActivity
 import io.nekohasekai.sagernet.ui.RouteFragment
@@ -257,10 +258,17 @@ class ListRecoveryNativeTest {
                 }
                 try { assertTrue("Profile list loaded", loaded.await(15, TimeUnit.SECONDS)) }
                 finally { handler.removeCallbacks(check) }
+                scenario.onActivity { child.configurationListView.scrollTo(0, true) }
+                instrumentation.waitForIdleSync()
                 scenario.onActivity { child.layoutManager.scrollToPositionWithOffset(15, 0) }
+                // Let the former 300ms automatic scroll run if it still exists.
+                val scrollWindow = CountDownLatch(1)
+                handler.postDelayed({ scrollWindow.countDown() }, 450)
+                assertTrue(scrollWindow.await(5, TimeUnit.SECONDS))
                 instrumentation.waitForIdleSync()
                 var first = -1
                 scenario.onActivity { first = child.layoutManager.findFirstVisibleItemPosition() }
+                assertEquals("Initial selection must not override a newer scroll", 15, first)
                 GroupUpdater.updating.add(groupId)
                 runBlocking { child.adapter!!.groupUpdated(groupId) }
                 instrumentation.waitForIdleSync()

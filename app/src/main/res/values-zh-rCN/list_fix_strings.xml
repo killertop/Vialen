@@ -1,4 +1,6 @@
 <resources>
+    <string name="profile_export_target_missing">要导出的配置已不存在，请重新选择配置。</string>
+    <string name="profile_import_target_missing">要导入的分组已不存在，请重新选择分组。</string>
     <string name="group_export_target_missing">要导出的分组已不存在，请重新选择分组。</string>
     <string name="rule_enable_named">启用规则：%1$s</string>
 </resources>

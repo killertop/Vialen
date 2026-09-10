@@ -125,6 +125,9 @@ class ConfigurationFragment @JvmOverloads constructor(
     lateinit var adapter: GroupPagerAdapter
     lateinit var tabLayout: TabLayout
     lateinit var groupPager: ViewPager2
+    private var pendingExportProfileId: Long? = null
+    private var pendingImportGroupId: Long? = null
+    private var pendingImportOriginGroupId: Long? = null
 
     val alwaysShowAddress by lazy { DataStore.alwaysShowAddress }
 
@@ -150,6 +153,9 @@ class ConfigurationFragment @JvmOverloads constructor(
     @SuppressLint("DetachAndAttachSameFragment")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingExportProfileId = savedInstanceState?.getLong("pendingExportProfileId")?.takeIf { it > 0 }
+        pendingImportGroupId = savedInstanceState?.getLong("pendingImportGroupId")?.takeIf { it > 0 }
+        pendingImportOriginGroupId = savedInstanceState?.getLong("pendingImportOriginGroupId")?.takeIf { it > 0 }
 
         if (savedInstanceState != null) {
             parentFragmentManager.beginTransaction()
@@ -158,6 +164,13 @@ class ConfigurationFragment @JvmOverloads constructor(
                 .attach(this)
                 .commit()
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        pendingExportProfileId?.let { outState.putLong("pendingExportProfileId", it) }
+        pendingImportGroupId?.let { outState.putLong("pendingImportGroupId", it) }
+        pendingImportOriginGroupId?.let { outState.putLong("pendingImportOriginGroupId", it) }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -221,6 +234,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {
         runOnMainDispatcher {
+            if (!isAdded || view == null || !::adapter.isInitialized) return@runOnMainDispatcher
             // editingGroup
             if (key == Key.PROFILE_GROUP) {
                 val targetId = DataStore.editingGroup
@@ -256,65 +270,82 @@ class ConfigurationFragment @JvmOverloads constructor(
         return super.onKeyDown(ketCode, event)
     }
 
+    private fun showMessage(message: CharSequence) {
+        runOnMainDispatcher {
+            val owner = activity as? MainActivity
+            if (owner != null && !owner.isFinishing && !owner.isDestroyed) {
+                owner.snackbar(message).show()
+            }
+        }
+    }
+
     private val importFile =
         registerForActivityResult(ActivityResultContracts.GetContent()) { file ->
-            if (file != null) runOnDefaultDispatcher {
+            val targetId = pendingImportGroupId
+            val originGroupId = pendingImportOriginGroupId
+            pendingImportGroupId = null
+            pendingImportOriginGroupId = null
+            if (file == null) return@registerForActivityResult
+            if (targetId == null) {
+                showMessage(app.getString(R.string.profile_import_target_missing))
+                return@registerForActivityResult
+            }
+            val resolver = app.contentResolver
+            val owner = activity as? MainActivity
+            runOnDefaultDispatcher {
                 try {
-                    val fileName =
-                        requireContext().contentResolver.query(file, null, null, null, null)
-                            ?.use { cursor ->
-                                cursor.moveToFirst()
-                                cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME)
-                                    .let(cursor::getString)
-                            }
-                    val proxies = mutableListOf<AbstractBean>()
-                    if (fileName != null && fileName.endsWith(".zip")) {
-                        // try parse wireguard zip
-                        val zip =
-                            ZipInputStream(requireContext().contentResolver.openInputStream(file)!!)
-                        while (true) {
-                            val entry = zip.nextEntry ?: break
-                            if (entry.isDirectory) continue
-                            val fileText = zip.bufferedReader().readText()
-                            RawUpdater.parseRaw(fileText, entry.name)
-                                ?.let { pl -> proxies.addAll(pl) }
-                            zip.closeEntry()
-                        }
-                        zip.closeQuietly()
-                    } else {
-                        val fileText =
-                            requireContext().contentResolver.openInputStream(file)!!.use {
-                                it.bufferedReader().readText()
-                            }
-                        RawUpdater.parseRaw(fileText, fileName ?: "")
-                            ?.let { pl -> proxies.addAll(pl) }
+                    val fileName = resolver.query(file, null, null, null, null)?.use { cursor ->
+                        if (!cursor.moveToFirst()) return@use null
+                        cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                            .takeIf { it >= 0 }?.let(cursor::getString)
                     }
-                    if (proxies.isEmpty()) onMainDispatcher {
-                        snackbar(getString(R.string.no_proxies_found_in_file)).show()
-                    } else import(proxies)
+                    val proxies = mutableListOf<AbstractBean>()
+                    if (fileName?.endsWith(".zip", ignoreCase = true) == true) {
+                        // A broken entry must close the archive as well as the underlying provider stream.
+                        checkNotNull(resolver.openInputStream(file)).use { input ->
+                            ZipInputStream(input).use { zip ->
+                                while (true) {
+                                    val entry = zip.nextEntry ?: break
+                                    if (!entry.isDirectory) {
+                                        RawUpdater.parseRaw(zip.readBytes().toString(Charsets.UTF_8), entry.name)
+                                            ?.let { proxies.addAll(it) }
+                                    }
+                                    zip.closeEntry()
+                                }
+                            }
+                        }
+                    } else {
+                        val fileText = checkNotNull(resolver.openInputStream(file)).bufferedReader().use {
+                            it.readText()
+                        }
+                        RawUpdater.parseRaw(fileText, fileName ?: "")?.let { proxies.addAll(it) }
+                    }
+                    if (proxies.isEmpty()) {
+                        showMessage(app.getString(R.string.no_proxies_found_in_file))
+                    } else {
+                        import(proxies, targetId, originGroupId)
+                    }
                 } catch (e: SubscriptionFoundException) {
-                    (requireActivity() as MainActivity).importSubscription(e.link.toUri())
+                    if (owner != null && !owner.isFinishing && !owner.isDestroyed) {
+                        owner.importSubscription(e.link.toUri())
+                    }
                 } catch (e: Exception) {
                     Logs.w(e)
-                    onMainDispatcher {
-                        snackbar(e.readableMessage).show()
-                    }
+                    showMessage(e.readableMessage)
                 }
             }
         }
 
-    suspend fun import(proxies: List<AbstractBean>) {
-        val targetId = DataStore.selectedGroupForImport()
-        for (proxy in proxies) {
-            ProfileManager.createProfile(targetId, proxy)
-        }
+    suspend fun import(proxies: List<AbstractBean>, targetId: Long, originGroupId: Long? = null) {
+        ProfileManager.createProfilesForImport(targetId, proxies)
         onMainDispatcher {
-            DataStore.editingGroup = targetId
-            snackbar(
-                requireContext().resources.getQuantityString(
-                    R.plurals.added, proxies.size, proxies.size
-                )
-            ).show()
+            val owner = activity as? MainActivity
+            if (owner != null && !owner.isFinishing && !owner.isDestroyed) {
+                if (isAdded && view != null && DataStore.selectedGroup == originGroupId) {
+                    DataStore.editingGroup = targetId
+                }
+                owner.snackbar(app.resources.getQuantityString(R.plurals.added, proxies.size, proxies.size)).show()
+            }
         }
 
     }
@@ -329,26 +360,50 @@ class ConfigurationFragment @JvmOverloads constructor(
                 val text = SagerNet.getClipboardText()
                 if (text.isBlank()) {
                     snackbar(getString(R.string.clipboard_empty)).show()
-                } else runOnDefaultDispatcher {
-                    try {
-                        val proxies = RawUpdater.parseRaw(text)
-                        if (proxies.isNullOrEmpty()) onMainDispatcher {
-                            snackbar(getString(R.string.no_proxies_found_in_clipboard)).show()
-                        } else import(proxies)
-                    } catch (e: SubscriptionFoundException) {
-                        (requireActivity() as MainActivity).importSubscription(e.link.toUri())
-                    } catch (e: Exception) {
-                        Logs.w(e)
-
-                        onMainDispatcher {
-                            snackbar(e.readableMessage).show()
+                } else {
+                    val originGroupId = DataStore.selectedGroup
+                    val targetId = try {
+                        DataStore.selectedGroupForImport()
+                    } catch (error: Exception) {
+                        Logs.w(error)
+                        snackbar(error.readableMessage).show()
+                        return true
+                    }
+                    val owner = activity as? MainActivity
+                    runOnDefaultDispatcher {
+                        try {
+                            val proxies = RawUpdater.parseRaw(text)
+                            if (proxies.isNullOrEmpty()) {
+                                showMessage(app.getString(R.string.no_proxies_found_in_clipboard))
+                            } else {
+                                import(proxies, targetId, originGroupId)
+                            }
+                        } catch (e: SubscriptionFoundException) {
+                            if (owner != null && !owner.isFinishing && !owner.isDestroyed) {
+                                owner.importSubscription(e.link.toUri())
+                            }
+                        } catch (e: Exception) {
+                            Logs.w(e)
+                            showMessage(e.readableMessage)
                         }
                     }
                 }
             }
 
             R.id.action_import_file -> {
-                startFilesForResult(importFile, "*/*")
+                pendingImportOriginGroupId = DataStore.selectedGroup
+                pendingImportGroupId = try {
+                    DataStore.selectedGroupForImport()
+                } catch (error: Exception) {
+                    pendingImportOriginGroupId = null
+                    Logs.w(error)
+                    snackbar(error.readableMessage).show()
+                    return true
+                }
+                if (!startFilesForResult(importFile, "*/*")) {
+                    pendingImportGroupId = null
+                    pendingImportOriginGroupId = null
+                }
             }
 
             R.id.action_new_socks -> {
@@ -1742,10 +1797,11 @@ class ConfigurationFragment @JvmOverloads constructor(
                         R.id.action_config_export_clipboard -> export(entity.exportConfig().first)
                         R.id.action_config_export_file -> {
                             val cfg = entity.exportConfig()
-                            DataStore.serverConfig = cfg.first
-                            startFilesForResult(
-                                (parentFragment as ConfigurationFragment).exportConfig, cfg.second
-                            )
+                            val owner = parentFragment as ConfigurationFragment
+                            owner.pendingExportProfileId = entity.id
+                            if (!startFilesForResult(owner.exportConfig, cfg.second)) {
+                                owner.pendingExportProfileId = null
+                            }
                         }
                     }
                 } catch (e: Exception) {
@@ -1760,23 +1816,25 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     private val exportConfig =
-        registerForActivityResult(ActivityResultContracts.CreateDocument()) { data ->
+        registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { data ->
+            val profileId = pendingExportProfileId
+            pendingExportProfileId = null
             if (data != null) {
+                val resolver = app.contentResolver
                 runOnDefaultDispatcher {
                     try {
-                        (requireActivity() as MainActivity).contentResolver.openOutputStream(data)!!
-                            .bufferedWriter()
-                            .use {
-                                it.write(DataStore.serverConfig)
-                            }
-                        onMainDispatcher {
-                            snackbar(getString(R.string.action_export_msg)).show()
+                        requireNotNull(profileId) { app.getString(R.string.profile_export_target_missing) }
+                        val profile = checkNotNull(SagerDatabase.proxyDao.getById(profileId)) {
+                            app.getString(R.string.profile_export_target_missing)
                         }
+                        val config = profile.exportConfig().first
+                        requireNotNull(resolver.openOutputStream(data)) {
+                            app.getString(R.string.action_export_err)
+                        }.bufferedWriter().use { it.write(config) }
+                        showMessage(app.getString(R.string.action_export_msg))
                     } catch (e: Exception) {
                         Logs.w(e)
-                        onMainDispatcher {
-                            snackbar(e.readableMessage).show()
-                        }
+                        showMessage(e.readableMessage)
                     }
 
                 }
