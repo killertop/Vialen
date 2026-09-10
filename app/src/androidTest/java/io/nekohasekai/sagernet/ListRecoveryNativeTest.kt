@@ -164,8 +164,16 @@ class ListRecoveryNativeTest {
                     val dialog = RouteFragment::class.java.getDeclaredField("resetDialog")
                         .apply { isAccessible = true }.get(fragment) as AlertDialog
                     dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+                }
+                // AlertDialog dispatches its positive listener through a Handler. Keep
+                // storage held, but let confirmation invalidate the undo generation first.
+                instrumentation.waitForIdleSync()
+                scenario.onActivity {
+                    assertTrue("Reset confirmation clears the visible list before storage runs",
+                        fragment.ruleAdapter.ruleList.isEmpty())
                     staleUndo.performClick()
-                    assertTrue(fragment.ruleAdapter.ruleList.isEmpty())
+                    assertTrue("Detached undo cannot restore the previous generation",
+                        fragment.ruleAdapter.ruleList.isEmpty())
                 }
             } finally { release.complete(Unit) }
             drain()
@@ -219,6 +227,7 @@ class ListRecoveryNativeTest {
                     .apply { isAccessible = true }.get(fragment) as AlertDialog
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             }
+            instrumentation.waitForIdleSync() // Let the dialog listener enqueue the reset before drain.
             drain()
             scenario.onActivity { assertEquals(before, fragment.ruleAdapter.ruleList.map { it.id }) }
             assertEquals(before, SagerDatabase.rulesDao.allRules().map { it.id })

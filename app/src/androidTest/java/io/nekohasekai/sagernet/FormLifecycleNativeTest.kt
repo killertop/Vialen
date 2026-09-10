@@ -177,9 +177,14 @@ class FormLifecycleNativeTest {
 
     @Test fun numericDialogPreservesInvalidTextAndCommitsOnlyValidInput() {
         ActivityScenario.launch<ConfigEditActivity>(Intent(context, ConfigEditActivity::class.java)).use { scenario ->
+            lateinit var dialog: AlertDialog
+            var commits = 0
             scenario.onActivity { activity ->
-                var commits = 0
-                val dialog = activity.showIntegerFormDialog("MTU", "1500", 1000..10000) { commits++; true }
+                dialog = activity.showIntegerFormDialog("MTU", "1500", 1000..10000) { commits++; true }
+            }
+            // Dialog dispatches OnShow asynchronously; let it install the validation listener.
+            instrumentation.waitForIdleSync()
+            scenario.onActivity {
                 fun findInput(view: View): EditText? = when (view) {
                     is EditText -> view
                     is ViewGroup -> (0 until view.childCount).firstNotNullOfOrNull { findInput(view.getChildAt(it)) }
@@ -204,16 +209,21 @@ class FormLifecycleNativeTest {
 
     @Test fun mtuCustomCommitRunsChangeListenerOnceAndHonorsVeto() {
         ActivityScenario.launch<ConfigEditActivity>(Intent(context, ConfigEditActivity::class.java)).use { scenario ->
+            lateinit var dialog: AlertDialog
+            var calls = 0
+            var accept = false
             scenario.onActivity { activity ->
                 val preference = MTUPreference(activity).apply { value = "1500" }
-                var calls = 0
-                var accept = false
                 preference.setOnPreferenceChangeListener { _, proposed ->
                     calls++
                     assertEquals("1500", proposed)
                     accept
                 }
-                val dialog = preference.showCustomDialog()
+                dialog = preference.showCustomDialog()
+            }
+            // Wait for OnShow before simulating the user's positive-button click.
+            instrumentation.waitForIdleSync()
+            scenario.onActivity {
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
                 assertEquals(1, calls)
                 assertTrue(dialog.isShowing)

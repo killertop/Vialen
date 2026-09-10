@@ -2,6 +2,7 @@ package io.nekohasekai.sagernet
 
 import android.os.PowerManager
 import android.os.Process
+import android.os.SystemClock
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.nekohasekai.sagernet.aidl.ISagerNetServiceCallback
@@ -125,12 +126,20 @@ class TrafficEfficiencyNativeTest {
                 service.data.binder.registerCallback(callback,SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_BACKGROUND)
                 delay(100)
                 val beforeRequest=queries.get()
+                val requestElapsed=SystemClock.elapsedRealtime()
+                val requestUptime=SystemClock.uptimeMillis()
                 val latency=withContext(Dispatchers.Default) {
                     Libcore.urlTest(proxy.box,"http://198.18.0.254/$nonce",4000)
                 }
                 assertTrue("Real SOCKS request failed",latency>=0)
                 assertEquals("Real HTTP RTT sends two requests",2,fixture.requests.get())
                 awaitCondition { fixture.diagnosticSnapshot().first().contains("active=0 ") }
+                val requestWindow=SystemClock.elapsedRealtime()-requestElapsed
+                val requestAwake=SystemClock.uptimeMillis()-requestUptime
+                Log.i("TrafficEfficiency", "request_window_ms=$requestWindow request_uptime_ms=$requestAwake query_delta=${queries.get()-beforeRequest}")
+                assertTrue("Short-request observation exceeded the 30 s background sampling period: " +
+                    "elapsed_ms=$requestWindow uptime_ms=$requestAwake; inspect host scheduling before interpreting query count",
+                    requestWindow<30_000)
                 assertEquals("Background request must remain pending in Go counters",beforeRequest,queries.get())
                 val beforeClose=db.proxyDao().getById(row.id)!!
                 assertEquals(11L,beforeClose.tx);assertEquals(37L,beforeClose.rx)

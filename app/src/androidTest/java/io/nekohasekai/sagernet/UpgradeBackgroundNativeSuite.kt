@@ -5,12 +5,15 @@ import android.os.PowerManager
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.ClassRule
 import org.junit.rules.TestRule
+import org.junit.rules.RuleChain
 import org.junit.runner.Description
 import org.junit.runner.RunWith
 import org.junit.runners.Suite
 import org.junit.runners.model.Statement
 
-/** Explicitly selected physical-device suite; keeps CPU awake without touching screen or production policy. */
+/** Physical-device functional suite with an inert foreground host and CPU wake lock.
+ * Traffic tests drive internal consumer signals; this does not measure OS-background power behavior.
+ */
 @RunWith(Suite::class)
 @Suite.SuiteClasses(
     RawSubscriptionNativeTest::class,
@@ -28,7 +31,7 @@ import org.junit.runners.model.Statement
 class UpgradeBackgroundNativeSuite {
     companion object {
         @ClassRule @JvmField
-        val cpuAwake: TestRule = object : TestRule {
+        val cpuAwake: TestRule = RuleChain.outerRule(BenchmarkForegroundRule()).around(object : TestRule {
             override fun apply(base: Statement, description: Description): Statement = object : Statement() {
                 override fun evaluate() {
                     val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -44,6 +47,6 @@ class UpgradeBackgroundNativeSuite {
                     }
                 }
             }
-        }
+        })
     }
 }

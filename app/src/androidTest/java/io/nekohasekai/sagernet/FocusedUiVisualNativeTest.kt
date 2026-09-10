@@ -245,6 +245,7 @@ class FocusedUiVisualNativeTest {
                 val page = activity.supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ConfigurationFragment
                 page?.getCurrentGroupFragment()?.adapter?.itemCount == 8
             }
+            val nodeList = awaitFixtureRows("nodes", activity, "本地示例 · Primary node")
             main {
                 appbar("nodes", activity)
                 contract("nodes-safe-fixture", (activity.supportFragmentManager.findFragmentById(R.id.fragment_holder) as ConfigurationFragment)
@@ -253,10 +254,23 @@ class FocusedUiVisualNativeTest {
                 contract("nodes-progress-hidden", activity.binding.fabProgress.visibility != View.VISIBLE)
             }
             shot("nodes", activity)
+            main { nodeList.scrollToPosition(7) }
+            awaitFixtureRows("nodes-bottom", activity, "示例节点 8 · Example")
+            main { nodeList.scrollBy(0, nodeList.height) }
+            awaitFixtureRows("nodes-bottom-settled", activity, "示例节点 8 · Example")
+            main {
+                val row = checkNotNull(nodeList.findViewHolderForAdapterPosition(7)).itemView
+                val visible = Rect()
+                val fullyVisible = row.getGlobalVisibleRect(visible) && visible.height() >= row.height - 1
+                contract("nodes-last-row-above-fab", fullyVisible && bounds(row).bottom <= bounds(activity.binding.fab).top,
+                    JSONObject().put("row", rectJson(bounds(row))).put("fab", rectJson(bounds(activity.binding.fab))))
+            }
+            shot("nodes-bottom", activity)
             main { navigate(activity, R.id.nav_group) }
             await("fixture groups") {
                 (activity.supportFragmentManager.findFragmentById(R.id.fragment_holder) as? GroupFragment)?.groupAdapter?.itemCount == 3
             }
+            awaitFixtureRows("groups", activity, "旅行配置 · Travel examples")
             main {
                 appbar("groups", activity)
                 hiddenConnectionControls("groups", activity)
@@ -270,6 +284,7 @@ class FocusedUiVisualNativeTest {
             await("fixture rules") {
                 (activity.supportFragmentManager.findFragmentById(R.id.fragment_holder) as? RouteFragment)?.ruleAdapter?.itemCount == 7
             }
+            awaitFixtureRows("rules", activity, "示例规则 1 · Example rule")
             main {
                 appbar("rules", activity)
                 hiddenConnectionControls("rules", activity)
@@ -291,6 +306,42 @@ class FocusedUiVisualNativeTest {
     private fun navigate(activity: MainActivity, id: Int) {
         activity.displayFragmentWithId(id)
         activity.supportFragmentManager.executePendingTransactions()
+    }
+
+    /** Adapter counts can precede binding and item/fragment fade-in animations. */
+    private fun awaitFixtureRows(name: String, activity: Activity, fixture: String): RecyclerView {
+        var ready: RecyclerView? = null
+        var stablePolls = 0
+        var previousBounds: List<Rect>? = null
+        await("$name fixture rendered") {
+            val list = descendants(activity.window.decorView).filterIsInstance<RecyclerView>().firstOrNull { candidate ->
+                candidate.isShown && descendants(candidate).filterIsInstance<TextView>().any { it.text.toString() == fixture }
+            }
+            val text = list?.let { descendants(it).filterIsInstance<TextView>().firstOrNull { it.text.toString() == fixture } }
+            val rows = list?.let { (0 until it.childCount).map(it::getChildAt) }
+                .orEmpty().filter { it.getGlobalVisibleRect(Rect()) }
+            val currentBounds = rows.map(::bounds)
+            val settled = list != null && text != null && visiblyOpaque(text) && rows.isNotEmpty() &&
+                rows.all { it.isLaidOut && !it.isLayoutRequested && visiblyOpaque(it) } &&
+                !list.isLayoutRequested && !list.isComputingLayout && !list.hasPendingAdapterUpdates() &&
+                list.scrollState == RecyclerView.SCROLL_STATE_IDLE && list.itemAnimator?.isRunning != true
+            stablePolls = if (settled && previousBounds == currentBounds) stablePolls + 1 else 0
+            previousBounds = currentBounds
+            ready = list
+            settled && stablePolls >= 3
+        }
+        main { contract("$name-fixture-visible", ready != null) }
+        return checkNotNull(ready)
+    }
+
+    private fun visiblyOpaque(view: View): Boolean {
+        if (!view.isShown || view.width <= 0 || view.height <= 0 || !view.getGlobalVisibleRect(Rect())) return false
+        var current: View? = view
+        while (current != null) {
+            if (current.alpha < 0.99f) return false
+            current = current.parent as? View
+        }
+        return true
     }
 
     private fun hiddenConnectionControls(name: String, activity: MainActivity) {

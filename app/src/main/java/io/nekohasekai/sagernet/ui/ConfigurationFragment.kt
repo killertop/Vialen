@@ -15,6 +15,7 @@ import android.view.LayoutInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -1036,6 +1037,37 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         lateinit var layoutManager: LinearLayoutManager
         lateinit var configurationListView: RecyclerView
+        private var fabPaddingObserver: ViewTreeObserver? = null
+        private var fabPaddingListener: ViewTreeObserver.OnGlobalLayoutListener? = null
+
+        private fun reserveFabScrollSpace() {
+            val host = activity as? MainActivity ?: return
+            val list = configurationListView
+            val fab = host.binding.fab
+            val minimum = list.paddingBottom
+            // Layout coordinates deliberately ignore translation/scale used by FAB hiding.
+            // Both views share the activity root, so its system-inset padding cancels out.
+            fun layoutTop(view: View): Int {
+                var top = view.top
+                var parent = view.parent as? View
+                while (parent != null) {
+                    top += parent.top - parent.scrollY
+                    parent = parent.parent as? View
+                }
+                return top
+            }
+            val listener = ViewTreeObserver.OnGlobalLayoutListener {
+                if (list.height > 0 && fab.height > 0) {
+                    val overlap = layoutTop(list) + list.height - layoutTop(fab)
+                    val padding = maxOf(minimum, overlap + dp2px(12))
+                    if (list.paddingBottom != padding) {
+                        list.setPadding(list.paddingLeft, list.paddingTop, list.paddingRight, padding)
+                    }
+                }
+            }
+            fabPaddingListener = listener
+            fabPaddingObserver = list.viewTreeObserver.also { it.addOnGlobalLayoutListener(listener) }
+        }
 
         val select by lazy {
             try {
@@ -1130,7 +1162,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             configurationListView.setItemViewCacheSize(20)
 
             if (!select) {
-
+                reserveFabScrollSpace()
                 undoManager = UndoSnackbarManager(activity as MainActivity, adapter!!)
 
                 ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
@@ -1176,6 +1208,15 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         override fun onDestroyView() {
             viewVersion++
+            fabPaddingListener?.let { listener ->
+                fabPaddingObserver?.takeIf { it.isAlive }?.removeOnGlobalLayoutListener(listener)
+                if (::configurationListView.isInitialized) {
+                    configurationListView.viewTreeObserver.takeIf { it.isAlive }
+                        ?.removeOnGlobalLayoutListener(listener)
+                }
+            }
+            fabPaddingObserver = null
+            fabPaddingListener = null
             adapter?.let {
                 ProfileManager.removeListener(it)
                 GroupManager.removeListener(it)

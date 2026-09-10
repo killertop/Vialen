@@ -5,10 +5,15 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
 import io.nekohasekai.sagernet.bg.SubscriptionUpdater
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
+import io.nekohasekai.sagernet.ktx.Logs
+import kotlinx.coroutines.CancellationException
+import java.util.concurrent.atomic.AtomicBoolean
 
 class BootReceiver : BroadcastReceiver() {
     companion object {
@@ -22,9 +27,30 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        runOnDefaultDispatcher {
-            SubscriptionUpdater.reconfigureUpdater()
+        val pending = goAsync()
+        val finished = AtomicBoolean(false)
+        fun finish() {
+            if (finished.compareAndSet(false, true)) pending.finish()
         }
+        val handler = Handler(Looper.getMainLooper())
+        // Leave margin within the shortest broadcast budget (10 seconds). A coroutine
+        // timeout alone cannot bound the updater's blocking Future.get(15 seconds).
+        val work = runOnDefaultDispatcher {
+            try {
+                SubscriptionUpdater.reconfigureUpdater()
+            } finally {
+                finish()
+            }
+        }
+        val deadline = Runnable {
+            if (!finished.get()) {
+                Logs.w("Subscription scheduling exceeded broadcast lifetime")
+                work.cancel(CancellationException("Broadcast scheduling deadline exceeded"))
+                finish()
+            }
+        }
+        handler.postDelayed(deadline, 8_000)
+        work.invokeOnCompletion { handler.removeCallbacks(deadline) }
 
         if (!DataStore.persistAcrossReboot) {   // sanity check
             enabled = false
