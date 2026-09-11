@@ -9,6 +9,8 @@ import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.SagerConnection
 import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.group.RawUpdater
+import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
+import io.nekohasekai.sagernet.fmt.toUniversalLink
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -28,11 +30,16 @@ class RustPipelineVpnNativeTest {
         val app = ApplicationProvider.getApplicationContext<SagerNet>()
         assertNull("Grant VPN consent before this explicit lifecycle test", VpnService.prepare(app))
         check(!DataStore.serviceState.started) { "An existing VPN is running; refusing to interrupt it" }
+        check(SagerNet.connectivity.allNetworks.none { network ->
+            SagerNet.connectivity.getNetworkCapabilities(network)
+                ?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN) == true
+        }) { "Refusing to replace an existing VPN" }
         val oldMode = DataStore.serviceMode; val oldProxy = DataStore.selectedProxy
         val oldDirect = DataStore.directDns; val oldRemote = DataStore.remoteDns
         val oldBypass = DataStore.bypassLan; val oldCoreBypass = DataStore.bypassLanInCore
         val oldApps = DataStore.proxyApps; val oldFake = DataStore.enableFakeDns
         val oldHttp = DataStore.appendHttpProxy
+        val oldIndividual = DataStore.individual; val oldBypassMode = DataStore.bypass
         val db = SagerDatabase.instance
         var groupId = 0L; var ruleId = 0L
         val connection = SagerConnection(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND)
@@ -49,9 +56,13 @@ class RustPipelineVpnNativeTest {
             DataStore.directDns = "local"; DataStore.remoteDns = "local"
             DataStore.bypassLan = false; DataStore.bypassLanInCore = false
             DataStore.proxyApps = androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("restrict_test_apps") == "true"; DataStore.enableFakeDns = false; DataStore.appendHttpProxy = false
+            if (DataStore.proxyApps) { DataStore.individual = app.packageName; DataStore.bypass = false }
             LoopbackSocksFixture(nonce).use { first -> LoopbackSocksFixture(nonce).use { second ->
                 LoopbackHttpFixture().use { server ->
-                    server.reply.set(LoopbackHttpFixture.Reply(body = "socks5://127.0.0.1:${first.port}#RustVPN_A\nsocks5://127.0.0.1:${second.port}#RustVPN_B"))
+                    val universal = SOCKSBean().apply {
+                        initializeDefaultValues(); name = "RustVPN_B"; serverAddress = "127.0.0.1"; serverPort = second.port
+                    }.toUniversalLink()
+                    server.reply.set(LoopbackHttpFixture.Reply(body = "socks5://127.0.0.1:${first.port}#RustVPN_A\n$universal"))
                     val sub = SubscriptionBean().apply { initializeDefaultValues(); link = "http://127.0.0.1:${server.port}/subscription"; deduplication = true; forceResolve = false }
                     val group = ProxyGroup(name = nonce, type = GroupType.SUBSCRIPTION, subscription = sub)
                     group.id = db.groupDao().createGroup(group); groupId = group.id
@@ -120,6 +131,7 @@ class RustPipelineVpnNativeTest {
                 DataStore.directDns = oldDirect; DataStore.remoteDns = oldRemote
                 DataStore.bypassLan = oldBypass; DataStore.bypassLanInCore = oldCoreBypass
                 DataStore.proxyApps = oldApps; DataStore.enableFakeDns = oldFake; DataStore.appendHttpProxy = oldHttp
+                DataStore.individual = oldIndividual; DataStore.bypass = oldBypassMode
                 db.runInTransaction {
                     if (ruleId != 0L) db.rulesDao().deleteById(ruleId)
                     if (groupId != 0L) { db.proxyDao().deleteByGroup(groupId); db.groupDao().deleteById(groupId) }

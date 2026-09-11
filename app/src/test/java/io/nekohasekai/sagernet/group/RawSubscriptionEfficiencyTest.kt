@@ -96,10 +96,25 @@ class RawSubscriptionEfficiencyTest {
             assertEquals(2, requests)
         }
     }
-    private fun projected(fields: String): SOCKSBean {
+    private fun projected(fields: String, fastFields: Boolean = false): SOCKSBean {
         val encoded = """{"version":1,"status":"SUCCESS","nodes":[{"kind":"SOCKS","fields":$fields,"initialize":false}]}"""
         return RustRawSubscription.parseWithCodecs(JsonObject(),
-            { encoded.encodeToByteArray() }, { error("Unexpected Universal decode") })!!.single() as SOCKSBean
+            { encoded.encodeToByteArray() }, { error("Unexpected Universal decode") }, fastFields = fastFields)!!.single() as SOCKSBean
+    }
+
+    @Test fun scalarFastPathPreservesGsonCoercionsNullsAndRejections() {
+        for (field in listOf("name", "serverPort", "sUoT")) {
+            for (value in listOf("null", "true", "false", "0", "-1", "123.75", "2147483648", "1e20", "\"true\"", "\"1080\"", "\"bad\"", "[]", "{}")) {
+                val fields = "{\"$field\":$value}"
+                val baseline = runCatching { projected(fields) }
+                val candidate = runCatching { projected(fields, true) }
+                assertEquals(fields, baseline.isSuccess, candidate.isSuccess)
+                if (baseline.isSuccess) {
+                    assertEquals(fields, moe.matsuri.nb4a.utils.JavaUtil.gson.toJsonTree(baseline.getOrThrow()),
+                        moe.matsuri.nb4a.utils.JavaUtil.gson.toJsonTree(candidate.getOrThrow()))
+                } else assertEquals(fields, baseline.exceptionOrNull()!!::class.java, candidate.exceptionOrNull()!!::class.java)
+            }
+        }
     }
 
     @Test fun cachedFieldsPreserveInheritedFieldsNullsAndDistinctBeans() {

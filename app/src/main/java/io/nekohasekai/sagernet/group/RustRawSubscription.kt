@@ -17,6 +17,7 @@ import io.nekohasekai.sagernet.fmt.v2ray.VMessBean
 import io.nekohasekai.sagernet.fmt.wireguard.WireGuardBean
 import io.nekohasekai.sagernet.ktx.SubscriptionFoundException
 import io.nekohasekai.sagernet.rust.RustBridge
+import io.nekohasekai.sagernet.rust.RustNative
 import moe.matsuri.nb4a.proxy.anytls.AnyTLSBean
 import moe.matsuri.nb4a.proxy.config.ConfigBean
 import moe.matsuri.nb4a.utils.JavaUtil.gson
@@ -49,6 +50,29 @@ internal object RustRawSubscription {
     }
 
     fun parse(text: String, fileName: String = "", mode: String = "raw", json: Any? = null): List<AbstractBean>? {
+        var document: SubscriptionWire.Document? = null
+        return parseWithCodecs(input(text, fileName, mode, json),
+            { checkNotNull(RustNative.nativeParseRawSubscriptionOptimized(it)) { "Rust subscription parsing failed" } },
+            { fields ->
+                val bytes = document?.binaryFields?.get(fields)
+                if (bytes == null) decodeUniversal(fields) else
+                    ProxyEntity(type = TypeMap[fields["type"].asString] ?: error("Unknown universal Bean type"))
+                        .apply { putByteArray(bytes) }.requireBean()
+            },
+            { bytes ->
+                document = null
+                if (bytes.size >= 4 && bytes[0] == 86.toByte() && bytes[1] == 67.toByte() &&
+                    bytes[2] == 87.toByte() && bytes[3] == 49.toByte()) {
+                    SubscriptionWire.rawDocument(bytes).also { document = it }.root
+                } else JsonParser.parseString(bytes.decodeToString(throwOnInvalidSequence = true)).asJsonObject
+            }, fastFields = true)
+    }
+
+    /** Frozen JSON/scalar path for equivalence tests and paired benchmarks. */
+    internal fun parseReference(text: String, fileName: String = "", mode: String = "raw", json: Any? = null): List<AbstractBean>? =
+        parseWithCodecs(input(text, fileName, mode, json), RustBridge::parseRawSubscription, ::decodeUniversal)
+
+    private fun input(text: String, fileName: String, mode: String, json: Any?): JsonObject {
         val input = JsonObject().apply {
             addProperty("version", 1); addProperty("mode", mode)
             addProperty("text", text); addProperty("file_name", fileName)
@@ -57,7 +81,7 @@ internal object RustRawSubscription {
                 else -> JsonNull.INSTANCE
             })
         }
-        return parseWithCodecs(input, RustBridge::parseRawSubscription, ::decodeUniversal)
+        return input
     }
 
     // Keep decoded mutable Beans local to a response position and retry iteration.
@@ -65,6 +89,10 @@ internal object RustRawSubscription {
         input: JsonObject,
         parseResponse: (ByteArray) -> ByteArray,
         decode: (JsonObject) -> AbstractBean,
+        decodeResponse: (ByteArray) -> JsonObject = {
+            JsonParser.parseString(it.decodeToString(throwOnInvalidSequence = true)).asJsonObject
+        },
+        fastFields: Boolean = false,
     ): List<AbstractBean>? {
         val invalid = linkedSetOf<String>()
         var universalBeans: Array<AbstractBean?>
@@ -72,7 +100,7 @@ internal object RustRawSubscription {
         while (true) {
             input.add("invalid_universal", gson.toJsonTree(invalid))
             val bytes = input.toString().encodeToByteArray(throwOnInvalidSequence = true)
-            result = JsonParser.parseString(parseResponse(bytes).decodeToString(throwOnInvalidSequence = true)).asJsonObject
+            result = decodeResponse(parseResponse(bytes))
             check(result["version"]?.toString() == "1") { "Invalid subscription result version" }
             check(result["status"]?.asString == "SUCCESS") { "Subscription parsing failed: ${result["error"]?.asString}" }
             result["subscription"]?.let { throw SubscriptionFoundException(it.asString) }
@@ -117,7 +145,14 @@ internal object RustRawSubscription {
                     fields.entrySet().forEach { (key, value) ->
                         val stored = projection.fields[key] ?: throw NoSuchFieldException(key)
                         check(!java.lang.reflect.Modifier.isStatic(stored.field.modifiers))
-                        stored.field.set(bean, gson.fromJson(value, stored.type))
+                        val scalar = if (fastFields && value.isJsonPrimitive) when {
+                            stored.type == String::class.java -> value.asString
+                            stored.type == Int::class.javaObjectType && value.asJsonPrimitive.isNumber -> value.asInt
+                            stored.type == Long::class.javaObjectType && value.asJsonPrimitive.isNumber -> value.asLong
+                            stored.type == Boolean::class.javaObjectType && value.asJsonPrimitive.isBoolean -> value.asBoolean
+                            else -> gson.fromJson<Any?>(value, stored.type)
+                        } else gson.fromJson<Any?>(value, stored.type)
+                        stored.field.set(bean, scalar)
                     }
                     if (bean is ConfigBean) bean.config = gson.toJson(JsonParser.parseString(bean.config))
                     bean

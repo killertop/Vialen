@@ -62,16 +62,10 @@ object RawUpdater : GroupUpdater() {
         }
 
         val proxiesMap = LinkedHashMap<String, AbstractBean>()
-        for (proxy in proxies) {
-            var index = 0
-            var name = proxy.displayName()
-            while (proxiesMap.containsKey(name)) {
-                println("Exists name: $name")
-                index++
-                name = name.replace(" (${index - 1})", "")
-                name = "$name ($index)"
-                proxy.name = name
-            }
+        val originalNames = proxies.map { it.displayName() }
+        val uniqueNames = SubscriptionNames.unique(originalNames)
+        for ((index, proxy) in proxies.withIndex()) {
+            if (uniqueNames[index] != originalNames[index]) proxy.name = uniqueNames[index]
             proxiesMap[proxy.displayName()] = proxy
         }
         proxies = proxiesMap.values.toList()

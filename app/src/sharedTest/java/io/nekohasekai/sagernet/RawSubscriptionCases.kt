@@ -12,6 +12,11 @@ import org.junit.Assert.*
 abstract class RawSubscriptionCases {
     private fun comparable(nodes: List<AbstractBean>?) = nodes?.map { it.javaClass.name to gson.toJsonTree(it) }
     private fun compare(text:String,file:String="") = runBlocking {
+        val reference = runCatching { io.nekohasekai.sagernet.group.RustRawSubscription.parseReference(text, file) }
+        val optimized = runCatching { io.nekohasekai.sagernet.group.RustRawSubscription.parse(text, file) }
+        assertEquals(text, reference.isSuccess, optimized.isSuccess)
+        if (reference.isSuccess) assertEquals(text, comparable(reference.getOrThrow()), comparable(optimized.getOrThrow()))
+        else assertEquals(text, reference.exceptionOrNull()!!::class.java, optimized.exceptionOrNull()!!::class.java)
         val old=runCatching { LegacyRawUpdater.parseRaw(text,file) }
         val fresh=runCatching { RawUpdater.parseRaw(text,file) }
         if(old.isSuccess) {assertTrue("Rust failed: ${fresh.exceptionOrNull()} for $text",fresh.isSuccess);assertEquals(text,comparable(old.getOrThrow()),comparable(fresh.getOrThrow()))}

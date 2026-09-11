@@ -513,6 +513,7 @@ object RustBridge {
 }
 
 internal object RustNative {
+    external fun nativeParseRawSubscriptionOptimized(input: ByteArray): ByteArray?
     init {
         System.loadLibrary("vialen_core")
     }

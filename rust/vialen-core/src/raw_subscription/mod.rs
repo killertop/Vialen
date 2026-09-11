@@ -217,18 +217,47 @@ fn parse(req: Input) -> Result<Value> {
     }
 }
 pub fn generate(input: &[u8]) -> Vec<u8> {
+    serde_json::to_vec(&generate_value(input)).expect("serializable result")
+}
+
+pub fn generate_optimized(input: &[u8]) -> Vec<u8> {
+    let value = generate_value(input);
+    let universal = value["nodes"].as_array().is_some_and(|nodes|
+        nodes.iter().any(|node| node["kind"] == "Universal"));
+    if universal { crate::subscription_wire::encode(&value) }
+    else { serde_json::to_vec(&value).expect("serializable result") }
+}
+
+#[cfg(test)]
+mod optimized_tests {
+    use super::*;
+    #[test]
+    fn only_universal_uses_binary_and_retry_returns_original_json() {
+        for text in ["", "[]", "proxies: [{type: socks5, server: example.com, port: 1080}]", "http://example.com:80"] {
+            let input = serde_json::to_vec(&json!({"version":1,"mode":"raw","text":text,"file_name":""})).unwrap();
+            assert_eq!(generate(&input), generate_optimized(&input));
+        }
+        let mut input = json!({"version":1,"mode":"raw","text":"sn://socks:AA==\nhttp://example.com:80","file_name":""});
+        let encoded = serde_json::to_vec(&input).unwrap();
+        assert!(generate_optimized(&encoded).starts_with(b"VCW1"));
+        input["invalid_universal"] = json!(["sn://socks:AA=="]);
+        let encoded = serde_json::to_vec(&input).unwrap();
+        assert_eq!(generate(&encoded), generate_optimized(&encoded));
+    }
+}
+
+fn generate_value(input: &[u8]) -> Value {
     let result = serde_json::from_slice::<Input>(input)
         .map_err(|_| "INVALID_SUBSCRIPTION_INPUT")
         .and_then(parse);
-    let value = match result {
+    match result {
         Ok(mut v) => {
             v["version"] = json!(1);
             v["status"] = json!("SUCCESS");
             v
         }
         Err(e) => json!({"version":1,"status":"ERROR","error":e}),
-    };
-    serde_json::to_vec(&value).expect("serializable result")
+    }
 }
 
 #[cfg(test)]

@@ -4,6 +4,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.group.RawUpdater
 import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
+import io.nekohasekai.sagernet.fmt.toUniversalLink
+import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Rule
@@ -23,7 +25,11 @@ class SubscriptionEndToEndNativeTest {
             val group=ProxyGroup(name="Rust-formats-${System.nanoTime()}",type=GroupType.SUBSCRIPTION,subscription=sub)
             group.id=db.groupDao().createGroup(group)
             try {
+                val universal = SOCKSBean().apply {
+                    initializeDefaultValues(); name = "Universal"; serverAddress = "127.0.0.1"; serverPort = 1080
+                }.toUniversalLink()
                 val formats=listOf(
+                    universal + "\n" + "sn://socks:AA==\nhttp://user:pass@127.0.0.1:8080#HTTP",
                     "proxies: [{type: http, name: HTTP, server: 127.0.0.1, port: 8080}, {type: anytls, name: AnyTLS, server: 127.0.0.1, port: 443, password: synthetic}]",
                     """{"outbounds":[{"type":"socks","tag":"Custom","server":"127.0.0.1","server_port":1080}]}""",
                     "[Interface]\nAddress=10.0.0.1/32\nPrivateKey=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nMTU=1420\n[Peer]\nEndpoint=127.0.0.1:51820\nPublicKey=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
@@ -42,6 +48,41 @@ class SubscriptionEndToEndNativeTest {
                 }
                 assertEquals(formats.size*2,server.requests.get())
             } finally {db.runInTransaction {db.proxyDao().deleteByGroup(group.id);db.groupDao().deleteById(group.id)}}
+        }
+    }
+    @Test fun universalCollisionNamesAndStableIdsReachRoom() = runBlocking {
+        val db = SagerDatabase.instance
+        LoopbackHttpFixture().use { server ->
+            val sub = SubscriptionBean().apply {
+                initializeDefaultValues(); link = "http://127.0.0.1:${server.port}/universal"
+                deduplication = false; forceResolve = false
+            }
+            val group = ProxyGroup(name = "Rust-universal-${System.nanoTime()}", type = GroupType.SUBSCRIPTION, subscription = sub)
+            group.id = db.groupDao().createGroup(group)
+            try {
+                val names = List(12) { "A" } + listOf("A (0)", "A (1)", "A (1) (1)", "节点😀", "节点😀")
+                val text = names.mapIndexed { index, label ->
+                    SOCKSBean().apply {
+                        initializeDefaultValues(); name = label; serverAddress = "127.0.0.1"; serverPort = 1080 + index
+                    }.toUniversalLink()
+                }.joinToString("\n")
+                val used = LinkedHashSet<String>()
+                val expected = names.map { original ->
+                    var name = original; var index = 0
+                    while (name in used) name = name.replace(" ($index)", "") + " (${++index})"
+                    used.add(name); name
+                }
+                server.reply.set(LoopbackHttpFixture.Reply(body = text))
+                RawUpdater.doUpdate(group, sub, null, false)
+                val rows = db.proxyDao().getByGroup(group.id)
+                assertEquals(expected, rows.map { it.displayName() })
+                assertEquals(names.indices.map { 1080 + it }, rows.map { it.requireBean().serverPort.toInt() })
+                RawUpdater.doUpdate(group, sub, null, false)
+                assertEquals(rows.map { it.id }, db.proxyDao().getByGroup(group.id).map { it.id })
+            } finally {
+                db.runInTransaction { db.proxyDao().deleteByGroup(group.id); db.groupDao().deleteById(group.id) }
+                assertNull(db.groupDao().getById(group.id))
+            }
         }
     }
     @Test fun actualHttpFetchDecodeBatchDedupDiffAndRoomRecoverTogether() = runBlocking {
@@ -145,4 +186,3 @@ class SubscriptionEndToEndNativeTest {
         assertEquals(originalGroups, db.groupDao().allGroups().map { it.id }.toSet())
     }
 }
-
