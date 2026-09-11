@@ -199,4 +199,65 @@ class ProfileExportNativeTest {
         }
         failure?.let { throw it }
     }
+
+    @Test fun exportStreamHandlesFlushAndCloseFailures() {
+        assumeTrue("Opt in on a physical device with -e vialenProfileExport true",
+            InstrumentationRegistry.getArguments().getString("vialenProfileExport") == "true")
+        val context = instrumentation.targetContext
+        val errorMsg = context.getString(R.string.action_export_err)
+
+        // 1. Opening failure (e.g. EISDIR / FileNotFoundException)
+        val openErr = assertThrows(java.io.IOException::class.java) {
+            ConfigurationFragment.writeExportConfig(
+                { throw java.io.FileNotFoundException("EISDIR: Is a directory") },
+                "test config",
+                errorMsg
+            )
+        }
+        assertEquals(errorMsg, openErr.message)
+        assertEquals("EISDIR: Is a directory", openErr.cause?.message)
+
+        // 2. Flush failure
+        val flushFailingStream = object : java.io.OutputStream() {
+            override fun write(b: Int) {}
+            override fun flush() { throw java.io.IOException("simulated flush error") }
+        }
+        val flushErr = assertThrows(java.io.IOException::class.java) {
+            ConfigurationFragment.writeExportConfig({ flushFailingStream }, "test config", errorMsg)
+        }
+        assertEquals(errorMsg, flushErr.message)
+        assertEquals("simulated flush error", flushErr.cause?.message)
+
+        // 3. Close failure
+        val closeFailingStream = object : java.io.OutputStream() {
+            override fun write(b: Int) {}
+            override fun close() { throw java.io.IOException("simulated close error") }
+        }
+        val closeErr = assertThrows(java.io.IOException::class.java) {
+            ConfigurationFragment.writeExportConfig({ closeFailingStream }, "test config", errorMsg)
+        }
+        assertEquals(errorMsg, closeErr.message)
+        assertEquals("simulated close error", closeErr.cause?.message)
+
+        // 4. Write failure
+        val writeFailingStream = object : java.io.OutputStream() {
+            override fun write(b: Int) { throw java.io.IOException("simulated write error") }
+        }
+        val writeErr = assertThrows(java.io.IOException::class.java) {
+            ConfigurationFragment.writeExportConfig({ writeFailingStream }, "test config", errorMsg)
+        }
+        assertEquals(errorMsg, writeErr.message)
+        assertEquals("simulated write error", writeErr.cause?.message)
+
+        // 5. Null stream
+        val nullErr = assertThrows(java.io.IOException::class.java) {
+            ConfigurationFragment.writeExportConfig({ null }, "test config", errorMsg)
+        }
+        assertEquals(errorMsg, nullErr.message)
+
+        // 6. Successful write
+        val successStream = java.io.ByteArrayOutputStream()
+        ConfigurationFragment.writeExportConfig({ successStream }, "{\"test\":\"ok\"}", errorMsg)
+        assertEquals("{\"test\":\"ok\"}", successStream.toString("UTF-8"))
+    }
 }

@@ -20,6 +20,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.VisibleForTesting
 import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.Toolbar
 import androidx.core.net.toUri
@@ -27,6 +28,8 @@ import androidx.core.view.isGone
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.core.view.size
+import java.io.IOException
+import java.io.OutputStream
 import androidx.fragment.app.Fragment
 import androidx.preference.PreferenceDataStore
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -123,6 +126,8 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     lateinit var adapter: GroupPagerAdapter
+    val isAdapterInitialized: Boolean
+        get() = ::adapter.isInitialized
     lateinit var tabLayout: TabLayout
     lateinit var groupPager: ViewPager2
     private var pendingExportProfileId: Long? = null
@@ -142,7 +147,8 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     val updateSelectedCallback = object : ViewPager2.OnPageChangeCallback() {
         override fun onPageSelected(position: Int) {
-            if (adapter.groupList.size > position) {
+            if (adapter.groupList.size > position && position >= 0) {
+                adapter.selectedGroupIndex = position
                 DataStore.selectedGroup = adapter.groupList[position].id
             }
         }
@@ -242,7 +248,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     if (targetIndex >= 0) {
                         groupPager.setCurrentItem(targetIndex, false)
                     } else {
-                        adapter.reload()
+                        adapter.reload(explicitTargetGroupId = targetId)
                     }
                 }
             }
@@ -918,11 +924,16 @@ class ConfigurationFragment @JvmOverloads constructor(
         var groupList: ArrayList<ProxyGroup> = ArrayList()
         var groupFragments: HashMap<Long, GroupFragment> = HashMap()
 
-        fun reload(now: Boolean = false) {
+        var reloadGeneration = 0L
+            private set
+        var publishedGeneration = 0L
+            private set
 
-            if (!select) {
-                groupPager.unregisterOnPageChangeCallback(updateSelectedCallback)
-            }
+        fun reload(now: Boolean = false, explicitTargetGroupId: Long? = null) {
+            val expectedGeneration = ++reloadGeneration
+            val expectedView = view
+            val expectedAdapter = this
+            val requestedTargetId = explicitTargetGroupId
 
             runOnDefaultDispatcher {
                 var newGroupList = ArrayList(SagerDatabase.groupDao.allGroups())
@@ -931,34 +942,68 @@ class ConfigurationFragment @JvmOverloads constructor(
                     newGroupList = ArrayList(SagerDatabase.groupDao.allGroups())
                 }
                 newGroupList.find { it.ungrouped }?.let {
-                    if (SagerDatabase.proxyDao.countByGroup(it.id) == 0L) {
+                    if (SagerDatabase.proxyDao.countByGroup(it.id) == 0L && newGroupList.size > 1) {
                         newGroupList.remove(it)
-                    }
-                }
-
-                var selectedGroup = selectedItem?.groupId ?: DataStore.currentGroupId()
-                var set = false
-                if (selectedGroup > 0L) {
-                    selectedGroupIndex = newGroupList.indexOfFirst { it.id == selectedGroup }
-                    set = true
-                } else if (groupList.size == 1) {
-                    selectedGroup = groupList[0].id
-                    if (DataStore.selectedGroup != selectedGroup) {
-                        DataStore.selectedGroup = selectedGroup
                     }
                 }
 
                 val runFunc = if (now) activity?.let { it::runOnUiThread } else groupPager::post
                 if (runFunc != null) {
                     runFunc {
-                        groupList = newGroupList
-                        notifyDataSetChanged()
-                        if (set) groupPager.setCurrentItem(selectedGroupIndex, false)
-                        val hideTab = groupList.size < 2
-                        tabLayout.isGone = hideTab
-                        toolbar.elevation = if (hideTab) 0F else dp2px(4).toFloat()
+                        if (!isAdded || view !== expectedView || adapter !== expectedAdapter || reloadGeneration != expectedGeneration) {
+                            return@runFunc
+                        }
+
+                        val currentPos = groupPager.currentItem
+                        val desiredGroupId = requestedTargetId ?: selectedItem?.groupId ?: if (!select) {
+                            val candidate = DataStore.selectedGroup
+                            if (candidate > 0L && newGroupList.any { it.id == candidate }) {
+                                candidate
+                            } else if (currentPos in groupList.indices && newGroupList.any { it.id == groupList[currentPos].id }) {
+                                groupList[currentPos].id
+                            } else if (selectedGroupIndex in groupList.indices && newGroupList.any { it.id == groupList[selectedGroupIndex].id }) {
+                                groupList[selectedGroupIndex].id
+                            } else {
+                                DataStore.currentGroupId()
+                            }
+                        } else {
+                            if (currentPos in groupList.indices && newGroupList.any { it.id == groupList[currentPos].id }) {
+                                groupList[currentPos].id
+                            } else if (selectedGroupIndex in groupList.indices && newGroupList.any { it.id == groupList[selectedGroupIndex].id }) {
+                                groupList[selectedGroupIndex].id
+                            } else {
+                                0L
+                            }
+                        }
+
                         if (!select) {
-                            groupPager.registerOnPageChangeCallback(updateSelectedCallback)
+                            groupPager.unregisterOnPageChangeCallback(updateSelectedCallback)
+                        }
+                        try {
+                            var targetIndex = if (desiredGroupId > 0L) newGroupList.indexOfFirst { it.id == desiredGroupId } else -1
+                            if (targetIndex < 0) {
+                                targetIndex = selectedGroupIndex.coerceIn(0, (newGroupList.size - 1).coerceAtLeast(0))
+                            }
+                            selectedGroupIndex = targetIndex
+
+                            groupList = newGroupList
+                            publishedGeneration = expectedGeneration
+                            notifyDataSetChanged()
+
+                            if (groupList.isNotEmpty() && targetIndex in groupList.indices) {
+                                groupPager.setCurrentItem(targetIndex, false)
+                                if (!select) {
+                                    DataStore.selectedGroup = groupList[targetIndex].id
+                                }
+                            }
+
+                            val hideTab = groupList.size < 2
+                            tabLayout.isGone = hideTab
+                            toolbar.elevation = if (hideTab) 0F else dp2px(4).toFloat()
+                        } finally {
+                            if (!select) {
+                                groupPager.registerOnPageChangeCallback(updateSelectedCallback)
+                            }
                         }
                     }
                 }
@@ -1005,12 +1050,48 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         override suspend fun groupRemoved(groupId: Long) {
-            val index = groupList.indexOfFirst { it.id == groupId }
-            if (index == -1) return
-
             tabLayout.post {
+                val index = groupList.indexOfFirst { it.id == groupId }
+                if (index == -1) return@post
+
+                val currentPos = groupPager.currentItem
+                val previousSelectedId = if (currentPos in groupList.indices) {
+                    groupList[currentPos].id
+                } else if (selectedGroupIndex in groupList.indices) {
+                    groupList[selectedGroupIndex].id
+                } else if (!select) {
+                    DataStore.selectedGroup
+                } else {
+                    -1L
+                }
+
+                groupFragments.remove(groupId)
                 groupList.removeAt(index)
                 notifyItemRemoved(index)
+
+                if (groupList.isEmpty()) {
+                    reload()
+                    return@post
+                }
+
+                val newPosition = if (previousSelectedId == groupId) {
+                    index.coerceIn(0, groupList.size - 1)
+                } else {
+                    val existingIndex = groupList.indexOfFirst { it.id == previousSelectedId }
+                    if (existingIndex >= 0) existingIndex else index.coerceIn(0, groupList.size - 1)
+                }
+
+                if (groupPager.currentItem != newPosition) {
+                    groupPager.setCurrentItem(newPosition, false)
+                }
+                selectedGroupIndex = newPosition
+                if (!select) {
+                    DataStore.selectedGroup = groupList[newPosition].id
+                }
+
+                val hideTab = groupList.size < 2
+                tabLayout.isGone = hideTab
+                toolbar.elevation = if (hideTab) 0F else dp2px(4).toFloat()
             }
         }
 
@@ -1028,7 +1109,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         override suspend fun onAdd(profile: ProxyEntity) {
             if (groupList.find { it.id == profile.groupId } == null) {
                 DataStore.selectedGroup = profile.groupId
-                reload()
+                reload(explicitTargetGroupId = profile.groupId)
             }
         }
 
@@ -1826,14 +1907,11 @@ class ConfigurationFragment @JvmOverloads constructor(
                             app.getString(R.string.profile_export_target_missing)
                         }
                         val config = profile.exportConfig().first
-                        try {
-                            val stream = resolver.openOutputStream(data)
-                                ?: throw java.io.IOException()
-                            stream.bufferedWriter().use { it.write(config) }
-                        } catch (e: Exception) {
-                            Logs.w(e)
-                            throw java.io.IOException(app.getString(R.string.action_export_err), e)
-                        }
+                        writeExportConfig(
+                            { resolver.openOutputStream(data) },
+                            config,
+                            app.getString(R.string.action_export_err)
+                        )
                         showMessage(app.getString(R.string.action_export_msg))
                     } catch (e: Exception) {
                         Logs.w(e)
@@ -1843,5 +1921,25 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
             }
         }
+
+    companion object {
+        @VisibleForTesting
+        internal fun writeExportConfig(
+            streamOpener: () -> OutputStream?,
+            config: String,
+            errorMessage: String
+        ) {
+            try {
+                val out = streamOpener() ?: throw IOException()
+                out.bufferedWriter().use {
+                    it.write(config)
+                    it.flush()
+                }
+            } catch (e: Exception) {
+                Logs.w(e)
+                throw IOException(errorMessage, e)
+            }
+        }
+    }
 
 }
