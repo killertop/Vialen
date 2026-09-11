@@ -40,6 +40,9 @@ class RustPipelineVpnNativeTest {
         val oldApps = DataStore.proxyApps; val oldFake = DataStore.enableFakeDns
         val oldHttp = DataStore.appendHttpProxy
         val oldIndividual = DataStore.individual; val oldBypassMode = DataStore.bypass
+        val kv = io.nekohasekai.sagernet.database.preference.PublicDatabase.kvPairDao
+        val hadIndividual = kv[Key.INDIVIDUAL] != null
+        val hadBypassMode = kv[Key.BYPASS_MODE] != null
         val db = SagerDatabase.instance
         var groupId = 0L; var ruleId = 0L
         val connection = SagerConnection(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND)
@@ -132,6 +135,8 @@ class RustPipelineVpnNativeTest {
                 DataStore.bypassLan = oldBypass; DataStore.bypassLanInCore = oldCoreBypass
                 DataStore.proxyApps = oldApps; DataStore.enableFakeDns = oldFake; DataStore.appendHttpProxy = oldHttp
                 DataStore.individual = oldIndividual; DataStore.bypass = oldBypassMode
+                if (!hadIndividual) kv.delete(Key.INDIVIDUAL)
+                if (!hadBypassMode) kv.delete(Key.BYPASS_MODE)
                 db.runInTransaction {
                     if (ruleId != 0L) db.rulesDao().deleteById(ruleId)
                     if (groupId != 0L) { db.proxyDao().deleteByGroup(groupId); db.groupDao().deleteById(groupId) }
