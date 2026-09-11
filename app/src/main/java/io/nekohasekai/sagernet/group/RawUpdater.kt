@@ -1,6 +1,5 @@
 package io.nekohasekai.sagernet.group
 
-import android.annotation.SuppressLint
 import androidx.core.net.toUri
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.*
@@ -13,7 +12,6 @@ import moe.matsuri.nb4a.utils.Util
 @Suppress("EXPERIMENTAL_API_USAGE")
 object RawUpdater : GroupUpdater() {
 
-    @SuppressLint("Recycle")
     override suspend fun doUpdate(
         proxyGroup: ProxyGroup,
         subscription: SubscriptionBean,
@@ -26,7 +24,7 @@ object RawUpdater : GroupUpdater() {
         if (link.startsWith("content://")) {
             val contentText = app.contentResolver.openInputStream(link.toUri())
                 ?.bufferedReader()
-                ?.readText()
+                ?.use { it.readText() }
 
             proxies = contentText?.let { parseRaw(contentText) }
                 ?: error(app.getString(R.string.no_proxies_found_in_subscription))

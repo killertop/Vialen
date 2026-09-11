@@ -106,6 +106,43 @@ class SubscriptionEndToEndNativeTest {
                 db.runInTransaction { db.proxyDao().deleteByGroup(group.id); db.groupDao().deleteById(group.id) }
             }
         }
+    }
+
+    @Test fun contentUriSubscriptionImportsSuccessfullyAgainstRoom() = runBlocking {
+        val db = SagerDatabase.instance
+        val originalGroups = db.groupDao().allGroups().map { it.id }.toSet()
+        val tempFile = java.io.File(SagerNet.application.cacheDir, "content_sub_test_${System.nanoTime()}.txt")
+        try {
+            tempFile.writeText("trojan://pw@node1.example:443#ContentTrojan\n")
+            val contentUri = androidx.core.content.FileProvider.getUriForFile(
+                SagerNet.application,
+                "${SagerNet.application.packageName}.cache",
+                tempFile
+            )
+            val sub = SubscriptionBean().apply {
+                initializeDefaultValues()
+                link = contentUri.toString()
+                deduplication = false
+                forceResolve = false
+            }
+            val group = ProxyGroup(name = "Content-E2E-${System.nanoTime()}", type = GroupType.SUBSCRIPTION, subscription = sub)
+            group.id = db.groupDao().createGroup(group)
+            try {
+                RawUpdater.doUpdate(group, sub, null, false)
+                val rows = db.proxyDao().getByGroup(group.id)
+                assertEquals(1, rows.size)
+                assertEquals("ContentTrojan", rows[0].displayName())
+                assertTrue(rows[0].requireBean() is TrojanBean)
+            } finally {
+                db.runInTransaction {
+                    db.proxyDao().deleteByGroup(group.id)
+                    db.groupDao().deleteById(group.id)
+                }
+            }
+        } finally {
+            tempFile.delete()
+        }
         assertEquals(originalGroups, db.groupDao().allGroups().map { it.id }.toSet())
     }
 }
+

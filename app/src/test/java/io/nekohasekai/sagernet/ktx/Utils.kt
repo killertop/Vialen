@@ -45,3 +45,6 @@ fun broadcastReceiver(callback: (Context, Intent) -> Unit): BroadcastReceiver =
     object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) = callback(context, intent)
     }
+
+val app get() = io.nekohasekai.sagernet.SagerNet.application
+
