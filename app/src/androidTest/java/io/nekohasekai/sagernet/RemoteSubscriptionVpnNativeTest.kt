@@ -44,10 +44,14 @@ class RemoteSubscriptionVpnNativeTest {
         val oldConsent = shell("cmd appops get ${app.packageName} ACTIVATE_VPN")
             .substringAfter("ACTIVATE_VPN: ", "default").substringBefore(';').trim()
         val input = File(app.filesDir, "remote-acceptance-private.json")
-        check(input.isFile) { "Private input missing" }
-        val beans = RawUpdater.parseRaw(input.readText()) ?: error("No imported nodes")
+        val urlInput = File(app.filesDir, "remote-acceptance-private.url")
+        val useRemoteUrl = args.getString("vialenRemoteUrl") == "true"
+        check(if (useRemoteUrl) urlInput.isFile else input.isFile) { "Private input missing" }
+        val beans = if (useRemoteUrl) null else RawUpdater.parseRaw(input.readText()) ?: error("No imported nodes")
         val index = args.getString("nodeIndex")?.toInt() ?: 0
-        check(index in beans.indices)
+        val rounds = args.getString("remoteRounds")?.toInt() ?: 2
+        require(rounds in 1..10) { "Remote rounds must be bounded to 1..10" }
+        if (beans != null) check(index in beans.indices)
         val db = SagerDatabase.instance
         val kv = PublicDatabase.kvPairDao
         val keys = listOf(Key.SERVICE_MODE, Key.DIRECT_DNS, Key.REMOTE_DNS,
@@ -57,16 +61,42 @@ class RemoteSubscriptionVpnNativeTest {
             KeyValuePair(row.key).also { it.valueType = row.valueType; it.value = row.value.copyOf() }
         } }
         var groupId = 0L
+        var refreshGroupId = 0L
         var ruleId = 0L
+        val requestTimes = mutableListOf<Long>()
+        val refreshCounts = mutableListOf<Int>()
         val connection = SagerConnection(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND)
         suspend fun awaitState(expected: BaseService.State) {
             repeat(200) { if (connection.service?.state == expected.ordinal) return; delay(100) }
             error("Binder did not reach $expected")
         }
         state.preservingFailure({
-            groupId = db.groupDao().createGroup(ProxyGroup(name = "remote-acceptance-${System.nanoTime()}"))
-            val profile = ProxyEntity().apply { this.groupId = groupId; putBean(beans[index]) }
-            profile.id = db.proxyDao().addProxy(profile)
+            val group = ProxyGroup(name = "remote-acceptance-${System.nanoTime()}")
+            if (useRemoteUrl) {
+                val subscription = SubscriptionBean().apply {
+                    initializeDefaultValues()
+                    link = urlInput.readText().trim()
+                    check(link.startsWith("https://")) { "HTTPS subscription required" }
+                    deduplication = true; forceResolve = false
+                }
+                group.type = GroupType.SUBSCRIPTION; group.subscription = subscription
+            }
+            groupId = db.groupDao().createGroup(group); group.id = groupId
+            val profile = if (useRemoteUrl) {
+                repeat(2) { refresh ->
+                    RawUpdater.doUpdate(group, group.subscription!!, null, false)
+                    check(db.proxyDao().getByGroup(groupId).isNotEmpty()) { "Empty remote refresh" }
+                    println("REMOTE_REFRESH round=$refresh count=${db.proxyDao().getByGroup(groupId).size}")
+                }
+                val imported = db.proxyDao().getByGroup(groupId)
+                check(index in imported.indices)
+                imported[index]
+            } else {
+                ProxyEntity().apply { this.groupId = groupId; putBean(beans!![index]) }.also {
+                    it.id = db.proxyDao().addProxy(it)
+                }
+            }
+            val importedCount = if (useRemoteUrl) db.proxyDao().getByGroup(groupId).size else beans!!.size
             ruleId = db.rulesDao().createRule(RuleEntity(name = "remote-acceptance", enabled = true,
                 userOrder = Long.MIN_VALUE, domains = "full:cp.cloudflare.com", outbound = profile.id))
             DataStore.serviceMode = Key.MODE_VPN
@@ -82,7 +112,7 @@ class RemoteSubscriptionVpnNativeTest {
                 override fun stateChanged(state: BaseService.State, profileName: String?, msg: String?) {}
                 override fun onServiceConnected(service: ISagerNetService) {}
             })
-            repeat(2) { round ->
+            repeat(rounds) { round ->
                 val needsConsent = VpnService.prepare(app) != null
                 SagerNet.startService()
                 if (needsConsent) {
@@ -99,11 +129,33 @@ class RemoteSubscriptionVpnNativeTest {
                     if (!vpn) delay(100)
                 }
                 assertTrue("Active network must be VPN", vpn)
+                if (round == 0 && args.getString("refreshThroughProxy") == "true") {
+                    check(urlInput.isFile) { "Private URL input missing" }
+                    val subscription = SubscriptionBean().apply {
+                        initializeDefaultValues(); link = urlInput.readText().trim()
+                        check(link.startsWith("https://")) { "HTTPS subscription required" }
+                        deduplication = true; forceResolve = false
+                    }
+                    val refreshGroup = ProxyGroup(name = "remote-refresh-${System.nanoTime()}",
+                        type = GroupType.SUBSCRIPTION, subscription = subscription)
+                    refreshGroupId = db.groupDao().createGroup(refreshGroup)
+                    refreshGroup.id = refreshGroupId
+                    repeat(2) {
+                        RawUpdater.doUpdate(refreshGroup, subscription, null, false)
+                        val count = db.proxyDao().getByGroup(refreshGroupId).size
+                        check(count > 0) { "Empty proxy-assisted refresh" }
+                        refreshCounts += count
+                    }
+                }
                 val request = URL("https://cp.cloudflare.com/generate_204").openConnection(Proxy.NO_PROXY) as HttpURLConnection
+                val requestStart = System.nanoTime()
+                var requestMs = 0L
                 try {
                     request.connectTimeout = 15000; request.readTimeout = 15000
                     request.instanceFollowRedirects = false
                     assertEquals("HTTPS through explicit proxy rule", 204, request.responseCode)
+                    requestMs = (System.nanoTime() - requestStart) / 1_000_000
+                    requestTimes += requestMs
                 } finally { request.disconnect() }
                 SagerNet.stopService(); awaitState(BaseService.State.Stopped)
                 val stopDeadline = System.nanoTime() + 5_000_000_000L
@@ -113,13 +165,14 @@ class RemoteSubscriptionVpnNativeTest {
                 }
                 while (hasVpn() && System.nanoTime() < stopDeadline) delay(100)
                 assertFalse("VPN network must disappear after stop", hasVpn())
-                println("REMOTE_VPN round=$round imported=${beans.size} binder_connected=true active_vpn=true https_204=true binder_stopped=true")
+                println("REMOTE_VPN round=$round imported=$importedCount binder_connected=true active_vpn=true https_204=true binder_stopped=true request_ms=$requestMs")
             }
         }, {
             state.cleanupSteps({ VpnConsentTestUi.cleanup() }, { state.stopAndAwait(connection) }, { connection.disconnect(app) }, {
                 db.runInTransaction {
                     if (ruleId != 0L) db.rulesDao().deleteById(ruleId)
                     if (groupId != 0L) { db.proxyDao().deleteByGroup(groupId); db.groupDao().deleteById(groupId) }
+                    if (refreshGroupId != 0L) { db.proxyDao().deleteByGroup(refreshGroupId); db.groupDao().deleteById(refreshGroupId) }
                 }
                 saved.forEach { (key, row) -> if (row == null) kv.delete(key) else kv.put(row) }
             }, {
@@ -136,5 +189,9 @@ class RemoteSubscriptionVpnNativeTest {
                 assertArrayEquals(row.value, actual.value)
             }
         }
+        InstrumentationRegistry.getInstrumentation().addResults(android.os.Bundle().apply {
+            putString("remote_request_ms", requestTimes.joinToString(","))
+            putString("proxy_refresh_counts", refreshCounts.joinToString(","))
+        })
     }
 }
