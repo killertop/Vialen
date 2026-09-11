@@ -10,8 +10,8 @@
     <item
         android:id="@+id/action_apply"
         android:alphabeticShortcut="s"
-        android:icon="@drawable/ic_action_done"
-        android:title="@string/apply"
+
+        android:title="@string/ui_save"
         app:showAsAction="always" />
     <item
         android:id="@+id/action_create_shortcut"

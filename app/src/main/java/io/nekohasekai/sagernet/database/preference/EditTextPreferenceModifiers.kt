@@ -16,6 +16,8 @@ object EditTextPreferenceModifiers {
     object Hosts : EditTextPreference.OnBindEditTextListener {
 
         override fun onBindEditText(editText: EditText) {
+            editText.setSingleLine()
+            editText.imeOptions = EditorInfo.IME_ACTION_DONE
             editText.setHorizontallyScrolling(true)
             editText.setSelection(editText.text.length)
         }

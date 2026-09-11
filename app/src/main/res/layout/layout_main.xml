@@ -36,13 +36,24 @@
             android:id="@+id/fab"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:elevation="6dp"
+            android:elevation="0dp"
             android:nextFocusDown="@+id/stats"
             app:backgroundTint="@color/vialen_service_background"
             app:tint="@color/vialen_service_foreground"
             app:layout_anchor="@id/stats"
             app:pressedTranslationZ="6dp"
             app:srcCompat="@drawable/ic_service_idle" />
+
+        <TextView
+            android:id="@+id/connection_summary"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="32dp"
+            android:accessibilityLiveRegion="polite"
+            android:textColor="@color/vialen_text_secondary"
+            android:textSize="14sp"
+            android:visibility="gone" />
 
         <io.nekohasekai.sagernet.widget.StatsBar
             android:id="@+id/stats"

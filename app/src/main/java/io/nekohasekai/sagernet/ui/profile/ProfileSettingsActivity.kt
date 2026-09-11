@@ -61,15 +61,14 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
     class UnsavedChangesDialogFragment : AlertDialogFragment<Empty, Empty>() {
         override fun AlertDialog.Builder.prepare(listener: DialogInterface.OnClickListener) {
             setTitle(R.string.unsaved_changes_prompt)
-            setPositiveButton(R.string.yes) { _, _ ->
-                runOnDefaultDispatcher {
-                    (requireActivity() as ProfileSettingsActivity<*>).saveAndExit()
-                }
+            setPositiveButton(R.string.ui_save) { _, _ ->
+                val owner = requireActivity() as ProfileSettingsActivity<*>
+                runOnDefaultDispatcher { owner.saveAndExit() }
             }
-            setNegativeButton(R.string.no) { _, _ ->
+            setNegativeButton(R.string.ui_discard) { _, _ ->
                 requireActivity().finish()
             }
-            setNeutralButton(android.R.string.cancel, null)
+            setNeutralButton(R.string.ui_keep_editing, null)
         }
     }
 
@@ -78,13 +77,13 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
     class DeleteConfirmationDialogFragment : AlertDialogFragment<ProfileIdArg, Empty>() {
         override fun AlertDialog.Builder.prepare(listener: DialogInterface.OnClickListener) {
             setTitle(R.string.delete_confirm_prompt)
-            setPositiveButton(R.string.yes) { _, _ ->
+            setPositiveButton(R.string.delete) { _, _ ->
                 runOnDefaultDispatcher {
                     ProfileManager.deleteProfile(arg.groupId, arg.profileId)
                 }
                 requireActivity().finish()
             }
-            setNegativeButton(R.string.no, null)
+            setNegativeButton(android.R.string.cancel, null)
         }
     }
 
@@ -147,6 +146,17 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
             DataStore.profileCacheStore.registerChangeListener(this)
         }
         isSubscription = intent.getBooleanExtra(EXTRA_IS_SUBSCRIPTION, false)
+        val protocol = io.nekohasekai.sagernet.database.ProxyEntity().apply {
+            putBean(createEntity().applyDefaultValues())
+        }.displayType()
+        val isNew = intent.getLongExtra(EXTRA_PROFILE_ID, 0L) == 0L
+        supportActionBar?.apply {
+            if (protocol.length > 8) {
+                title = protocol
+                subtitle = getString(if (isNew) R.string.ui_new_node_short else R.string.ui_edit_node_short)
+            } else title = getString(if (isNew) R.string.ui_new_node else R.string.ui_edit_node, protocol)
+        }
+
     }
 
     private lateinit var draftSession: String
@@ -192,6 +202,7 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.profile_config_menu, menu)
+        menu.findItem(R.id.action_delete)?.isVisible = DataStore.editingId != 0L
         menu.findItem(R.id.action_move)?.apply {
             if (DataStore.editingId != 0L // not new profile
                 && SagerDatabase.groupDao.getById(DataStore.editingGroup)?.type == GroupType.BASIC // not in subscription group
@@ -254,7 +265,7 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
         return false
     }
 
-    class MyPreferenceFragmentCompat : PreferenceFragmentCompat() {
+    class MyPreferenceFragmentCompat : io.nekohasekai.sagernet.ui.VialenPreferenceFragment() {
 
         var activity: ProfileSettingsActivity<*>? = null
 

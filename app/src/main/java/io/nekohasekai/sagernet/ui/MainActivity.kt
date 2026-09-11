@@ -6,6 +6,12 @@ import android.os.Bundle
 import android.os.RemoteException
 import android.view.KeyEvent
 import android.view.MenuItem
+import android.view.View
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import io.nekohasekai.sagernet.database.SagerDatabase
 import androidx.activity.addCallback
 import androidx.annotation.IdRes
 import androidx.core.view.GravityCompat
@@ -53,6 +59,32 @@ class MainActivity : ThemedActivity(),
     lateinit var navigation: NavigationView
     private var renderedState = BaseService.State.Idle
     private var pendingPage: Int? = null
+    private var hasProfiles = false
+    private var availabilityVersion = 0L
+
+    fun refreshProfileAvailability() {
+        val version = ++availabilityVersion
+        val excluded = (supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ConfigurationFragment)
+            ?.pendingRemovalIds().orEmpty()
+        lifecycleScope.launch {
+            val available = withContext(Dispatchers.IO) {
+                if (excluded.isEmpty()) SagerDatabase.proxyDao.hasProfiles()
+                else SagerDatabase.proxyDao.hasProfilesExcluding(excluded)
+            }
+            if (version != availabilityVersion) return@launch
+            hasProfiles = available
+            syncPageControls(supportFragmentManager.findFragmentById(R.id.fragment_holder))
+        }
+    }
+
+    private fun updateConnectionSummary(showControls: Boolean) {
+        binding.connectionSummary.visibility = if (showControls && !renderedState.connected) View.VISIBLE else View.GONE
+        binding.connectionSummary.setText(when (renderedState) {
+            BaseService.State.Connecting -> R.string.connecting
+            BaseService.State.Stopping -> R.string.stopping
+            else -> R.string.not_connected
+        })
+    }
 
     private val pageCallbacks = object : FragmentManager.FragmentLifecycleCallbacks() {
         override fun onFragmentResumed(fm: FragmentManager, fragment: Fragment) {
@@ -94,6 +126,10 @@ class MainActivity : ThemedActivity(),
         }
 
         binding.fab.setOnClickListener {
+            if (!hasProfiles && !DataStore.serviceState.canStop) {
+                (supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ConfigurationFragment)?.showAddNodeSheet()
+                return@setOnClickListener
+            }
             if (DataStore.serviceState.canStop) SagerNet.stopService() else connect.launch(
                 null
             )
@@ -103,6 +139,7 @@ class MainActivity : ThemedActivity(),
         setContentView(binding.root)
         syncPageControls(supportFragmentManager.findFragmentById(R.id.fragment_holder))
         changeState(BaseService.State.Idle)
+        refreshProfileAvailability()
         connection.connect(this, this)
         DataStore.configurationStore.registerChangeListener(this)
         GroupManager.userInterface = GroupInterfaceAdapter(this)
@@ -190,7 +227,7 @@ class MainActivity : ThemedActivity(),
 
             MaterialAlertDialogBuilder(this@MainActivity).setTitle(R.string.subscription_import)
                 .setMessage(getString(R.string.subscription_import_message, name))
-                .setPositiveButton(R.string.yes) { _, _ ->
+                .setPositiveButton(R.string.ui_import) { _, _ ->
                     runOnDefaultDispatcher {
                         finishImportSubscription(group)
                     }
@@ -220,7 +257,7 @@ class MainActivity : ThemedActivity(),
         onMainDispatcher {
             MaterialAlertDialogBuilder(this@MainActivity).setTitle(R.string.profile_import)
                 .setMessage(getString(R.string.profile_import_message, profile.displayName()))
-                .setPositiveButton(R.string.yes) { _, _ ->
+                .setPositiveButton(R.string.ui_import) { _, _ ->
                     runOnDefaultDispatcher {
                         finishImportProfile(profile)
                     }
@@ -239,7 +276,7 @@ class MainActivity : ThemedActivity(),
         onMainDispatcher {
             displayFragmentWithId(R.id.nav_configuration)
 
-            snackbar(resources.getQuantityString(R.plurals.added, 1, 1)).show()
+            snackbar(getString(R.string.ui_import_next)).show()
         }
     }
 
@@ -251,6 +288,13 @@ class MainActivity : ThemedActivity(),
     }
 
 
+    fun addNodeToGroup(groupId: Long) {
+        DataStore.selectedGroup = groupId
+        displayFragment(ConfigurationFragment().apply {
+            arguments = Bundle().apply { putBoolean("openAddNode", true) }
+        })
+    }
+
     private fun displayFragment(fragment: ToolbarFragment) {
         syncPageControls(fragment)
         supportFragmentManager.beginTransaction()
@@ -261,10 +305,12 @@ class MainActivity : ThemedActivity(),
 
     private fun syncPageControls(fragment: Fragment?) {
         if (fragment == null || !::binding.isInitialized) return
-        val showControls = fragment is ConfigurationFragment || DataStore.showBottomBar
+        val showControls = (fragment is ConfigurationFragment || DataStore.showBottomBar) &&
+            (hasProfiles || renderedState.canStop)
         binding.stats.allowShow = showControls
         binding.fab.pageAllowsControls = showControls
         if (showControls) binding.fab.show() else binding.fab.hide()
+        updateConnectionSummary(showControls)
         val id = when (fragment) {
             is ConfigurationFragment -> R.id.nav_configuration
             is GroupFragment -> R.id.nav_group
@@ -318,6 +364,7 @@ class MainActivity : ThemedActivity(),
         DataStore.serviceState = state
         binding.fab.changeState(state, previousState, animate)
         binding.stats.changeState(state)
+        syncPageControls(supportFragmentManager.findFragmentById(R.id.fragment_holder))
         if (msg != null) snackbar(getString(R.string.vpn_error, msg)).show()
     }
 

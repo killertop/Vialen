@@ -33,16 +33,16 @@
             android:layout_marginRight="20dp"
             android:orientation="vertical"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            app:passwordToggleEnabled="true">
+            app:hintEnabled="false">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@android:id/edit"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="textPassword"
+                android:inputType="textCapSentences|textMultiLine"
                 android:minHeight="48dp"
                 android:paddingTop="12dp"
-                android:singleLine="true"
+                android:maxLines="6"
                 android:typeface="monospace" />
         </com.google.android.material.textfield.TextInputLayout>
     </LinearLayout>

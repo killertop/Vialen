@@ -20,6 +20,23 @@ class MTUPreference
         dialogLayoutResource = R.layout.layout_mtu_help
     }
 
+    override fun onClick() {
+        val choices = entries.map { it.toString() } + context.getString(R.string.ui_custom)
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(context)
+            .setTitle(title)
+            .setSingleChoiceItems(choices.toTypedArray(), entryValues.indexOf(value).takeIf { it >= 0 } ?: entryValues.size) { dialog, index ->
+                if (index == entryValues.size) {
+                    dialog.dismiss()
+                    showCustomDialog()
+                } else {
+                    val proposed = entryValues[index].toString()
+                    if (callChangeListener(proposed)) { value = proposed; dialog.dismiss() }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     internal fun showCustomDialog() =
         context.showIntegerFormDialog("MTU", value.orEmpty(), 1000..10000) { mtu ->
             val proposed = mtu.toString()

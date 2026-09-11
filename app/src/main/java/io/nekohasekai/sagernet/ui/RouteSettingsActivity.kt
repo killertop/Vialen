@@ -191,15 +191,14 @@ class RouteSettingsActivity(
     class UnsavedChangesDialogFragment : AlertDialogFragment<Empty, Empty>() {
         override fun AlertDialog.Builder.prepare(listener: DialogInterface.OnClickListener) {
             setTitle(R.string.unsaved_changes_prompt)
-            setPositiveButton(R.string.yes) { _, _ ->
-                runOnDefaultDispatcher {
-                    (requireActivity() as RouteSettingsActivity).saveAndExit()
-                }
+            setPositiveButton(R.string.ui_save) { _, _ ->
+                val owner = requireActivity() as RouteSettingsActivity
+                runOnDefaultDispatcher { owner.saveAndExit() }
             }
-            setNegativeButton(R.string.no) { _, _ ->
+            setNegativeButton(R.string.ui_discard) { _, _ ->
                 requireActivity().finish()
             }
-            setNeutralButton(android.R.string.cancel, null)
+            setNeutralButton(R.string.ui_keep_editing, null)
         }
     }
 
@@ -208,13 +207,13 @@ class RouteSettingsActivity(
     class DeleteConfirmationDialogFragment : AlertDialogFragment<ProfileIdArg, Empty>() {
         override fun AlertDialog.Builder.prepare(listener: DialogInterface.OnClickListener) {
             setTitle(R.string.delete_route_prompt)
-            setPositiveButton(R.string.yes) { _, _ ->
+            setPositiveButton(R.string.delete) { _, _ ->
                 runOnDefaultDispatcher {
                     ProfileManager.deleteRule(arg.ruleId)
                 }
                 requireActivity().finish()
             }
-            setNegativeButton(R.string.no, null)
+            setNegativeButton(android.R.string.cancel, null)
         }
     }
 
@@ -229,7 +228,7 @@ class RouteSettingsActivity(
         onBackPressedDispatcher.addCallback(this) { requestClose() }
         setSupportActionBar(findViewById(R.id.toolbar))
         supportActionBar?.apply {
-            setTitle(R.string.cag_route)
+            setTitle(if (intent.getLongExtra(EXTRA_ROUTE_ID, 0L) == 0L) R.string.ui_new_route else R.string.cag_route)
             setDisplayHomeAsUpEnabled(true)
             setHomeAsUpIndicator(R.drawable.ic_navigation_close)
         }
@@ -323,6 +322,7 @@ class RouteSettingsActivity(
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.profile_config_menu, menu)
+        menu.findItem(R.id.action_delete)?.isVisible = DataStore.editingId != 0L
         return true
     }
 
@@ -358,7 +358,7 @@ class RouteSettingsActivity(
         }
     }
 
-    class MyPreferenceFragmentCompat : PreferenceFragmentCompat() {
+    class MyPreferenceFragmentCompat : io.nekohasekai.sagernet.ui.VialenPreferenceFragment() {
 
         var activity: RouteSettingsActivity? = null
 

@@ -143,7 +143,9 @@ class GroupSettingsActivity(
         fun updateGroupType(groupType: Int = DataStore.groupType) {
             val isSubscription = groupType == GroupType.SUBSCRIPTION
             groupSubscription.isVisible = isSubscription
+            groupSubscription.order = if (isSubscription) -1 else 2
             subscriptionUpdate.isVisible = isSubscription
+            findPreference<PreferenceCategory>("uiSubscriptionAdvanced")?.isVisible = isSubscription
         }
         updateGroupType()
         groupType.setOnPreferenceChangeListener { _, newValue ->
@@ -174,15 +176,14 @@ class GroupSettingsActivity(
     class UnsavedChangesDialogFragment : AlertDialogFragment<Empty, Empty>() {
         override fun AlertDialog.Builder.prepare(listener: DialogInterface.OnClickListener) {
             setTitle(R.string.unsaved_changes_prompt)
-            setPositiveButton(R.string.yes) { _, _ ->
-                runOnDefaultDispatcher {
-                    (requireActivity() as GroupSettingsActivity).saveAndExit()
-                }
+            setPositiveButton(R.string.ui_save) { _, _ ->
+                val owner = requireActivity() as GroupSettingsActivity
+                runOnDefaultDispatcher { owner.saveAndExit() }
             }
-            setNegativeButton(R.string.no) { _, _ ->
+            setNegativeButton(R.string.ui_discard) { _, _ ->
                 requireActivity().finish()
             }
-            setNeutralButton(android.R.string.cancel, null)
+            setNeutralButton(R.string.ui_keep_editing, null)
         }
     }
 
@@ -191,13 +192,13 @@ class GroupSettingsActivity(
     class DeleteConfirmationDialogFragment : AlertDialogFragment<GroupIdArg, Empty>() {
         override fun AlertDialog.Builder.prepare(listener: DialogInterface.OnClickListener) {
             setTitle(R.string.delete_group_prompt)
-            setPositiveButton(R.string.yes) { _, _ ->
+            setPositiveButton(R.string.delete) { _, _ ->
                 runOnDefaultDispatcher {
                     GroupManager.deleteGroup(arg.groupId)
                 }
                 requireActivity().finish()
             }
-            setNegativeButton(R.string.no, null)
+            setNegativeButton(android.R.string.cancel, null)
         }
     }
 
@@ -212,7 +213,7 @@ class GroupSettingsActivity(
         onBackPressedDispatcher.addCallback(this) { requestClose() }
         setSupportActionBar(findViewById(R.id.toolbar))
         supportActionBar?.apply {
-            setTitle(R.string.group_settings)
+            setTitle(if (intent.getLongExtra(EXTRA_GROUP_ID, 0L) == 0L) (if (intent.getBooleanExtra("newSubscription", false)) R.string.ui_add_subscription else R.string.ui_new_group) else R.string.group_settings)
             setDisplayHomeAsUpEnabled(true)
             setHomeAsUpIndicator(R.drawable.ic_navigation_close)
         }
@@ -230,6 +231,9 @@ class GroupSettingsActivity(
                     }
                     lifecycle.withResumed {
                         entity.init()
+                        if (editingId == 0L && intent.getBooleanExtra("newSubscription", false)) {
+                            DataStore.groupType = GroupType.SUBSCRIPTION
+                        }
                         // Cache initialization and fragment attachment are one main-thread operation.
                         // A cancelled old Activity never writes a late initialization into this draft.
                         DataStore.dirty = false
@@ -296,6 +300,7 @@ class GroupSettingsActivity(
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.profile_config_menu, menu)
+        menu.findItem(R.id.action_delete)?.isVisible = DataStore.editingId != 0L
         return true
     }
 
@@ -331,7 +336,7 @@ class GroupSettingsActivity(
         }
     }
 
-    class MyPreferenceFragmentCompat : PreferenceFragmentCompat() {
+    class MyPreferenceFragmentCompat : io.nekohasekai.sagernet.ui.VialenPreferenceFragment() {
 
         var activity: GroupSettingsActivity? = null
 

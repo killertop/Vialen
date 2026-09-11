@@ -45,13 +45,13 @@ class ConfigEditActivity : ThemedActivity() {
     class UnsavedChangesDialogFragment : AlertDialogFragment<Empty, Empty>() {
         override fun AlertDialog.Builder.prepare(listener: DialogInterface.OnClickListener) {
             setTitle(R.string.unsaved_changes_prompt)
-            setPositiveButton(R.string.yes) { _, _ ->
+            setPositiveButton(R.string.ui_save) { _, _ ->
                 (requireActivity() as ConfigEditActivity).saveAndExit()
             }
-            setNegativeButton(R.string.no) { _, _ ->
+            setNegativeButton(R.string.ui_discard) { _, _ ->
                 requireActivity().finish()
             }
-            setNeutralButton(android.R.string.cancel, null)
+            setNeutralButton(R.string.ui_keep_editing, null)
         }
     }
 
@@ -82,12 +82,13 @@ class ConfigEditActivity : ThemedActivity() {
 
         setSupportActionBar(findViewById(R.id.toolbar))
         supportActionBar?.apply {
-            setTitle(R.string.config_settings)
+            setTitle(R.string.ui_json_title)
             setDisplayHomeAsUpEnabled(true)
             setHomeAsUpIndicator(R.drawable.ic_navigation_close)
         }
 
         binding.editor.apply {
+            hint = getString(R.string.ui_json_hint)
             // Editorkit freezes its text by default, which can exceed Binder's state limit.
             isSaveEnabled = false
             colorScheme = editorColorScheme()
@@ -211,8 +212,17 @@ class ConfigEditActivity : ThemedActivity() {
             }
             return JSONObject(txt).toStringPretty()
         } catch (e: Exception) {
+            val text = binding.editor.text.toString()
+            val offset = Regex("at character (\\d+)").find(e.message.orEmpty())
+                ?.groupValues?.get(1)?.toIntOrNull()?.coerceIn(0, text.length)
+            val message = if (offset != null) {
+                binding.editor.setSelection(offset)
+                val prefix = text.take(offset)
+                getString(R.string.ui_json_location, prefix.count { it == '\n' } + 1,
+                    offset - prefix.lastIndexOf('\n'), e.readableMessage.substringBefore(" at character"))
+            } else e.readableMessage
             MaterialAlertDialogBuilder(this).setTitle(R.string.error_title)
-                .setMessage(e.readableMessage).show()
+                .setMessage(message).setPositiveButton(android.R.string.ok, null).show()
             return null
         }
     }
@@ -275,6 +285,7 @@ class ConfigEditActivity : ThemedActivity() {
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.profile_apply_menu, menu)
+        menu.findItem(R.id.action_delete)?.isVisible = DataStore.editingId != 0L
         return true
     }
 

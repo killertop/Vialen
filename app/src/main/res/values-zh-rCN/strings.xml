@@ -6,7 +6,7 @@
     <string name="telegram">Telegram 更新频道</string>
     <string name="oss_licenses">开放源代码协议</string>
     <string name="app_version">版本</string>
-    <string name="menu_configuration">配置</string>
+    <string name="menu_configuration">节点</string>
     <string name="menu_group">分组</string>
     <string name="menu_about">关于</string>
     <string name="group_default">未分组</string>
@@ -134,9 +134,9 @@
     <string name="action_import_err">导入失败.</string>
     <!-- share -->
     <!-- profile -->
-    <string name="profile_config">服务器配置</string>
+    <string name="profile_config">节点设置</string>
     <string name="delete">删除</string>
-    <string name="delete_confirm_prompt">您确定要删除这个服务器配置吗\?</string>
+    <string name="delete_confirm_prompt">您确定要删除这个节点吗\?</string>
     <string name="share_qr_nfc">二维码</string>
     <string name="add_profile_methods_scan_qr_code">扫描二维码</string>
     <string name="add_profile_methods_manual_settings">手动输入</string>

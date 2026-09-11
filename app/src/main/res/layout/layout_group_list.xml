@@ -17,7 +17,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/vialen_surface"
-        android:elevation="4dp"
+        android:elevation="0dp"
         android:visibility="gone"
         app:tabIndicatorColor="?tabIndicatorColor"
         app:tabIndicatorFullWidth="false"
@@ -30,6 +30,7 @@
 
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/group_pager"
+        android:background="@color/vialen_list_background"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 

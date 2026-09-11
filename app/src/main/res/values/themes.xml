@@ -25,6 +25,7 @@
         <item name="windowActionModeOverlay">true</item>
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
+        <item name="materialButtonStyle">@style/Widget.Vialen.Button</item>
         <item name="chipStyle">@style/Widget.MaterialComponents.Chip.Choice.SagerNet</item>
         <item name="itemShapeAppearance">
             @style/ShapeAppearance.MaterialComponents.MediumComponent
@@ -88,6 +89,7 @@
         <item name="windowActionModeOverlay">true</item>
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
+        <item name="materialButtonStyle">@style/Widget.Vialen.Button</item>
         <item name="chipStyle">@style/Widget.MaterialComponents.Chip.Choice.SagerNet</item>
         <item name="itemShapeAppearance">
             @style/ShapeAppearance.MaterialComponents.MediumComponent
@@ -135,6 +137,7 @@
         <item name="android:statusBarColor">@color/vialen_legacy_system_bar</item>
         <item name="android:navigationBarColor">@color/vialen_legacy_system_bar</item>
         <item name="android:checkedTextViewStyle">@style/Widget.Vialen.DialogChoice</item>
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.Vialen.Dialog</item>
         <item name="materialAlertDialogBodyTextStyle">@style/Widget.Vialen.DialogBody</item>
         <item name="materialAlertDialogTitleTextStyle">@style/Widget.Vialen.DialogTitle</item>
         <item name="buttonBarPositiveButtonStyle">
@@ -154,8 +157,8 @@
         <item name="android:textColor">?primaryOrTextPrimary</item>
     </style>
     <style name="Widget.MaterialComponents.Chip.Choice.SagerNet">
-        <item name="textStartPadding">30dp</item>
-        <item name="textEndPadding">30dp</item>
+        <item name="textStartPadding">12dp</item>
+        <item name="textEndPadding">12dp</item>
         <item name="chipBackgroundColor">@color/chip_background</item>
         <item name="android:textColor">@color/chip_text_color</item>
         <item name="checkedIconTint">@color/vialen_accent</item>
@@ -214,5 +217,17 @@
     </style>
     <style name="Widget.Vialen.DialogTitle" parent="MaterialAlertDialog.MaterialComponents.Title.Text">
         <item name="android:textColor">@color/vialen_text_primary_tint</item>
+    </style>
+    <style name="ShapeAppearanceOverlay.Vialen.Dialog" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">20dp</item>
+    </style>
+    <style name="Widget.Vialen.Preference" parent="Preference.Material">
+        <item name="iconSpaceReserved">false</item>
+    </style>
+    <style name="Widget.Vialen.Button" parent="Widget.MaterialComponents.Button">
+        <item name="cornerRadius">12dp</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="android:elevation">0dp</item>
     </style>
 </resources>

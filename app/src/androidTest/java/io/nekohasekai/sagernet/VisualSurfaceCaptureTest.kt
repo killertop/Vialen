@@ -205,6 +205,7 @@ class VisualSurfaceCaptureTest {
                 }
                 if (name == "settings") {
                     await { preferenceFragment(activity) != null }
+                    expandPreferenceSections(activity)
                     scrollPages("$mode/settings", activity, 12)
                     for (key in listOf("remoteDns", "logLevel", "nightTheme", "mtu", "connectionTestURL")) {
                         clickPreference(activity, key)
@@ -466,13 +467,41 @@ class VisualSurfaceCaptureTest {
 
     private fun <A : Activity> withActivity(cls: Class<A>, extras: Intent.() -> Unit = {}, body: (A) -> Unit) {
         activeSurface = "$activeSurface -> ${cls.simpleName}"
+        // Normal foreground launcher entry avoids ROM background-activity restrictions.
+        instrumentation.uiAutomation.executeShellCommand(
+            "am start -W -n ${context.packageName}/io.nekohasekai.sagernet.ui.MainActivity"
+        ).use { ParcelFileDescriptor.AutoCloseInputStream(it).readBytes() }
         val scenario = ActivityScenario.launch<A>(Intent(context, cls).apply(extras))
+        lateinit var activity: A
+        scenario.onActivity { activity = it }
         try {
-            lateinit var activity: A
-            scenario.onActivity { activity = it }
             settle()
             body(activity)
-        } finally { scenario.close(); settle() }
+        } finally {
+            onMain { activity.finish() }
+            await("capture activity destroyed") { activity.isDestroyed }
+            scenario.close()
+        }
+    }
+
+    private fun expandPreferenceSections(activity: Activity) {
+        repeat(12) {
+            var position = -1
+            lateinit var list: RecyclerView
+            onMain {
+                list = preferenceFragment(activity)!!.listView
+                val adapter = list.adapter as PreferenceGroupAdapter
+                position = (0 until adapter.itemCount).firstOrNull {
+                    adapter.getItem(it)?.javaClass?.simpleName == "ExpandButton"
+                } ?: -1
+                if (position >= 0) list.scrollToPosition(position)
+            }
+            if (position < 0) return
+            await { list.findViewHolderForAdapterPosition(position) != null }
+            onMain { check(list.findViewHolderForAdapterPosition(position)!!.itemView.performClick()) }
+            settle()
+        }
+        error("Too many collapsed preference sections")
     }
 
     private fun clickPreference(activity: Activity, key: String, longClick: Boolean = false) {
@@ -556,7 +585,9 @@ class VisualSurfaceCaptureTest {
     private fun descendants(view: View): List<View> = listOf(view) + if (view is ViewGroup)
         (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList()
     private fun onMain(block: () -> Unit) = instrumentation.runOnMainSync(block)
-    private fun settle() { instrumentation.waitForIdleSync(); Thread.sleep(250); instrumentation.waitForIdleSync() }
+    // IME/background animation callbacks can keep the queue non-idle after an Activity
+    // closes on a physical ROM. Cross a main-thread boundary, then allow a render interval.
+    private fun settle() { onMain { }; Thread.sleep(500); onMain { } }
     private fun await(expectation: String = "actual layout/preference binding", condition: () -> Boolean) {
         val until = System.nanoTime() + 10_000_000_000L
         do {

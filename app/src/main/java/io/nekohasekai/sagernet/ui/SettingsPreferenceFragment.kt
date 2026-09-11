@@ -18,7 +18,7 @@ import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.utils.Theme
 import moe.matsuri.nb4a.ui.*
 
-class SettingsPreferenceFragment : PreferenceFragmentCompat() {
+class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFragment() {
 
     private lateinit var isProxyApps: SwitchPreference
 
@@ -97,9 +97,27 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
         }
         isProxyApps = findPreference(Key.PROXY_APPS)!!
         isProxyApps.setOnPreferenceChangeListener { _, newValue ->
+            DataStore.dirty = true
+            needReload()
+            true
+        }
+
+        findPreference<Preference>("uiEditApps")!!.setOnPreferenceClickListener {
             startActivity(Intent(activity, AppManagerActivity::class.java))
-            if (newValue as Boolean) DataStore.dirty = true
-            newValue
+            true
+        }
+        findPreference<Preference>("uiLogBuffer")!!.apply {
+            summary = DataStore.logBufSize.toString()
+            setOnPreferenceClickListener {
+                requireContext().showIntegerFormDialog(getString(R.string.form_log_buffer_size),
+                    DataStore.logBufSize.toString(), 1..Int.MAX_VALUE) { size ->
+                    DataStore.logBufSize = size
+                    summary = size.toString()
+                    needRestart()
+                    true
+                }
+                true
+            }
         }
 
         val profileTrafficStatistics =

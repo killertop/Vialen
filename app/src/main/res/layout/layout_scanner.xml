@@ -3,10 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <include
-        layout="@layout/layout_appbar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+
 
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
@@ -29,4 +26,19 @@
         android:layout_gravity="center"
         android:layout_marginTop="80dp"
         android:src="@drawable/camera_scan_flashlight_selector" />
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_margin="24dp"
+        android:layout_marginBottom="64dp"
+        android:padding="16dp"
+        android:background="@color/vialen_surface"
+        android:text="@string/ui_scanner_hint"
+        android:textColor="@color/vialen_text_primary"
+        android:textSize="14sp" />
+    <include
+        layout="@layout/layout_appbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
 </FrameLayout>

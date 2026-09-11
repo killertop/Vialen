@@ -340,7 +340,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                 rule = ruleEntity
                 profileName.text = rule.displayName()
                 profileType.text = rule.mkSummary()
-                routeOutbound.text = rule.displayOutbound()
+                routeOutbound.text = "→ ${rule.displayOutbound()} · ${getString(if (rule.enabled) R.string.ui_enabled else R.string.ui_disabled)}"
                 itemView.setOnClickListener {
                     enableSwitch.performClick()
                 }

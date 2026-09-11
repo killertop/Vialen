@@ -362,6 +362,12 @@ data class ProxyEntity(
     @androidx.room.Dao
     interface Dao {
 
+        @Query("SELECT EXISTS(SELECT 1 FROM proxy_entities)")
+        fun hasProfiles(): Boolean
+
+        @Query("SELECT EXISTS(SELECT 1 FROM proxy_entities WHERE id NOT IN (:excludedIds))")
+        fun hasProfilesExcluding(excludedIds: List<Long>): Boolean
+
         @Query("select * from proxy_entities")
         fun getAll(): List<ProxyEntity>
 

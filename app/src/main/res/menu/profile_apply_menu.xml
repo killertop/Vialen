@@ -2,8 +2,8 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
       xmlns:app="http://schemas.android.com/apk/res-auto">
     <item android:id="@+id/action_apply"
-          android:title="@string/apply"
-          android:icon="@drawable/ic_action_done"
+          android:title="@string/ui_save"
+
           android:alphabeticShortcut="s"
           app:showAsAction="always"/>
 </menu>

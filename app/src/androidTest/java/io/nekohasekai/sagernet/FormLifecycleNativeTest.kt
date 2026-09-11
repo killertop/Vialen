@@ -54,6 +54,12 @@ class FormLifecycleNativeTest {
         cache = TempDatabase.profileCacheDao.all().map { row -> KeyValuePair(row.key).also {
             it.valueType = row.valueType; it.value = row.value.copyOf()
         } }
+        DataStore.configurationStore.putBoolean("isAutoConnect", false)
+        // Enter through the exported launcher as a user would. Some physical-device ROMs
+        // block ActivityScenario's first background launch even under instrumentation.
+        instrumentation.uiAutomation.executeShellCommand(
+            "am start -W -n ${context.packageName}/io.nekohasekai.sagernet.ui.MainActivity"
+        ).use { android.os.ParcelFileDescriptor.AutoCloseInputStream(it).readBytes() }
     }
     @After fun restoreDraft() {
         if (::cache.isInitialized) {
@@ -61,6 +67,18 @@ class FormLifecycleNativeTest {
             cache.forEach { TempDatabase.profileCacheDao.put(it) }
             PublicDatabase.kvPairDao.reset()
             config.forEach { PublicDatabase.kvPairDao.put(it) }
+        }
+    }
+
+    private fun <T : FragmentActivity> ActivityScenario<T>.useWithCleanup(block: (ActivityScenario<T>) -> Unit) {
+        try { block(this) } finally {
+            if (state != androidx.lifecycle.Lifecycle.State.DESTROYED) onActivity { it.finish() }
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+            while (state != androidx.lifecycle.Lifecycle.State.DESTROYED && System.nanoTime() < deadline) {
+                Thread.sleep(25)
+            }
+            check(state == androidx.lifecycle.Lifecycle.State.DESTROYED) { "Form Activity did not finish" }
+            close()
         }
     }
 
@@ -86,7 +104,7 @@ class FormLifecycleNativeTest {
         val id = SagerDatabase.groupDao.createGroup(ProxyGroup().apply { name = "forms-before" })
         try {
             ActivityScenario.launch<GroupSettingsActivity>(Intent(context, GroupSettingsActivity::class.java)
-                .putExtra(GroupSettingsActivity.EXTRA_GROUP_ID, id)).use { scenario ->
+                .putExtra(GroupSettingsActivity.EXTRA_GROUP_ID, id)).useWithCleanup { scenario ->
                 ready(scenario)
                 scenario.recreate()
                 ready(scenario)
@@ -114,7 +132,7 @@ class FormLifecycleNativeTest {
         val id = SagerDatabase.rulesDao.createRule(RuleEntity().apply { name = "forms-before"; domains = "example.com" })
         try {
             ActivityScenario.launch<RouteSettingsActivity>(Intent(context, RouteSettingsActivity::class.java)
-                .putExtra(RouteSettingsActivity.EXTRA_ROUTE_ID, id)).use { scenario ->
+                .putExtra(RouteSettingsActivity.EXTRA_ROUTE_ID, id)).useWithCleanup { scenario ->
                 ready(scenario)
                 scenario.onActivity { DataStore.routeName = "forms-after" }
                 scenario.recreate(); ready(scenario)
@@ -140,7 +158,7 @@ class FormLifecycleNativeTest {
         val id = SagerDatabase.groupDao.createGroup(ProxyGroup().apply { name = "forms-deleted" })
         try {
             ActivityScenario.launch<GroupSettingsActivity>(Intent(context, GroupSettingsActivity::class.java)
-                .putExtra(GroupSettingsActivity.EXTRA_GROUP_ID, id)).use { scenario ->
+                .putExtra(GroupSettingsActivity.EXTRA_GROUP_ID, id)).useWithCleanup { scenario ->
                 ready(scenario)
                 lateinit var activity: GroupSettingsActivity
                 scenario.onActivity { activity = it; DataStore.groupName = "unsaved" }
@@ -155,7 +173,7 @@ class FormLifecycleNativeTest {
     @Test fun configDraftRecreatesWithoutSavingAndInvalidJsonStaysOpen() {
         DataStore.serverCustom = "{}"
         ActivityScenario.launch<ConfigEditActivity>(Intent(context, ConfigEditActivity::class.java)
-            .putExtra("key", Key.SERVER_CUSTOM)).use { scenario ->
+            .putExtra("key", Key.SERVER_CUSTOM)).useWithCleanup { scenario ->
             scenario.onActivity { it.binding.editor.setTextContent("{invalid") }
             scenario.recreate()
             scenario.onActivity {
@@ -175,8 +193,156 @@ class FormLifecycleNativeTest {
         }
     }
 
+    @Test fun preferenceDialogKeepsVetoedInputAcrossRecreationThenCommitsOnce() {
+        ActivityScenario.launch<SocksSettingsActivity>(Intent(context, SocksSettingsActivity::class.java)).useWithCleanup { scenario ->
+            ready(scenario)
+            scenario.onActivity { activity ->
+                val fragment = activity.supportFragmentManager.findFragmentById(R.id.settings)
+                    as io.nekohasekai.sagernet.ui.VialenPreferenceFragment
+                val preference = fragment.findPreference<androidx.preference.EditTextPreference>("serverAddress")!!
+                fragment.onDisplayPreferenceDialog(preference)
+            }
+            instrumentation.waitForIdleSync()
+            scenario.onActivity { activity ->
+                val fragment = activity.supportFragmentManager.findFragmentById(R.id.settings)
+                    as io.nekohasekai.sagernet.ui.VialenPreferenceFragment
+                val preference = fragment.findPreference<androidx.preference.EditTextPreference>("serverAddress")!!
+                val before = preference.text
+                preference.setOnPreferenceChangeListener { _, _ -> false }
+                val dialog = (activity.supportFragmentManager.findFragmentByTag("androidx.preference.PreferenceFragment.DIALOG")
+                    as androidx.fragment.app.DialogFragment).dialog as AlertDialog
+                dialog.findViewById<EditText>(android.R.id.edit)!!.setText("pending.example")
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+                assertTrue(dialog.isShowing)
+                assertEquals(before, preference.text)
+                assertNotNull(dialog.findViewById<EditText>(android.R.id.edit)!!.error)
+            }
+            scenario.recreate()
+            ready(scenario)
+            var calls = 0
+            scenario.onActivity { activity ->
+                val fragment = activity.supportFragmentManager.findFragmentById(R.id.settings)
+                    as io.nekohasekai.sagernet.ui.VialenPreferenceFragment
+                val preference = fragment.findPreference<androidx.preference.EditTextPreference>("serverAddress")!!
+                preference.setOnPreferenceChangeListener { _, _ -> calls++; true }
+                val dialog = (activity.supportFragmentManager.findFragmentByTag("androidx.preference.PreferenceFragment.DIALOG")
+                    as androidx.fragment.app.DialogFragment).dialog as AlertDialog
+                assertEquals("pending.example", dialog.findViewById<EditText>(android.R.id.edit)!!.text.toString())
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+                assertEquals("pending.example", preference.text)
+                assertFalse(dialog.isShowing)
+            }
+            instrumentation.waitForIdleSync()
+            assertEquals(1, calls)
+            // Dismiss the owned activity before ActivityScenario's helper activity takes focus.
+            scenario.onActivity { it.finish() }
+        }
+    }
+
+    @Test fun subscriptionDialogPreservesItsValidationLayout() {
+        ActivityScenario.launch<GroupSettingsActivity>(Intent(context, GroupSettingsActivity::class.java)
+            .putExtra("newSubscription", true)).useWithCleanup { scenario ->
+            ready(scenario)
+            scenario.onActivity { activity ->
+                val fragment = activity.supportFragmentManager.findFragmentById(R.id.settings)
+                    as io.nekohasekai.sagernet.ui.VialenPreferenceFragment
+                val preference = fragment.findPreference<androidx.preference.EditTextPreference>("subscriptionLink")!!
+                assertEquals(R.layout.layout_urltest_preference_dialog, preference.dialogLayoutResource)
+                fragment.onDisplayPreferenceDialog(preference)
+            }
+            instrumentation.waitForIdleSync()
+            scenario.onActivity { activity ->
+                val dialog = (activity.supportFragmentManager.findFragmentByTag("androidx.preference.PreferenceFragment.DIALOG")
+                    as androidx.fragment.app.DialogFragment).dialog as AlertDialog
+                val input = dialog.findViewById<EditText>(android.R.id.edit)!!
+                val container = dialog.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.input_layout)!!
+                input.setText("not a URL")
+                assertNotNull(container.error)
+                input.setText("https://example.invalid/subscription")
+                assertFalse(container.isErrorEnabled)
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+                assertEquals("https://example.invalid/subscription", DataStore.subscriptionLink)
+                activity.finish()
+            }
+        }
+    }
+
+    @Test fun unsavedDialogSaveCommitsAfterDialogDetaches() {
+        val id = SagerDatabase.groupDao.createGroup(ProxyGroup().apply { name = "dialog-before" })
+        try {
+            ActivityScenario.launch<GroupSettingsActivity>(Intent(context, GroupSettingsActivity::class.java)
+                .putExtra(GroupSettingsActivity.EXTRA_GROUP_ID, id)).useWithCleanup { scenario ->
+                ready(scenario)
+                scenario.onActivity { activity ->
+                    DataStore.groupName = "dialog-after"
+                    DataStore.dirty = true
+                    activity.onBackPressedDispatcher.onBackPressed()
+                }
+                instrumentation.waitForIdleSync()
+                scenario.onActivity { activity ->
+                    val fragment = activity.supportFragmentManager.findFragmentByTag("form.unsaved")
+                        as androidx.fragment.app.DialogFragment
+                    (fragment.dialog as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+                }
+                val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+                while (SagerDatabase.groupDao.getById(id)?.name != "dialog-after" && System.nanoTime() < deadline) {
+                    Thread.sleep(25)
+                }
+                assertEquals("dialog-after", SagerDatabase.groupDao.getById(id)?.name)
+            }
+        } finally { SagerDatabase.groupDao.deleteById(id) }
+    }
+
+    @Test fun lastNodeDeleteUndoAndCommitRefreshConnectionControls() {
+        Assume.assumeTrue("This empty-home scenario requires no saved nodes", SagerDatabase.proxyDao.getAll().isEmpty())
+        val groupId = SagerDatabase.groupDao.createGroup(ProxyGroup(name = "UI availability fixture", userOrder = 99999))
+        val bean = io.nekohasekai.sagernet.fmt.socks.SOCKSBean().apply {
+            initializeDefaultValues(); name = "UI availability node"; serverAddress = "127.0.0.1"; serverPort = 9
+        }
+        val entity = ProxyEntity(groupId = groupId, socksBean = bean)
+        val id = SagerDatabase.proxyDao.addProxy(entity)
+        DataStore.selectedGroup = groupId
+        DataStore.selectedProxy = id
+        try {
+            ActivityScenario.launch<io.nekohasekai.sagernet.ui.MainActivity>(Intent(context,
+                io.nekohasekai.sagernet.ui.MainActivity::class.java)).useWithCleanup { scenario ->
+                fun awaitUi(check: (io.nekohasekai.sagernet.ui.MainActivity) -> Boolean) {
+                    val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+                    var matched = false
+                    while (!matched && System.nanoTime() < deadline) {
+                        scenario.onActivity { matched = check(it) }
+                        if (!matched) Thread.sleep(25)
+                    }
+                    assertTrue("Expected node/connection UI state", matched)
+                }
+                awaitUi { it.findViewById<View>(R.id.remove)?.isShown == true && it.binding.fab.isShown }
+                scenario.onActivity { it.findViewById<View>(R.id.remove).performClick() }
+                awaitUi { it.findViewById<View>(R.id.empty_state)?.isShown == true && !it.binding.fab.isShown }
+                // The row is still persisted while Undo is offered, but must not be connectable.
+                assertNotNull(SagerDatabase.proxyDao.getById(id))
+                scenario.onActivity {
+                    assertTrue(it.findViewById<View>(com.google.android.material.R.id.snackbar_action).performClick())
+                }
+                awaitUi { it.findViewById<View>(R.id.remove)?.isShown == true && it.binding.fab.isShown }
+                scenario.onActivity {
+                    it.findViewById<View>(R.id.remove).performClick()
+                    val page = it.supportFragmentManager.findFragmentById(R.id.fragment_holder)
+                        as io.nekohasekai.sagernet.ui.ConfigurationFragment
+                    page.getCurrentGroupFragment()!!.undoManager.flush()
+                }
+                val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+                while (SagerDatabase.proxyDao.getById(id) != null && System.nanoTime() < deadline) Thread.sleep(25)
+                assertNull(SagerDatabase.proxyDao.getById(id))
+                awaitUi { !it.binding.fab.isShown }
+            }
+        } finally {
+            SagerDatabase.proxyDao.deleteById(id)
+            SagerDatabase.groupDao.deleteById(groupId)
+        }
+    }
+
     @Test fun numericDialogPreservesInvalidTextAndCommitsOnlyValidInput() {
-        ActivityScenario.launch<ConfigEditActivity>(Intent(context, ConfigEditActivity::class.java)).use { scenario ->
+        ActivityScenario.launch<ConfigEditActivity>(Intent(context, ConfigEditActivity::class.java)).useWithCleanup { scenario ->
             lateinit var dialog: AlertDialog
             var commits = 0
             scenario.onActivity { activity ->
@@ -208,7 +374,7 @@ class FormLifecycleNativeTest {
     }
 
     @Test fun mtuCustomCommitRunsChangeListenerOnceAndHonorsVeto() {
-        ActivityScenario.launch<ConfigEditActivity>(Intent(context, ConfigEditActivity::class.java)).use { scenario ->
+        ActivityScenario.launch<ConfigEditActivity>(Intent(context, ConfigEditActivity::class.java)).useWithCleanup { scenario ->
             lateinit var dialog: AlertDialog
             var calls = 0
             var accept = false
@@ -273,7 +439,7 @@ class FormLifecycleNativeTest {
     @Test fun newProfileCustomJsonSurvivesRecreationAndPersists() {
         val id = SagerDatabase.groupDao.createGroup(ProxyGroup().apply { name = "forms-json" })
         try {
-            ActivityScenario.launch<SocksSettingsActivity>(Intent(context, SocksSettingsActivity::class.java)).use { scenario ->
+            ActivityScenario.launch<SocksSettingsActivity>(Intent(context, SocksSettingsActivity::class.java)).useWithCleanup { scenario ->
                 ready(scenario)
                 scenario.onActivity {
                     DataStore.editingGroup = id

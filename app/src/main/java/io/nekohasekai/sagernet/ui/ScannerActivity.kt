@@ -49,6 +49,7 @@ class ScannerActivity : ThemedActivity(),
         // opaque surface as the toolbar so day/night system icons retain contrast.
         findViewById<android.view.View>(R.id.appbar).setBackgroundResource(R.color.vialen_surface)
         setSupportActionBar(findViewById(R.id.toolbar))
+        supportActionBar?.setTitle(R.string.ui_scanner_title)
         supportActionBar?.apply {
             setDisplayHomeAsUpEnabled(true)
             setHomeAsUpIndicator(R.drawable.ic_navigation_close)

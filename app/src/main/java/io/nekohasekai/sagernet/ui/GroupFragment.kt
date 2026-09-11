@@ -421,7 +421,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             itemView.setOnClickListener { }
 
             editButton.isGone = proxyGroup.ungrouped
-            updateButton.isInvisible = proxyGroup.type != GroupType.SUBSCRIPTION
+            updateButton.isInvisible = false
             groupName.text = proxyGroup.displayName()
 
             editButton.setOnClickListener {
@@ -430,8 +430,13 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                 })
             }
 
+            updateButton.setText(if (proxyGroup.type == GroupType.SUBSCRIPTION) R.string.group_update else R.string.ui_add_node)
             updateButton.setOnClickListener {
-                GroupUpdater.startUpdate(proxyGroup, true)
+                if (proxyGroup.type == GroupType.SUBSCRIPTION) {
+                    GroupUpdater.startUpdate(proxyGroup, true)
+                } else {
+                    (requireActivity() as MainActivity).addNodeToGroup(proxyGroup.id)
+                }
             }
 
             optionsButton.setOnClickListener {
@@ -472,7 +477,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                 }
 
                 subscriptionUpdateProgress.isVisible = false
-                updateButton.isInvisible = proxyGroup.type != GroupType.SUBSCRIPTION
+                updateButton.isInvisible = false
                 editButton.isGone = proxyGroup.ungrouped
             }
 
@@ -555,23 +560,20 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                     @Suppress("DEPRECATION") when (group.type) {
                         GroupType.BASIC -> {
                             if (size == 0L) {
-                                groupStatus.setText(R.string.group_status_empty)
+                                groupStatus.text = getString(R.string.ui_node_count, 0)
                             } else {
-                                groupStatus.text = getString(R.string.group_status_proxies, size)
+                                groupStatus.text = getString(R.string.ui_node_count, size)
                             }
                         }
 
                         GroupType.SUBSCRIPTION -> {
-                            groupStatus.text = if (size == 0L) {
+                            val lastUpdated = group.subscription?.lastUpdated ?: 0
+                            val updated = if (lastUpdated == 0) {
                                 getString(R.string.group_status_empty_subscription)
-                            } else {
-                                val date = Date(group.subscription!!.lastUpdated * 1000L)
-                                getString(
-                                    R.string.group_status_proxies_subscription,
-                                    size,
-                                    "${date.month + 1} - ${date.date}"
-                                )
-                            }
+                            } else java.text.DateFormat.getDateTimeInstance(
+                                java.text.DateFormat.SHORT, java.text.DateFormat.SHORT
+                            ).format(Date(lastUpdated * 1000L))
+                            groupStatus.text = getString(R.string.ui_node_count, size) + " · " + updated
 
                         }
                     }

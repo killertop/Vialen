@@ -33,14 +33,14 @@ data class RuleEntity(
 
     fun mkSummary(): String {
         var summary = ""
-        if (config.isNotBlank()) summary += "[config]\n"
+        if (config.isNotBlank()) summary += app.getString(R.string.custom_config) + "\n"
         if (domains.isNotBlank()) summary += "$domains\n"
         if (ip.isNotBlank()) summary += "$ip\n"
-        if (source.isNotBlank()) summary += "src ip: $source\n"
-        if (sourcePort.isNotBlank()) summary += "src port: $sourcePort\n"
-        if (port.isNotBlank()) summary += "dst port: $port\n"
-        if (network.isNotBlank()) summary += "network: $network\n"
-        if (protocol.isNotBlank()) summary += "protocol: $protocol\n"
+        if (source.isNotBlank()) summary += "${app.getString(R.string.ui_rule_source_ip)}: $source\n"
+        if (sourcePort.isNotBlank()) summary += "${app.getString(R.string.ui_rule_source_port)}: $sourcePort\n"
+        if (port.isNotBlank()) summary += "${app.getString(R.string.ui_rule_destination_port)}: $port\n"
+        if (network.isNotBlank()) summary += "${app.getString(R.string.ui_rule_network)}: $network\n"
+        if (protocol.isNotBlank()) summary += "${app.getString(R.string.ui_rule_protocol)}: $protocol\n"
         if (packages.isNotEmpty()) summary += app.getString(
             R.string.apps_message, packages.size
         ) + "\n"

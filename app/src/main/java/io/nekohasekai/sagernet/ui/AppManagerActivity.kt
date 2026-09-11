@@ -97,6 +97,7 @@ class AppManagerActivity : ThemedActivity() {
                 .joinToString("\n") { it.packageName }
 
             appsAdapter.notifyItemRangeChanged(0, appsAdapter.itemCount, SWITCH)
+            updateSelectionSummary()
         }
     }
 
@@ -146,6 +147,7 @@ class AppManagerActivity : ThemedActivity() {
                 @Suppress("UNCHECKED_CAST")
                 filteredApps = results.values as List<ProxiedApp>
                 notifyDataSetChanged()
+                updateSelectionSummary()
             }
         }
 
@@ -175,6 +177,18 @@ class AppManagerActivity : ThemedActivity() {
         }
     }
 
+    private fun updateSelectionSummary() {
+        if (!::binding.isInitialized) return
+        val explanation = getString(when {
+            !DataStore.proxyApps -> R.string.ui_apps_off
+            DataStore.bypass -> R.string.ui_apps_bypass
+            else -> R.string.ui_apps_proxy
+        })
+        val count = if (apps.isEmpty()) DataStore.individual.lineSequence().count { it.isNotBlank() }
+            else apps.count { isProxiedApp(it) }
+        binding.selectionSummary.text = explanation + "\n" + getString(R.string.ui_selected_apps, count)
+    }
+
     private fun isProxiedApp(app: ProxiedApp) = proxiedUids[app.uid]
 
     @UiThread
@@ -185,10 +199,15 @@ class AppManagerActivity : ThemedActivity() {
             val adapter = binding.list.adapter as AppsAdapter
             withContext(Dispatchers.IO) { adapter.reload() }
             adapter.filter.filter(binding.search.text?.toString() ?: "")
+            binding.autoSelectProxyApps.isEnabled = apps.isNotEmpty()
+            binding.showSystemApps.isEnabled = apps.isNotEmpty()
+            binding.search.isEnabled = apps.isNotEmpty()
+            updateSelectionSummary()
             if (apps.isEmpty()) {
                 binding.list.visibility = View.GONE
                 binding.appPlaceholder.root.crossFadeFrom(loading)
             } else {
+                binding.appPlaceholder.root.visibility = View.GONE
                 binding.list.crossFadeFrom(loading)
             }
         }
@@ -215,22 +234,23 @@ class AppManagerActivity : ThemedActivity() {
             setHomeAsUpIndicator(R.drawable.ic_navigation_close)
         }
 
-        if (!DataStore.proxyApps) {
-            DataStore.proxyApps = true
-        }
-
-        binding.bypassGroup.check(if (DataStore.bypass) R.id.appProxyModeBypass else R.id.appProxyModeOn)
+        binding.bypassGroup.check(when {
+            !DataStore.proxyApps -> R.id.appProxyModeDisable
+            DataStore.bypass -> R.id.appProxyModeBypass
+            else -> R.id.appProxyModeOn
+        })
         binding.bypassGroup.setOnCheckedChangeListener { _, checkedId ->
             when (checkedId) {
                 R.id.appProxyModeDisable -> {
                     DataStore.proxyApps = false
-                    finish()
                 }
 
-                R.id.appProxyModeOn -> DataStore.bypass = false
-                R.id.appProxyModeBypass -> DataStore.bypass = true
+                R.id.appProxyModeOn -> { DataStore.proxyApps = true; DataStore.bypass = false }
+                R.id.appProxyModeBypass -> { DataStore.proxyApps = true; DataStore.bypass = true }
             }
+            updateSelectionSummary()
         }
+        updateSelectionSummary()
         binding.autoSelectProxyApps.setOnClickListener { selectProxyApp() }
 
         initProxiedUids()
@@ -251,6 +271,10 @@ class AppManagerActivity : ThemedActivity() {
         }
 
         instance = this
+    }
+
+    override fun onResume() {
+        super.onResume()
         loadApps()
     }
 
@@ -324,6 +348,7 @@ class AppManagerActivity : ThemedActivity() {
                         ).show()
                         initProxiedUids(apps)
                         appsAdapter.notifyItemRangeChanged(0, appsAdapter.itemCount, SWITCH)
+            updateSelectionSummary()
                         return true
                     } catch (_: IllegalArgumentException) {
                     }

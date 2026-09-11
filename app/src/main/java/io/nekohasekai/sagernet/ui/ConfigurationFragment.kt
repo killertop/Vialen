@@ -150,6 +150,8 @@ class ConfigurationFragment @JvmOverloads constructor(
             if (adapter.groupList.size > position && position >= 0) {
                 adapter.selectedGroupIndex = position
                 DataStore.selectedGroup = adapter.groupList[position].id
+                val group = adapter.groupList[position]
+                updateGroupActions(group, adapter.groupFragments[group.id]?.adapter?.itemCount?.let { it > 0 } == true)
             }
         }
     }
@@ -183,6 +185,10 @@ class ConfigurationFragment @JvmOverloads constructor(
         if (!select) {
             toolbar.inflateMenu(R.menu.add_profile_menu)
             toolbar.setOnMenuItemClickListener(this)
+            toolbar.menu.findItem(R.id.action_misc)?.subMenu?.let {
+                androidx.core.view.MenuCompat.setGroupDividerEnabled(it, true)
+            }
+            toolbar.menu.findItem(R.id.action_misc)?.isVisible = false
         } else {
             if (titleRes != 0) {
                 toolbar.setTitle(titleRes)
@@ -193,6 +199,10 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
         }
 
+        if (arguments?.getBoolean("openAddNode") == true) {
+            arguments?.remove("openAddNode")
+            view.post { if (isAdded && this.view != null) showAddNodeSheet() }
+        }
         groupPager = view.findViewById(R.id.group_pager)
         tabLayout = view.findViewById(R.id.group_tab)
         adapter = GroupPagerAdapter()
@@ -350,14 +360,125 @@ class ConfigurationFragment @JvmOverloads constructor(
                 if (isAdded && view != null && DataStore.selectedGroup == originGroupId) {
                     DataStore.editingGroup = targetId
                 }
-                owner.snackbar(app.resources.getQuantityString(R.plurals.added, proxies.size, proxies.size)).show()
+                owner.snackbar(getString(R.string.ui_import_next)).show()
             }
         }
 
     }
 
+    fun pendingRemovalIds(): List<Long> = if (::adapter.isInitialized) {
+        adapter.groupFragments.values.flatMap { it.adapter?.pendingRemovalIds().orEmpty() }
+    } else emptyList()
+
+    fun showAddNodeSheet() {
+        val context = requireContext()
+        val sheet = com.google.android.material.bottomsheet.BottomSheetDialog(context)
+        val content = android.widget.LinearLayout(context).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(dp2px(24), dp2px(24), dp2px(24), dp2px(32))
+        }
+        content.addView(android.widget.TextView(context).apply {
+            setText(R.string.ui_add_node)
+            textSize = 22f
+            setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.vialen_text_primary))
+            setPadding(0, 0, 0, dp2px(16))
+        })
+        val actions = PopupMenu(context, toolbar).menu.apply { requireActivity().menuInflater.inflate(R.menu.node_creation_menu, this) }
+        fun action(title: Int, run: () -> Unit) {
+            content.addView(com.google.android.material.button.MaterialButton(context, null,
+                com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                setText(title)
+                minimumHeight = dp2px(48)
+                cornerRadius = dp2px(12)
+                isAllCaps = false
+                setOnClickListener { sheet.dismiss(); run() }
+            }, android.widget.LinearLayout.LayoutParams(-1, -2))
+        }
+        action(R.string.ui_add_subscription) {
+            startActivity(Intent(context, GroupSettingsActivity::class.java).putExtra("newSubscription", true))
+        }
+        action(R.string.add_profile_methods_scan_qr_code) { onMenuItemClick(actions.findItem(R.id.action_scan_qr_code)) }
+        action(R.string.action_import) { onMenuItemClick(actions.findItem(R.id.action_import_clipboard)) }
+        action(R.string.action_import_file) { onMenuItemClick(actions.findItem(R.id.action_import_file)) }
+        action(R.string.ui_manual_config) { showProtocolPicker(actions) }
+        content.addView(android.widget.TextView(context).apply {
+            setText(R.string.ui_import_hint)
+            textSize = 14f
+            setPadding(0, dp2px(16), 0, 0)
+        })
+        sheet.setContentView(content)
+        sheet.show()
+    }
+
+    private fun showProtocolPicker(menu: android.view.Menu) {
+        val items = (0 until menu.size()).map { menu.getItem(it) }.filter {
+            it.itemId !in setOf(R.id.action_scan_qr_code, R.id.action_import_clipboard, R.id.action_import_file)
+        }
+        val context = requireContext()
+        val content = android.widget.LinearLayout(context).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(dp2px(24), 0, dp2px(24), 0)
+        }
+        val search = android.widget.EditText(context).apply {
+            setHint(R.string.ui_search_protocol)
+            setSingleLine()
+        }
+        val list = android.widget.ListView(context)
+        val commonIds = setOf(R.id.action_new_vless, R.id.action_new_ss, R.id.action_new_vmess, R.id.action_new_trojan)
+        var rows = emptyList<Pair<CharSequence, MenuItem?>>()
+        fun filter(query: String) {
+            rows = if (query.isBlank()) {
+                listOf(getString(R.string.ui_common_protocols) to null) +
+                    items.filter { it.itemId in commonIds }.map { it.title!! to it } +
+                    listOf(getString(R.string.ui_other_protocols) to null) +
+                    items.filter { it.itemId !in commonIds }.map { it.title!! to it }
+            } else items.filter { it.title.toString().contains(query, ignoreCase = true) }.map { it.title!! to it }
+            list.adapter = object : android.widget.ArrayAdapter<CharSequence>(context,
+                android.R.layout.simple_list_item_1, rows.map { it.first }) {
+                override fun areAllItemsEnabled() = false
+                override fun isEnabled(position: Int) = rows[position].second != null
+                override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
+                    val row = super.getView(position, convertView, parent) as android.widget.TextView
+                    val heading = !isEnabled(position)
+                    row.textSize = if (heading) 13f else 16f
+                    row.setTextColor(androidx.core.content.ContextCompat.getColor(context,
+                        if (heading) R.color.vialen_text_secondary else R.color.vialen_text_primary))
+                    return row
+                }
+            }
+        }
+        content.addView(search)
+        content.addView(list, android.widget.LinearLayout.LayoutParams(-1, dp2px(320)))
+        filter("")
+        search.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { filter(s.toString()) }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+        val dialog = MaterialAlertDialogBuilder(context).setTitle(R.string.ui_choose_protocol)
+            .setView(content).setNegativeButton(android.R.string.cancel, null).create()
+        list.setOnItemClickListener { _, _, position, _ ->
+            val item = rows[position].second ?: return@setOnItemClickListener
+            dialog.dismiss()
+            onMenuItemClick(item)
+        }
+        dialog.show()
+    }
+
+    private fun updateGroupActions(group: ProxyGroup, hasNodes: Boolean) {
+        if (select || view == null || group.id != DataStore.selectedGroup) return
+        val subscription = group.type == GroupType.SUBSCRIPTION
+        toolbar.menu.findItem(R.id.action_misc)?.isVisible = hasNodes || subscription
+        toolbar.menu.findItem(R.id.action_update_subscription)?.isVisible = subscription
+        for (id in intArrayOf(R.id.action_clear_traffic_statistics, R.id.action_remove_duplicate,
+            R.id.action_connection_tcp_ping, R.id.action_connection_url_test,
+            R.id.action_connection_test_clear_results, R.id.action_connection_test_delete_unavailable,
+            R.id.action_order)) toolbar.menu.findItem(id)?.isVisible = hasNodes
+    }
+
     override fun onMenuItemClick(item: MenuItem): Boolean {
         when (item.itemId) {
+            R.id.action_add -> showAddNodeSheet()
             R.id.action_scan_qr_code -> {
                 startActivity(Intent(context, ScannerActivity::class.java))
             }
@@ -525,8 +646,8 @@ class ConfigurationFragment @JvmOverloads constructor(
                     if (toClear.isNotEmpty()) {
                         onMainDispatcher {
                             MaterialAlertDialogBuilder(requireContext()).setTitle(R.string.confirm)
-                                .setMessage(R.string.delete_confirm_prompt)
-                                .setPositiveButton(R.string.yes) { _, _ ->
+                                .setMessage(getString(R.string.ui_delete_nodes, toClear.size))
+                                .setPositiveButton(R.string.delete) { _, _ ->
                                     for (profile in toClear) {
                                         adapter.groupFragments[DataStore.selectedGroup]?.adapter?.apply {
                                             val index = configurationIdList.indexOf(profile.id)
@@ -543,9 +664,14 @@ class ConfigurationFragment @JvmOverloads constructor(
                                                 profile.groupId, profile.id
                                             )
                                         }
+                                        val targetAdapter = onMainDispatcher {
+                                            (activity as? MainActivity)?.refreshProfileAvailability()
+                                            adapter.groupFragments[toClear.first().groupId]?.adapter
+                                        }
+                                        targetAdapter?.reloadProfiles()
                                     }
                                 }
-                                .setNegativeButton(R.string.no, null)
+                                .setNegativeButton(android.R.string.cancel, null)
                                 .show()
                         }
                     }
@@ -567,7 +693,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                         onMainDispatcher {
                             MaterialAlertDialogBuilder(requireContext()).setTitle(R.string.confirm)
                                 .setMessage(
-                                    getString(R.string.delete_confirm_prompt) + "\n" +
+                                    getString(R.string.ui_delete_nodes, toClear.size) + "\n" +
                                             toClear.mapIndexedNotNull { index, proxyEntity ->
                                                 if (index < 20) {
                                                     proxyEntity.displayName()
@@ -578,7 +704,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                                                 }
                                             }.joinToString("\n")
                                 )
-                                .setPositiveButton(R.string.yes) { _, _ ->
+                                .setPositiveButton(R.string.delete) { _, _ ->
                                     for (profile in toClear) {
                                         adapter.groupFragments[DataStore.selectedGroup]?.adapter?.apply {
                                             val index = configurationIdList.indexOf(profile.id)
@@ -595,9 +721,14 @@ class ConfigurationFragment @JvmOverloads constructor(
                                                 profile.groupId, profile.id
                                             )
                                         }
+                                        val targetAdapter = onMainDispatcher {
+                                            (activity as? MainActivity)?.refreshProfileAvailability()
+                                            adapter.groupFragments[toClear.first().groupId]?.adapter
+                                        }
+                                        targetAdapter?.reloadProfiles()
                                     }
                                 }
-                                .setNegativeButton(R.string.no, null)
+                                .setNegativeButton(android.R.string.cancel, null)
                                 .show()
                         }
                     }
@@ -1002,7 +1133,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                             val hideTab = groupList.size < 2
                             tabLayout.isGone = hideTab
-                            toolbar.elevation = if (hideTab) 0F else dp2px(4).toFloat()
+                            toolbar.elevation = 0F
                         } finally {
                             if (!select) {
                                 groupPager.registerOnPageChangeCallback(updateSelectedCallback)
@@ -1094,7 +1225,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                 val hideTab = groupList.size < 2
                 tabLayout.isGone = hideTab
-                toolbar.elevation = if (hideTab) 0F else dp2px(4).toFloat()
+                toolbar.elevation = 0F
             }
         }
 
@@ -1121,6 +1252,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         override suspend fun onUpdated(profile: ProxyEntity, noTraffic: Boolean) = Unit
 
         override suspend fun onRemoved(groupId: Long, profileId: Long) {
+            onMainDispatcher { (activity as? MainActivity)?.refreshProfileAvailability() }
             val group = groupList.find { it.id == groupId } ?: return
             if (group.ungrouped && SagerDatabase.proxyDao.countByGroup(groupId) == 0L) {
                 reload()
@@ -1236,6 +1368,30 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
             checkOrderMenu()
             configurationListView.requestFocus()
+        }
+
+        private var lastEmpty: Boolean? = null
+
+        private fun updateEmptyState() {
+            val root = view ?: return
+            val owner = parentFragment as? ConfigurationFragment ?: return
+            val empty = (adapter?.itemCount ?: 0) == 0
+            root.findViewById<View>(R.id.empty_state).isVisible = empty
+            configurationListView.isVisible = !empty
+            val firstGroup = owner.adapter.groupList.size <= 1 && proxyGroup.ungrouped
+            root.findViewById<android.widget.TextView>(R.id.empty_title).setText(
+                if (select) R.string.ui_empty_select else if (firstGroup) R.string.ui_empty_title else R.string.ui_empty_group_title)
+            root.findViewById<android.widget.TextView>(R.id.empty_body).setText(
+                if (firstGroup || select) R.string.ui_empty_body else R.string.ui_empty_group_body)
+            root.findViewById<View>(R.id.empty_add).apply {
+                isVisible = !select
+                setOnClickListener { owner.showAddNodeSheet() }
+            }
+            owner.updateGroupActions(proxyGroup, !empty)
+            if (lastEmpty != empty) {
+                lastEmpty = empty
+                (activity as? MainActivity)?.refreshProfileAvailability()
+            }
         }
 
         fun checkOrderMenu() {
@@ -1381,13 +1537,14 @@ class ConfigurationFragment @JvmOverloads constructor(
             private val reloadGeneration = java.util.concurrent.atomic.AtomicLong()
             private fun alive() = expectedView == viewVersion && view != null
             private fun post(block: () -> Unit) {
-                configurationListView.post { if (alive()) block() }
+                configurationListView.post { if (alive()) { block(); updateEmptyState() } }
             }
 
             var configurationIdList: MutableList<Long> = mutableListOf()
             val configurationList = HashMap<Long, ProxyEntity>()
             private val contentSnapshots = HashMap<Long, List<Byte>>()
             private val pendingRemovals = HashSet<Long>()
+            fun pendingRemovalIds(): List<Long> = pendingRemovals.toList()
             private fun snapshot(profile: ProxyEntity) = io.nekohasekai.sagernet.fmt.KryoConverters.serialize(profile).toList()
 
             private fun getItem(profileId: Long): ProxyEntity {
@@ -1467,6 +1624,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 reloadGeneration.incrementAndGet()
                 pendingRemovals.add(configurationIdList.removeAt(pos))
                 notifyItemRemoved(pos)
+                updateEmptyState()
             }
 
             override fun undo(actions: List<Pair<Int, ProxyEntity>>) {
