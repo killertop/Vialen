@@ -443,7 +443,7 @@ class ProfileImportNativeTest {
             val currentSelected = DataStore.selectedGroup
             var selectorFragment: ConfigurationFragment? = null
             active.onActivity { activity ->
-                val selector = ConfigurationFragment(select = true)
+                val selector = ConfigurationFragment(select = true, titleRes = R.string.select_profile)
                 selectorFragment = selector
                 activity.supportFragmentManager.beginTransaction()
                     .replace(R.id.fragment_holder, selector)

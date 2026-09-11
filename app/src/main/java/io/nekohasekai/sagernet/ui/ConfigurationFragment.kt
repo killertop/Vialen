@@ -184,7 +184,9 @@ class ConfigurationFragment @JvmOverloads constructor(
             toolbar.inflateMenu(R.menu.add_profile_menu)
             toolbar.setOnMenuItemClickListener(this)
         } else {
-            toolbar.setTitle(titleRes)
+            if (titleRes != 0) {
+                toolbar.setTitle(titleRes)
+            }
             toolbar.setNavigationIcon(R.drawable.ic_navigation_close)
             toolbar.setNavigationOnClickListener {
                 requireActivity().finish()
@@ -941,10 +943,11 @@ class ConfigurationFragment @JvmOverloads constructor(
                     SagerDatabase.groupDao.createGroup(ProxyGroup(ungrouped = true))
                     newGroupList = ArrayList(SagerDatabase.groupDao.allGroups())
                 }
-                newGroupList.find { it.ungrouped }?.let {
-                    if (SagerDatabase.proxyDao.countByGroup(it.id) == 0L && newGroupList.size > 1) {
-                        newGroupList.remove(it)
-                    }
+                val emptyUngrouped = newGroupList.filter { it.ungrouped && SagerDatabase.proxyDao.countByGroup(it.id) == 0L }
+                if (emptyUngrouped.isNotEmpty() && newGroupList.size > emptyUngrouped.size) {
+                    newGroupList.removeAll(emptyUngrouped)
+                } else if (emptyUngrouped.size == newGroupList.size && newGroupList.size > 1) {
+                    newGroupList.removeAll(emptyUngrouped.drop(1))
                 }
 
                 val runFunc = if (now) activity?.let { it::runOnUiThread } else groupPager::post
