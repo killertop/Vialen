@@ -141,9 +141,7 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     val updateSelectedCallback = object : ViewPager2.OnPageChangeCallback() {
-        override fun onPageScrolled(
-            position: Int, positionOffset: Float, positionOffsetPixels: Int
-        ) {
+        override fun onPageSelected(position: Int) {
             if (adapter.groupList.size > position) {
                 DataStore.selectedGroup = adapter.groupList[position].id
             }
@@ -1828,9 +1826,14 @@ class ConfigurationFragment @JvmOverloads constructor(
                             app.getString(R.string.profile_export_target_missing)
                         }
                         val config = profile.exportConfig().first
-                        requireNotNull(resolver.openOutputStream(data)) {
-                            app.getString(R.string.action_export_err)
-                        }.bufferedWriter().use { it.write(config) }
+                        try {
+                            val stream = resolver.openOutputStream(data)
+                                ?: throw java.io.IOException()
+                            stream.bufferedWriter().use { it.write(config) }
+                        } catch (e: Exception) {
+                            Logs.w(e)
+                            throw java.io.IOException(app.getString(R.string.action_export_err), e)
+                        }
                         showMessage(app.getString(R.string.action_export_msg))
                     } catch (e: Exception) {
                         Logs.w(e)

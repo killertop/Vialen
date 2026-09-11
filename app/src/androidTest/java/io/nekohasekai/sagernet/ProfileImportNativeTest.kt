@@ -124,7 +124,7 @@ class ProfileImportNativeTest {
                     val menu = PopupMenu(activity, fragment.groupPager).menu
                     assertTrue(fragment.onMenuItemClick(menu.add(0, R.id.action_import_file, 0, "Import")))
                     val saved = Bundle().also(fragment::onSaveInstanceState)
-                    assertEquals(DataStore.selectedGroup, saved.getLong("pendingImportGroupId"))
+                    assertEquals(DataStore.selectedGroupForImport(), saved.getLong("pendingImportGroupId"))
                     assertEquals(DataStore.selectedGroup, saved.getLong("pendingImportOriginGroupId"))
                     val registry = Bundle().also(activity.activityResultRegistry::onSaveInstanceState)
                     val launched = requireNotNull(registry.getStringArrayList("KEY_COMPONENT_ACTIVITY_LAUNCHED_KEYS")).single()
