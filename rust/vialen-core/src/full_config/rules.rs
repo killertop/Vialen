@@ -1,64 +1,41 @@
 use super::{Rule, Settings};
-use crate::config::not_blank;
 use crate::config::protocols::{int, list};
+use serde::Deserialize;
 use serde_json::{Value, json};
 
-pub(super) fn normalize(s: &str) -> String {
-    if let Some(v) = s.strip_prefix("geosite:") {
-        return format!("geosite-{}", v.to_lowercase());
-    }
-    if let Some(v) = s.strip_prefix("geoip:") {
-        return format!("geoip-{}", v.to_lowercase());
-    }
-    if s.starts_with("http://") || s.starts_with("https://") {
-        let base = s
-            .rsplit('/')
-            .next()
-            .unwrap_or("")
-            .split('?')
-            .next()
-            .unwrap_or("");
-        return if base.starts_with("geosite-")
-            || base.starts_with("geoip-")
-            || matches!(base, "geoip" | "geosite")
-        {
-            format!("user-{base}")
-        } else {
-            base.to_string()
-        };
-    }
-    s.to_lowercase()
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct RuleSet {
+    name: String,
+    source: String,
+    format: String,
+    #[serde(rename = "match")]
+    direction: String,
 }
-fn add(obj: &mut Value, key: &str, value: String) {
-    if not_blank(&value) {
-        if obj.get(key).is_none() {
-            obj[key] = json!([]);
-        }
-        obj[key].as_array_mut().unwrap().push(json!(value));
-    }
+
+pub(super) struct BuiltRule {
+    pub route: Option<Value>,
+    pub dns: Vec<Value>,
+    pub sets: Vec<Value>,
+    pub missing_outbound: bool,
+    pub dns_safe: bool,
 }
+
+fn add(obj: &mut Value, key: &str, value: Value) {
+    obj.as_object_mut()
+        .unwrap()
+        .entry(key)
+        .or_insert(json!([]))
+        .as_array_mut()
+        .unwrap()
+        .push(value);
+}
+
+// Native address input only; sets have a separate typed field.
 pub(super) fn match_rule(obj: &mut Value, values: &[&str], ip: bool) {
-    // Legacy IP application replaces rule_set, including previously added domain sets.
-    obj.as_object_mut().unwrap().remove("rule_set");
     for &v in values {
         if ip {
-            if matches!(v, "geoip:private" | "geoip-private") {
-                obj["ip_is_private"] = json!(true);
-            } else if v.starts_with("geoip:")
-                || v.starts_with("geoip-")
-                || v.starts_with("http://")
-                || v.starts_with("https://")
-            {
-                add(obj, "rule_set", normalize(v));
-            } else {
-                add(obj, "ip_cidr", v.into());
-            }
-        } else if v.starts_with("geosite:")
-            || v.starts_with("geosite-")
-            || v.starts_with("http://")
-            || v.starts_with("https://")
-        {
-            add(obj, "rule_set", normalize(v));
+            add(obj, "ip_cidr", json!(v));
         } else {
             let (key, text) = if let Some(v) = v.strip_prefix("full:") {
                 ("domain", v)
@@ -71,195 +48,285 @@ pub(super) fn match_rule(obj: &mut Value, values: &[&str], ip: bool) {
             } else {
                 ("domain_suffix", v)
             };
-            add(obj, key, text.to_lowercase());
+            add(
+                obj,
+                key,
+                json!(if key == "domain_regex" {
+                    text.to_owned()
+                } else {
+                    text.to_lowercase()
+                }),
+            );
         }
     }
 }
-fn sets(values: &[&str], target: &mut Vec<Value>) {
-    for &v in values {
-        let url = if v.starts_with("geoip:") || v.starts_with("geoip-") {
-            if normalize(v) == "geoip-private" {
-                continue;
-            }
-            format!(
-                "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/{}.srs",
-                normalize(v)
-            )
-        } else if v.starts_with("geosite:") || v.starts_with("geosite-") {
-            format!(
-                "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/{}.srs",
-                normalize(v)
-            )
-        } else if v.starts_with("http://") || v.starts_with("https://") {
-            v.into()
-        } else {
-            continue;
-        };
-        let remote = v.starts_with("http://") || v.starts_with("https://");
-        let mut set = json!({"type":"remote","tag":normalize(v),"format":if !remote || v.contains(".srs") {"binary"} else {"source"},"url":url,"http_client":"default-http-client"});
-        if !remote {
-            set["update_interval"] = json!("24h");
-        }
-        target.push(set);
-    }
-}
-pub(super) fn dns_empty(obj: &Value) -> bool {
-    let fields = [
-        "rule_set",
-        "domain",
-        "domain_suffix",
-        "domain_regex",
-        "domain_keyword",
-        "user_id",
-        "ip_cidr",
-    ];
-    fields.iter().all(|k| {
-        obj.get(*k)
-            .and_then(Value::as_array)
-            .is_none_or(Vec::is_empty)
-    }) && obj.get("ip_is_private") != Some(&json!(true))
-        && obj.get("match_response").is_none()
-}
-fn route_empty(obj: &Value, custom: &Value) -> bool {
-    dns_empty(obj)
-        && obj.get("source_ip_is_private") != Some(&json!(true))
-        && obj.get("rule_set_ip_cidr_match_source") != Some(&json!(true))
-        && ["port", "port_range", "source_ip_cidr"].iter().all(|k| {
-            obj.get(*k)
-                .and_then(Value::as_array)
-                .is_none_or(Vec::is_empty)
-        })
-        && custom.is_null()
-}
-fn ports(obj: &mut Value, raw: &str, key: &str, range: &str) {
-    if !not_blank(raw) {
-        return;
-    }
-    obj[key] = json!([]);
-    obj[range] = json!([]);
+
+fn ports(obj: &mut Value, raw: &str, key: &str, range: &str) -> Result<(), String> {
     for part in list(raw) {
-        if part.contains(':') {
-            obj[range].as_array_mut().unwrap().push(json!(part));
-        } else if let Some(n) = int(part) {
-            obj[key].as_array_mut().unwrap().push(json!(n));
+        if let Some((start, end)) = part.split_once(':') {
+            let parse = |s: &str, default| {
+                if s.is_empty() {
+                    Some(default)
+                } else {
+                    s.parse::<u16>().ok()
+                }
+            };
+            let (Some(a), Some(b)) = (parse(start, 0), parse(end, 65535)) else {
+                return Err(format!("invalid {range}: {part}"));
+            };
+            if a > b {
+                return Err(format!("reversed {range}: {part}"));
+            }
+            add(obj, range, json!(format!("{a}:{b}")));
+        } else {
+            let n = int(part)
+                .filter(|v| (0..=65535).contains(v))
+                .ok_or_else(|| format!("invalid {key}: {part}"))?;
+            add(obj, key, json!(n));
         }
     }
+    Ok(())
 }
-/// Pure rule lowering. DNS response-IP evaluate/match_response is preserved.
+
+fn cidrs(raw: &str) -> Result<(), String> {
+    for part in list(raw) {
+        let (addr, prefix) = part
+            .split_once('/')
+            .map_or((part, None), |(a, p)| (a, Some(p)));
+        let address = addr
+            .parse::<std::net::IpAddr>()
+            .map_err(|_| format!("invalid IP/CIDR: {part}; use the rule-set selector for sets"))?;
+        if let Some(prefix) = prefix {
+            let n = prefix
+                .parse::<u8>()
+                .map_err(|_| format!("invalid CIDR: {part}"))?;
+            if n > if address.is_ipv4() { 32 } else { 128 } {
+                return Err(format!("invalid CIDR: {part}"));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn take_fields(obj: &mut Value, keys: &[&str]) -> Value {
+    let mut part = json!({});
+    for key in keys {
+        if let Some(v) = obj.as_object_mut().unwrap().remove(*key) {
+            part[*key] = v;
+        }
+    }
+    part
+}
+fn combine(mode: &str, mut parts: Vec<Value>) -> Value {
+    parts.retain(|p| p.as_object().is_some_and(|o| !o.is_empty()));
+    if parts.len() == 1 {
+        parts.remove(0)
+    } else if parts.is_empty() {
+        json!({})
+    } else {
+        json!({"type":"logical", "mode":mode, "rules":parts})
+    }
+}
+
 pub(super) fn build(
     rule: &Rule,
     tag: &str,
     settings: &Settings,
     fake: bool,
-) -> (Option<Value>, Vec<Value>, Vec<Value>, bool) {
+) -> Result<BuiltRule, String> {
+    build_inner(rule, tag, settings, fake).map_err(|e| format!("Rule {}: {e}", rule.id))
+}
+fn build_inner(
+    rule: &Rule,
+    tag: &str,
+    settings: &Settings,
+    fake: bool,
+) -> Result<BuiltRule, String> {
     let mut out = json!({});
-    let mut rule_sets = vec![];
-    let mut dns = vec![];
-    let uids: Vec<_> = rule.uids.iter().copied().filter(|v| *v >= 1000).collect();
-    if !uids.is_empty() {
-        out["user_id"] = json!(uids);
+    for value in list(&rule.domains) {
+        if value.starts_with("geoip:")
+            || value.starts_with("geosite:")
+            || value.starts_with("geoip-")
+            || value.starts_with("geosite-")
+            || value.contains("://")
+        {
+            return Err(
+                "use native rule-set references, not database shorthand or URLs in domains".into(),
+            );
+        }
     }
-    let domains = list(&rule.domains);
-    let ips = list(&rule.ip);
-    if not_blank(&rule.domains) {
-        match_rule(&mut out, &domains, false);
-        sets(&domains, &mut rule_sets);
+    cidrs(&rule.ip)?;
+    cidrs(&rule.source)?;
+    match_rule(&mut out, &list(&rule.domains), false);
+    match_rule(&mut out, &list(&rule.ip), true);
+    if rule.ip_is_private {
+        out["ip_is_private"] = json!(true);
     }
-    if not_blank(&rule.ip) {
-        match_rule(&mut out, &ips, true);
-        sets(&ips, &mut rule_sets);
+    if rule.source_ip_is_private {
+        out["source_ip_is_private"] = json!(true);
     }
-    ports(&mut out, &rule.port, "port", "port_range");
+    for value in list(&rule.source) {
+        add(&mut out, "source_ip_cidr", json!(value));
+    }
+    ports(&mut out, &rule.port, "port", "port_range")?;
     ports(
         &mut out,
         &rule.source_port,
         "source_port",
         "source_port_range",
-    );
-    if not_blank(&rule.network) {
-        out["network"] = json!([rule.network]);
+    )?;
+    for value in list(&rule.network) {
+        if !matches!(value, "tcp" | "udp" | "icmp") {
+            return Err(format!("invalid network: {value}"));
+        }
+        add(&mut out, "network", json!(value));
     }
-    for item in list(&rule.source) {
-        if matches!(item, "geoip:private" | "geoip-private") {
-            out["source_ip_is_private"] = json!(true);
-        } else if item.starts_with("geoip:") || item.starts_with("geoip-") {
-            let tag = normalize(item);
-            sets(&[&tag], &mut rule_sets);
-            add(&mut out, "rule_set", tag);
-            out["rule_set_ip_cidr_match_source"] = json!(true);
-        } else {
-            add(&mut out, "source_ip_cidr", item.into());
+    for value in list(&rule.protocol) {
+        add(&mut out, "protocol", json!(value));
+    }
+    let uids: Vec<_> = rule.uids.iter().copied().filter(|v| *v >= 1000).collect();
+    if rule.package_count > 0 && uids.is_empty() {
+        return Err("no selected application could be resolved; refusing to widen the rule".into());
+    }
+    if !uids.is_empty() {
+        out["user_id"] = json!(uids);
+    }
+    if rule.custom.get("type") == Some(&json!("logical"))
+        && (!out.as_object().unwrap().is_empty() || !rule.rule_sets.is_empty())
+    {
+        return Err("custom logical rules must not be mixed with form conditions; put all conditions inside the custom rule".into());
+    }
+    // Preserve replacement / append / prepend semantics before changing structure.
+    super::merge(&mut out, &rule.custom);
+    if !rule.rule_sets.is_empty()
+        && (out.get("rule_set").is_some() || out.get("rule_set_ip_cidr_match_source").is_some())
+    {
+        return Err("custom rule_set fields conflict with the form's typed references".into());
+    }
+    let mut sets = vec![];
+    let mut destination = vec![];
+    let mut source = vec![];
+    let mut general = vec![];
+    for set in &rule.rule_sets {
+        if set.name.trim().is_empty() || !matches!(set.format.as_str(), "binary" | "source") {
+            return Err("invalid rule-set name or format".into());
+        }
+        let remote = set.source.starts_with("https://");
+        if (!remote && !set.source.starts_with('/'))
+            || set.source.split('?').next().unwrap().ends_with(".db")
+        {
+            return Err(
+                "rule-set source must be an HTTPS URL or imported local path, not a .db file"
+                    .into(),
+            );
+        }
+        // Full identity avoids basename collisions without a hashing dependency.
+        let id = format!("rs:{}:{}", set.format, set.source);
+        let mut declared =
+            json!({"tag":id,"type":if remote {"remote"} else {"local"},"format":set.format});
+        declared[if remote { "url" } else { "path" }] = json!(set.source);
+        if remote {
+            declared["http_client"] = json!("default-http-client");
+            declared["update_interval"] = json!("24h");
+        }
+        sets.push(declared);
+        let mut predicate = json!({"rule_set":[id]});
+        match set.direction.as_str() {
+            "destination" => destination.push(predicate),
+            "source" => {
+                predicate["rule_set_ip_cidr_match_source"] = json!(true);
+                source.push(predicate);
+            }
+            "rule" => general.push(predicate),
+            _ => return Err("invalid rule-set match direction".into()),
         }
     }
-    if not_blank(&rule.protocol) {
-        out["protocol"] = json!(list(&rule.protocol));
+    let has_conditions = !out.as_object().unwrap().is_empty() || !sets.is_empty();
+    let mut built = BuiltRule {
+        route: None,
+        dns: vec![],
+        sets,
+        missing_outbound: false,
+        dns_safe: true,
+    };
+    if !has_conditions {
+        return Ok(built);
     }
-    let mut query = json!({});
-    if !uids.is_empty() {
-        query["user_id"] = json!(uids);
+    if tag.is_empty() {
+        built.missing_outbound = true;
+        built.sets.clear();
+        return Ok(built);
     }
-    if not_blank(&rule.domains) {
-        match_rule(&mut query, &domains, false);
-        sets(&domains, &mut rule_sets);
-    }
-    if matches!(rule.outbound, -2..=0) {
-        let server = match rule.outbound {
-            -1 => Some("dns-direct"),
-            0 => Some("dns-remote"),
-            _ => None,
-        };
-        if not_blank(&rule.ip) {
-            let mut evaluate = query.clone();
-            evaluate["action"] = json!("evaluate");
-            evaluate["server"] = json!("dns-remote");
-            dns.push(evaluate);
-            let mut response = json!({"match_response":true});
-            match_rule(&mut response, &ips, true);
-            sets(&ips, &mut rule_sets);
-            let mut matched = if dns_empty(&query) {
-                response
-            } else {
-                json!({"type":"logical","mode":"and","rules":[query,response]})
-            };
-            matched["action"] = json!(if server.is_some() { "route" } else { "reject" });
-            if let Some(s) = server {
-                matched["server"] = json!(s);
-            }
-            dns.push(matched);
+    // DNS cannot reproduce future connection attributes or arbitrary set contents.
+    // The caller stops projection after the first non-projectable rule.
+    built.dns_safe = rule.custom.is_null()
+        && rule.rule_sets.is_empty()
+        && !out.as_object().unwrap().is_empty()
+        && out.as_object().unwrap().keys().all(|k| {
+            matches!(
+                k.as_str(),
+                "domain" | "domain_suffix" | "domain_regex" | "domain_keyword"
+            )
+        });
+    if built.dns_safe && settings.enable_dns_routing && matches!(rule.outbound, -2..=0) {
+        let mut query = out.clone();
+        if rule.outbound == -2 {
+            query["action"] = json!("reject");
         } else {
             if rule.outbound == 0 && fake {
                 let mut q = query.clone();
                 q["server"] = json!("dns-fake");
                 q["inbound"] = json!(["tun-in"]);
-                dns.push(q);
+                built.dns.push(q);
             }
-            if let Some(s) = server {
-                query["server"] = json!(s);
+            query["server"] = json!(if rule.outbound == -1 {
+                "dns-direct"
             } else {
-                query["action"] = json!("reject");
-            }
-            dns.push(query);
+                "dns-remote"
+            });
         }
+        built.dns.push(query);
+    } else if !matches!(rule.outbound, -2..=0) {
+        built.dns_safe = false;
     }
-    if !settings.enable_dns_routing {
-        dns.clear();
+    let mut actions = take_fields(
+        &mut out,
+        &["action", "outbound", "invert", "method", "no_drop"],
+    );
+    if actions.get("action").is_none() {
+        actions["action"] = json!(if tag == "block" { "reject" } else { "route" });
     }
-    dns.retain(|v| {
-        !dns_empty(v)
-            || v.get("type") == Some(&json!("logical"))
-            || v.get("action") == Some(&json!("evaluate"))
-    });
-    if route_empty(&out, &rule.custom) {
-        return (None, dns, vec![], false);
+    if tag != "block" && actions.get("outbound").is_none() && actions["action"] == "route" {
+        actions["outbound"] = json!(tag);
     }
-    if tag.is_empty() {
-        return (None, dns, vec![], true);
+    let mut parts = vec![];
+    if !destination.is_empty() {
+        destination.push(take_fields(
+            &mut out,
+            &[
+                "domain",
+                "domain_suffix",
+                "domain_regex",
+                "domain_keyword",
+                "ip_cidr",
+                "ip_is_private",
+            ],
+        ));
+        parts.push(combine("or", destination));
     }
-    if tag == "block" {
-        out["action"] = json!("reject");
-    } else {
-        out["outbound"] = json!(tag);
+    if !source.is_empty() {
+        source.push(take_fields(
+            &mut out,
+            &["source_ip_cidr", "source_ip_is_private"],
+        ));
+        parts.push(combine("or", source));
     }
-    super::merge(&mut out, &rule.custom);
-    (Some(out), dns, rule_sets, false)
+    if !general.is_empty() {
+        parts.push(combine("or", general));
+    }
+    parts.push(out);
+    let mut route = combine("and", parts);
+    super::merge(&mut route, &actions);
+    built.route = Some(route);
+    Ok(built)
 }

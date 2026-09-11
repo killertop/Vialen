@@ -33,7 +33,7 @@ internal class ConfigSnapshot private constructor(
                 "NO_DIRECT_DNS" -> "No direct DNS, check your settings!"
                 "NO_REMOTE_DNS" -> "No remote DNS, check your settings!"
                 "CYCLIC_OR_EXCESSIVE_CHAIN" -> "Proxy chain is cyclic or too deep"
-                else -> "Configuration snapshot rejected"
+                else -> root["error"]?.asString?.takeIf { it.startsWith("Rule ") } ?: "Configuration snapshot rejected"
             }
         }
         check(root.keySet() == setOf("version","status","config","traffic","tags","selector_group","generated","warnings"))
@@ -161,7 +161,9 @@ internal class ConfigSnapshot private constructor(
                     "source_port" to rule.sourcePort,"network" to rule.network,"source" to rule.source,
                     "protocol" to rule.protocol,"outbound" to rule.outbound,
                     "uids" to rule.packages.mapNotNull { PackageCache[it]?.takeIf { uid -> uid >= 1000 } }.toSet().toList(),
-                    "package_count" to rule.packages.size,"custom" to overlay(rule.config))
+                    "package_count" to rule.packages.size,"custom" to overlay(rule.config),
+                    "rule_sets" to RouteRuleSet.decode(rule.ruleSets).map { it.snapshotJson { io.nekohasekai.sagernet.SagerNet.application.filesDir } },
+                    "ip_is_private" to rule.ipIsPrivate,"source_ip_is_private" to rule.sourceIpIsPrivate)
             }
             val profileInputs = entities.values.map { row ->
                 val bean = row.requireBean()

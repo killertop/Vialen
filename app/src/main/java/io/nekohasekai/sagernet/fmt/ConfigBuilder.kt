@@ -28,6 +28,9 @@ class ConfigBuildResult(
 fun buildConfig(proxy: ProxyEntity, forTest: Boolean = false, forExport: Boolean = false): ConfigBuildResult {
     val snapshot = ConfigSnapshot.capture(proxy, forTest, forExport)
     val output = snapshot.generate()
+    if (output.warnings.any { it.second == "DNS_RULE_NOT_PROJECTED" }) {
+        Toast.makeText(SagerNet.application, R.string.route_dns_not_projected, Toast.LENGTH_LONG).show()
+    }
     for ((id, code) in output.warnings) {
         val name = snapshot.ruleNames[id].orEmpty()
         val message = when (code) {

@@ -195,6 +195,7 @@ object ProfileManager {
     }
 
     suspend fun createRule(rule: RuleEntity, post: Boolean = true): RuleEntity {
+        RouteRuleSet.validateRule(rule)
         rule.userOrder = SagerDatabase.rulesDao.nextOrder() ?: 1
         rule.id = SagerDatabase.rulesDao.createRule(rule)
         if (post) {
@@ -204,6 +205,7 @@ object ProfileManager {
     }
 
     suspend fun updateRule(rule: RuleEntity) {
+        RouteRuleSet.validateRule(rule)
         SagerDatabase.rulesDao.updateRule(rule)
         ruleIterator { onUpdated(rule) }
     }
@@ -237,7 +239,7 @@ object ProfileManager {
             createRule(
                 RuleEntity(
                     name = app.getString(R.string.route_opt_block_ads),
-                    domains = "geosite:category-ads-all",
+                    ruleSets = RouteRuleSet.encode(listOf(RouteRuleSet.official("geosite", "category-ads-all", app.getString(R.string.route_set_ads)))),
                     outbound = -2
                 )
             )
@@ -260,14 +262,14 @@ object ProfileManager {
                 createRule(
                     RuleEntity(
                         name = app.getString(R.string.route_bypass_domain, displayCountry),
-                        domains = "geosite:$country",
+                        ruleSets = RouteRuleSet.encode(listOf(RouteRuleSet.official("geosite", country, displayCountry))),
                         outbound = -1
                     ), false
                 )
                 createRule(
                     RuleEntity(
                         name = app.getString(R.string.route_bypass_ip, displayCountry),
-                        ip = "geoip:$country",
+                        ruleSets = RouteRuleSet.encode(listOf(RouteRuleSet.official("geoip", country, displayCountry))),
                         outbound = -1
                     ), false
                 )

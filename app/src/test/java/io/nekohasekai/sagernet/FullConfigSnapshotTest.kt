@@ -72,13 +72,14 @@ class FullConfigSnapshotTest {
         val chain=ProxyEntity(id=1,groupId=1).apply {putBean(ChainBean().applyDefaultValues().apply { proxies= mutableListOf(17,2);name="chain" })}
         val group=ProxyGroup(id=1,isSelector=true)
         val rules=listOf(
-            RuleEntity(id=1,domains="full:a.example,geosite:cn",ip="geoip:private,10.0.0.0/8",outbound=-1),
-            RuleEntity(id=2,source="geoip:cn,192.0.2.0/24",port="80,443,100:200",sourcePort="53,1:2",outbound=33),
+            RuleEntity(id=1,domains="full:a.example",ip="10.0.0.0/8",outbound=-1),
+            RuleEntity(id=2,source="192.0.2.0/24",port="80,443,100:200",sourcePort="53,1:2",outbound=33),
             RuleEntity(id=3,domains="keyword:ads",outbound=-2),
         )
         repository(listOf(chain,first,second,third),listOf(group),rules)
         first.requireBean().customOutboundJson="""{"detour":"user-override","tag":"custom-tag"}"""
-        every { DataStore.globalCustomConfig } returns """{"route":{"rules":[{"action":"reject"}],"+rules":[{"action":"sniff"}]}}"""
+        // This tests overlay precedence; native route/DNS policy has its own core-backed matrix.
+        every { DataStore.globalCustomConfig } returns """{"route":{"rules":[{"action":"reject"}],"+rules":[{"action":"sniff"}]},"dns":{"rules":[]}}"""
         chain.requireBean().customConfigJson="""{"route":{"rules+":[{"action":"resolve","strategy":"ipv4_only"}]}}"""
         compare(chain)
         group.isSelector=false;group.frontProxy=33;compare(chain)

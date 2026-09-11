@@ -3,7 +3,6 @@
 set -e
 
 #### Download assets
-bash buildScript/lib/assets.sh
 
 exit
 

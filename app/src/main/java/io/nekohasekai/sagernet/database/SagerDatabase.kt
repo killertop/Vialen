@@ -19,17 +19,35 @@ import kotlinx.coroutines.launch
 
 @Database(
     entities = [ProxyGroup::class, ProxyEntity::class, RuleEntity::class],
-    version = 7,
+    version = 8,
     autoMigrations = [
         AutoMigration(from = 3, to = 4),
         AutoMigration(from = 4, to = 5),
         AutoMigration(from = 5, to = 6),
-        AutoMigration(from = 6, to = 7, spec = SagerDatabase.Migration6To7::class)
+        AutoMigration(from = 6, to = 7, spec = SagerDatabase.Migration6To7::class),
+        AutoMigration(from = 7, to = 8, spec = SagerDatabase.Migration7To8::class)
     ]
 )
 @TypeConverters(value = [KryoConverters::class, GsonConverters::class])
 @GenerateRoomMigrations
 abstract class SagerDatabase : RoomDatabase() {
+
+    class Migration7To8 : AutoMigrationSpec {
+        override fun onPostMigrate(db: SupportSQLiteDatabase) {
+            // Keep ambiguous rows untouched and editable. The native generator rejects
+            // their old input explicitly; it never guesses or drops a condition.
+            db.query("SELECT id, domains, ip, source, port, sourcePort, network, protocol, packages, config FROM rules").use { cursor ->
+                while (cursor.moveToNext()) {
+                    val original = RuleEntity(id = cursor.getLong(0), domains = cursor.getString(1), ip = cursor.getString(2), source = cursor.getString(3),
+                        port = cursor.getString(4), sourcePort = cursor.getString(5), network = cursor.getString(6), protocol = cursor.getString(7),
+                        packages = StringCollectionConverter.toSet(cursor.getString(8)), config = cursor.getString(9))
+                    val row = try { RouteRulesMigration.migrate(original.copy()) } catch (_: IllegalArgumentException) { continue }
+                    db.execSQL("UPDATE rules SET domains=?, ip=?, source=?, ruleSets=?, ipIsPrivate=?, sourceIpIsPrivate=? WHERE id=?",
+                        arrayOf<Any>(row.domains, row.ip, row.source, row.ruleSets, row.ipIsPrivate, row.sourceIpIsPrivate, row.id))
+                }
+            }
+        }
+    }
 
     @DeleteColumn(tableName = "proxy_entities", columnName = "trojanGoBean")
     @DeleteColumn(tableName = "proxy_entities", columnName = "mieruBean")
@@ -55,7 +73,6 @@ abstract class SagerDatabase : RoomDatabase() {
                 .setJournalMode(JournalMode.TRUNCATE)
                 .allowMainThreadQueries()
                 .enableMultiInstanceInvalidation()
-                .fallbackToDestructiveMigration()
                 .setQueryExecutor { GlobalScope.launch { it.run() } }
                 .build()
         }

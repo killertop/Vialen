@@ -25,6 +25,9 @@ data class RuleEntity(
     var protocol: String = "",
     var outbound: Long = 0,
     var packages: Set<String> = emptySet(),
+    @ColumnInfo(defaultValue = "'[]'") var ruleSets: String = "[]",
+    @ColumnInfo(defaultValue = "0") var ipIsPrivate: Boolean = false,
+    @ColumnInfo(defaultValue = "0") var sourceIpIsPrivate: Boolean = false,
 ) : Parcelable {
 
     fun displayName(): String {
@@ -36,6 +39,9 @@ data class RuleEntity(
         if (config.isNotBlank()) summary += app.getString(R.string.custom_config) + "\n"
         if (domains.isNotBlank()) summary += "$domains\n"
         if (ip.isNotBlank()) summary += "$ip\n"
+        RouteRuleSet.decode(ruleSets).forEach { summary += "${it.name} (${it.match})\n" }
+        if (ipIsPrivate) summary += "${app.getString(R.string.route_private_destination)}\n"
+        if (sourceIpIsPrivate) summary += "${app.getString(R.string.route_private_source)}\n"
         if (source.isNotBlank()) summary += "${app.getString(R.string.ui_rule_source_ip)}: $source\n"
         if (sourcePort.isNotBlank()) summary += "${app.getString(R.string.ui_rule_source_port)}: $sourcePort\n"
         if (port.isNotBlank()) summary += "${app.getString(R.string.ui_rule_destination_port)}: $port\n"

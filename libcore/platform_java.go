@@ -7,7 +7,6 @@ var useProcfs bool
 var isBgProcess bool
 
 type NB4AInterface interface {
-	UseOfficialAssets() bool
 	Selector_OnProxySelected(selectorTag string, tag string)
 }
 

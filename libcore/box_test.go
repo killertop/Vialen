@@ -11,7 +11,6 @@ import (
 	"github.com/sagernet/sing-box/common/srs"
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/option"
-	"libcore/nekoutils"
 )
 
 type dummyPlatformInterface struct{}
@@ -57,27 +56,6 @@ func createDummySRS(path string) error {
 
 func TestGoldenConfigsInitialization(t *testing.T) {
 	intfBox = &dummyPlatformInterface{}
-	nekoutils.GetGeoIPHeadlessRules = func(name string) ([]option.HeadlessRule, error) {
-		return []option.HeadlessRule{}, nil
-	}
-	nekoutils.GetGeoSiteHeadlessRules = func(name string) ([]option.HeadlessRule, error) {
-		return []option.HeadlessRule{}, nil
-	}
-
-	dummyRuleSets := []string{
-		"geoip:cn",
-		"geosite:cn",
-		"geosite:category-ads-all",
-	}
-	for _, name := range dummyRuleSets {
-		_ = createDummySRS(name)
-	}
-	defer func() {
-		for _, name := range dummyRuleSets {
-			_ = os.Remove(name)
-		}
-	}()
-
 	fixtureDir := filepath.Join("..", "app", "src", "test", "resources", "config-v1.14")
 	files, err := os.ReadDir(fixtureDir)
 	if err != nil {

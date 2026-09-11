@@ -1,0 +1,22 @@
+<resources>
+    <string name="route_destination_sets">Destination rule sets (OR)</string>
+    <string name="route_source_sets">Source IP rule sets (OR)</string>
+    <string name="route_general_sets">Additional rule-set constraint</string>
+    <string name="route_private_destination">Private destination IP</string>
+    <string name="route_private_source">Private source IP</string>
+    <string name="route_native_semantics">Domain, destination IP and destination sets match ANY. Source addresses form a separate ANY group. These groups, ports, network, protocol, apps and the additional rule-set constraint must ALL match. Rule sets retain their internal logic. Use IP-only sets for source matching. Complex connection rules are not copied to DNS.</string>
+    <string name="route_set_add">Add rule set</string>
+    <string name="route_set_custom">HTTPS rule-set URL</string>
+    <string name="route_set_local">Imported local rule set</string>
+    <string name="route_set_empty_local">Import a .srs or .json file from the rule-set files page first.</string>
+    <string name="route_set_name">Display name</string>
+    <string name="route_set_url">HTTPS URL</string>
+    <string name="route_set_files">Rule-set files</string>
+    <string name="route_set_cn_ip">China IP addresses</string>
+    <string name="route_set_cn_domain">China domains</string>
+    <string name="route_set_ads">Advertising domains</string>
+    <string name="route_set_remove">Remove this reference?</string>
+    <string name="route_set_import_error">Import a valid .srs binary or .json source rule set. Database files are not supported.</string>
+    <string name="route_set_in_use">This file is referenced by a routing rule. Remove that reference before deleting the file.</string>
+    <string name="route_dns_not_projected">Some routing rules cannot be safely applied to DNS. They and subsequent rules remain connection-only; DNS uses its configured default.</string>
+</resources>

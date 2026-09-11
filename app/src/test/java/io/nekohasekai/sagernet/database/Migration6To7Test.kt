@@ -36,7 +36,7 @@ class Migration6To7Test {
     val helper: MigrationTestHelper = MigrationTestHelper(
         InstrumentationRegistry.getInstrumentation(),
         SagerDatabase::class.java,
-        listOf(SagerDatabase.Migration6To7()),
+        listOf(SagerDatabase.Migration6To7(), SagerDatabase.Migration7To8()),
         FrameworkSQLiteOpenHelperFactory()
     )
 

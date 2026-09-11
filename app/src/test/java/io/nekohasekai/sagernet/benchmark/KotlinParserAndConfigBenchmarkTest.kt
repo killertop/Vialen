@@ -46,6 +46,9 @@ class KotlinParserAndConfigBenchmarkTest {
         @BeforeClass
         @JvmStatic
         fun setup() {
+            io.mockk.mockkStatic(android.widget.Toast::class)
+            every { android.widget.Toast.makeText(any(), any<Int>(), any()) } returns mockk(relaxed = true)
+            every { android.widget.Toast.makeText(any(), any<CharSequence>(), any()) } returns mockk(relaxed = true)
             mockkStatic(Base64::class)
             every { Base64.encode(any(), any()) } answers {
                 JavaBase64.getEncoder().encode(firstArg<ByteArray>())
@@ -407,7 +410,8 @@ class KotlinParserAndConfigBenchmarkTest {
         // 2. Measure Remote Rule-Set ConfigBuilder (3 iterations)
         val ruleEntity = RuleEntity().apply {
             id = 1L
-            domains = "https://benchmark.internal/rules.srs"
+            ruleSets = io.nekohasekai.sagernet.database.RouteRuleSet.encode(listOf(
+                io.nekohasekai.sagernet.database.RouteRuleSet("benchmark", "https://benchmark.internal/rules.srs")))
             outbound = 0L
         }
         every { mockRuleDao.enabledRules() } returns listOf(ruleEntity)

@@ -1251,9 +1251,6 @@ public class SingBoxOptions {
         public List<String> domain_regex;
 
         // Generate note: Listable
-        public List<String> geosite;
-
-        // Generate note: Listable
         public List<String> source_ip_cidr;
 
         // Generate note: Listable

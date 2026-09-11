@@ -54,6 +54,8 @@ def check_archive(path, prefix):
     with zipfile.ZipFile(path) as archive:
         require(archive.testzip() is None, "Corrupt archive")
         names = archive.namelist()
+        require(not any(re.search(r"(?:^|/)assets/(?:sing-box/)?(?:geoip|geosite)\.(?:db|version\.txt)(?:\.xz)?$", n, re.I) for n in names),
+                "Obsolete GeoIP database asset in artifact; use native rule sets")
         libraries = [n for n in names if n.endswith(".so")]
         require(libraries, "No native libraries in artifact")
         require(all(n.startswith(prefix + "/arm64-v8a/") for n in libraries),

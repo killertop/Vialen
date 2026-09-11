@@ -108,6 +108,12 @@ struct Rule {
     uids: Vec<i32>,
     package_count: usize,
     custom: Value,
+    #[serde(default)]
+    rule_sets: Vec<rules::RuleSet>,
+    #[serde(default)]
+    ip_is_private: bool,
+    #[serde(default)]
+    source_ip_is_private: bool,
 }
 
 /// Existing deep map merge, including +array prepend and array+ append semantics.
@@ -296,14 +302,14 @@ impl Builder<'_> {
     }
 }
 
-fn build(req: Request) -> Result<Value, &'static str> {
+fn build(req: Request) -> Result<Value, String> {
     if req.version != 1 {
-        return Err("UNSUPPORTED_VERSION");
+        return Err("UNSUPPORTED_VERSION".into());
     }
     let nodes: HashMap<_, _> = req.profiles.iter().map(|v| (v.id, v)).collect();
     let groups: HashMap<_, _> = req.groups.iter().map(|v| (v.id, v)).collect();
     if nodes.len() != req.profiles.len() || groups.len() != req.groups.len() {
-        return Err("DUPLICATE_SNAPSHOT_ID");
+        return Err("DUPLICATE_SNAPSHOT_ID".into());
     }
     let selected = *nodes.get(&req.selected).ok_or("MISSING_SELECTED_PROFILE")?;
     if let Some(config) = &selected.full_config {
@@ -340,7 +346,7 @@ fn build(req: Request) -> Result<Value, &'static str> {
         let order: HashSet<_> = req.selector_order.iter().copied().collect();
         let ids: HashSet<_> = req.selector_ids.iter().copied().collect();
         if order != ids || req.selector_order.len() != order.len() {
-            return Err("INVALID_SELECTOR_ORDER");
+            return Err("INVALID_SELECTOR_ORDER".into());
         }
         let options: Vec<_> = req
             .selector_order
@@ -385,6 +391,7 @@ fn build(req: Request) -> Result<Value, &'static str> {
     let mut dns_rules = vec![];
     let mut rule_sets = vec![];
     let mut warnings = vec![];
+    let mut dns_projection_open = true;
     if !req.for_test {
         for rule in &req.rules {
             if s.service_mode != "vpn" {
@@ -403,14 +410,19 @@ fn build(req: Request) -> Result<Value, &'static str> {
                     .find(|(key, _)| *key == id)
                     .map_or("", |(_, tag)| tag.as_str()),
             };
-            let (route, mut dns, mut sets, missing_outbound) = rules::build(rule, tag, s, fake);
-            if let Some(route) = route {
+            let mut lowered = rules::build(rule, tag, s, fake)?;
+            if lowered.route.is_some() && !lowered.dns_safe { dns_projection_open = false; }
+            if !dns_projection_open {
+                lowered.dns.clear();
+                if s.enable_dns_routing && lowered.route.is_some() { warnings.push(json!([rule.id, "DNS_RULE_NOT_PROJECTED"])); }
+            }
+            if let Some(route) = lowered.route {
                 route_rules.push(route);
-            } else if missing_outbound {
+            } else if lowered.missing_outbound {
                 warnings.push(json!([rule.id, "MISSING_RULE_OUTBOUND"]));
             }
-            dns_rules.append(&mut dns);
-            rule_sets.append(&mut sets);
+            dns_rules.append(&mut lowered.dns);
+            rule_sets.append(&mut lowered.sets);
         }
     }
     let mut seen = HashSet::new();
@@ -549,11 +561,11 @@ fn build(req: Request) -> Result<Value, &'static str> {
 }
 pub fn generate(input: &[u8]) -> Vec<u8> {
     let result = serde_json::from_slice::<Input>(input)
-        .map_err(|_| "INVALID_CONFIG_SNAPSHOT")
+        .map_err(|_| "INVALID_CONFIG_SNAPSHOT".to_string())
         .and_then(|input| match input {
             Input::Snapshot(request) => build(*request),
             Input::Passthrough(full) => {
-                if full.version != 1 { return Err("UNSUPPORTED_VERSION"); }
+                if full.version != 1 { return Err("UNSUPPORTED_VERSION".into()); }
                 Ok(json!({"config":full.full_config,"traffic":{"proxy":[full.selected]},"tags":[[full.selected,"proxy"]],"selector_group":-1,"generated":[],"warnings":[]}))
             }
         });
@@ -582,6 +594,74 @@ mod tests {
     }
     fn rule() -> Value {
         json!({"id":1,"domains":"","ip":"","port":"","source_port":"","network":"","source":"","protocol":"","outbound":999,"uids":[],"package_count":0,"custom":null})
+    }
+    fn generated_rule(mut r: Value) -> Value {
+        r["outbound"] = json!(-1);
+        let mut v = request();
+        v["rules"] = json!([r]);
+        let output = run(&v);
+        assert_eq!(output["status"], "SUCCESS", "{output}");
+        serde_json::from_str(output["config"].as_str().unwrap()).unwrap()
+    }
+    fn rule_set(name: &str, direction: &str) -> Value {
+        json!({"name":name,"source":format!("https://example.net/{name}.srs"),"format":"binary","match":direction})
+    }
+    #[test]
+    fn combined_destination_references_survive() {
+        for kind in 0..3 {
+            let mut r = rule();
+            r["rule_sets"] = json!([rule_set("geosite-cn", "destination")]);
+            match kind {
+                0 => r["rule_sets"].as_array_mut().unwrap().push(rule_set("geoip-cn", "destination")),
+                1 => r["ip"] = json!("203.0.113.0/24"),
+                _ => r["ip_is_private"] = json!(true),
+            }
+            let c = generated_rule(r);
+            assert!(c["route"]["rules"].to_string().contains("geosite-cn"), "{c}");
+        }
+    }
+    #[test]
+    fn source_geo_is_isolated_from_destination() {
+        let mut r = rule();
+        r["rule_sets"] = json!([rule_set("geoip-cn", "source"),rule_set("geoip-us", "destination")]);
+        let c = generated_rule(r);
+        let route = c["route"]["rules"].as_array().unwrap().iter().find(|r| r["outbound"] == "bypass").unwrap();
+        assert_eq!(route["type"], "logical");
+        assert!(route.get("rule_set_ip_cidr_match_source").is_none());
+    }
+    #[test]
+    fn connection_only_rules_are_not_empty() {
+        for (key, value) in [("source_port", "1234"), ("network", "tcp"), ("protocol", "tls")] {
+            let mut r = rule();
+            r[key] = json!(value);
+            let c = generated_rule(r);
+            assert!(c["route"]["rules"].as_array().unwrap().iter().any(|r| r["outbound"] == "bypass"), "{key}: {c}");
+        }
+    }
+    #[test]
+    fn invalid_port_cannot_disappear() {
+        let mut v = request();
+        let mut r = rule();
+        r["domains"] = json!("example.com");
+        r["port"] = json!("not-a-port");
+        r["outbound"] = json!(-2);
+        v["rules"] = json!([r]);
+        assert_eq!(run(&v)["status"], "ERROR");
+    }
+    #[test]
+    fn connection_constraint_prevents_dns_reject_and_shadowing() {
+        let mut v = request();
+        let mut first = rule();
+        first["domains"] = json!("example.com");
+        first["port"] = json!("443");
+        first["outbound"] = json!(-1);
+        let mut second = rule();
+        second["domains"] = json!("example.com");
+        second["outbound"] = json!(-2);
+        v["rules"] = json!([first, second]);
+        let output = run(&v);
+        let c: Value = serde_json::from_str(output["config"].as_str().unwrap()).unwrap();
+        assert!(!c["dns"]["rules"].to_string().contains("reject"), "{c}");
     }
     // Validate the generated graph itself, independently of the Kotlin oracle.
     fn assert_outbound_tag_integrity(config: &Value) {
@@ -736,26 +816,20 @@ mod tests {
         assert_eq!(dst["route"]["rules"], json!([5]));
     }
     #[test]
-    fn dns_response_ip_remains_evaluate_then_logical_match() {
+    fn address_sets_are_not_projected_to_dns() {
         let mut v = request();
         let mut r = rule();
         r["outbound"] = json!(-1);
         r["domains"] = json!("full:example.com");
-        r["ip"] = json!("geoip:cn,10.0.0.0/8");
+        r["ip"] = json!("10.0.0.0/8");
+        r["rule_sets"] = json!([rule_set("geoip-cn", "destination")]);
         v["rules"] = json!([r]);
         let output = run(&v);
         let config: Value = serde_json::from_str(output["config"].as_str().unwrap()).unwrap();
         let rules = config["dns"]["rules"].as_array().unwrap();
-        let pos = rules
-            .iter()
-            .position(|v| v["action"] == "evaluate")
-            .unwrap();
-        assert_eq!(rules[pos]["server"], "dns-remote");
-        assert_eq!(rules[pos + 1]["type"], "logical");
-        assert_eq!(rules[pos + 1]["mode"], "and");
-        assert_eq!(rules[pos + 1]["rules"][1]["match_response"], true);
-        assert_eq!(rules[pos + 1]["server"], "dns-direct");
-        assert_eq!(config["route"]["rule_set"][0]["tag"], "geoip-cn");
+        assert!(!rules.iter().any(|v| v["action"] == "evaluate"));
+        assert_eq!(output["warnings"], json!([[1,"DNS_RULE_NOT_PROJECTED"]]));
+        assert_eq!(config["route"]["rule_set"][0]["url"], "https://example.net/geoip-cn.srs");
         assert_eq!(config["http_clients"], json!([{"tag":"default-http-client"}]));
     }
     #[test]

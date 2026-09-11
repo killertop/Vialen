@@ -35,6 +35,9 @@ class RuleSetModernizationTest {
         @BeforeClass
         @JvmStatic
         fun setUp() {
+            io.mockk.mockkStatic(android.widget.Toast::class)
+            every { android.widget.Toast.makeText(any(), any<Int>(), any()) } returns mockk(relaxed = true)
+            every { android.widget.Toast.makeText(any(), any<CharSequence>(), any()) } returns mockk(relaxed = true)
             val mockApp = mockk<SagerNet>(relaxed = true)
             every { mockApp.getDatabasePath(any()) } returns File("/tmp/test_mock_db")
             SagerNet.application = mockApp
@@ -86,7 +89,7 @@ class RuleSetModernizationTest {
 
     private fun buildConfigWithRules(rules: List<RuleEntity>): Pair<SingBoxOptions.MyOptions, JsonObject> {
         val mockRuleDao = mockk<RuleEntity.Dao>(relaxed = true)
-        every { mockRuleDao.enabledRules() } returns rules
+        every { mockRuleDao.enabledRules() } returns rules.filter { it.enabled }.sortedBy { it.userOrder }
         every { SagerDatabase.rulesDao } returns mockRuleDao
 
         val proxy = ProxyEntity().apply {
@@ -107,314 +110,151 @@ class RuleSetModernizationTest {
         return json.getAsJsonObject("dns").getAsJsonArray("rules").map { it.asJsonObject }
     }
 
-    private fun logicalChildren(rule: JsonObject): List<JsonObject> {
-        return rule.getAsJsonArray("rules").map { it.asJsonObject }
+    private fun nativeRule() = RuleEntity(id = 100, enabled = true, outbound = -1)
+    private fun ref(name: String, match: String = "destination") =
+        io.nekohasekai.sagernet.database.RouteRuleSet(name, "https://example.net/" + name + ".srs", match = match)
+    private fun sets(rule: RuleEntity, vararg refs: io.nekohasekai.sagernet.database.RouteRuleSet) = rule.apply {
+        ruleSets = io.nekohasekai.sagernet.database.RouteRuleSet.encode(refs.toList())
+    }
+    private fun routes(json: JsonObject) = json.getAsJsonObject("route").getAsJsonArray("rules").map { it.asJsonObject }
+
+    @Test fun nativeReferencesAreDeclaredAndUsedWithoutBasenameCollisions() {
+        val first = ref("same")
+        val second = first.copy(source = "https://another.example/same.srs")
+        val (_, json) = buildConfigWithRules(listOf(sets(nativeRule(), first, second)))
+        val declared = json.getAsJsonObject("route").getAsJsonArray("rule_set").map { it.asJsonObject }
+        assertEquals(2, declared.size)
+        assertEquals(2, declared.map { it["tag"].asString }.toSet().size)
+        declared.forEach {
+            assertEquals("binary", it["format"].asString)
+            assertEquals("default-http-client", it["http_client"].asString)
+            assertTrue(routes(json).toString().contains(it["tag"].asString))
+        }
     }
 
-    @Test
-    fun testRuleSetDedup() {
-        val rule1 = RuleEntity().apply {
-            name = "Rule 1"
-            domains = "geosite:cn\ngeosite:apple"
-            ip = "geoip:cn"
-            outbound = 0
+    @Test fun connectionOnlyRulesSurviveAndNeverBecomeDnsBlocks() {
+        for (r in listOf(nativeRule().apply { sourcePort = "1234" }, nativeRule().apply { network = "tcp" }, nativeRule().apply { protocol = "tls" })) {
+            val (_, json) = buildConfigWithRules(listOf(r))
+            assertTrue(routes(json).any { it["outbound"]?.asString == "bypass" })
         }
-        val rule2 = RuleEntity().apply {
-            name = "Rule 2"
-            domains = "geosite:cn\ngeosite:category-ads-all"
-            ip = "geoip:cn"
-            outbound = 0
-        }
-
-        val (config, _) = buildConfigWithRules(listOf(rule1, rule2))
-        val ruleSets = config.route.rule_set
-
-        val tags = ruleSets.map { it.tag }
-        assertEquals("Each tag must be unique (no duplicates)", tags.distinct().size, tags.size)
-        assertTrue("Must contain geosite-cn", tags.contains("geosite-cn"))
-        assertTrue("Must contain geosite-apple", tags.contains("geosite-apple"))
-        assertTrue("Must contain geosite-category-ads-all", tags.contains("geosite-category-ads-all"))
-        assertTrue("Must contain geoip-cn", tags.contains("geoip-cn"))
-        assertEquals("Exact 4 deduplicated rule-sets expected", 4, ruleSets.size)
+        val first = nativeRule().apply { domains = "example.com"; port = "443" }
+        val later = nativeRule().apply { domains = "example.com"; outbound = -2 }
+        val (_, json) = buildConfigWithRules(listOf(first, later))
+        assertFalse(dnsRules(json).any { it["action"]?.asString == "reject" })
     }
 
-    @Test
-    fun testRuleSetDeterministicOrder() {
-        val rule = RuleEntity().apply {
-            name = "Mixed Rules"
-            domains = "geosite:zhihu\ngeosite:bilibili\ngeosite:apple\ngeosite:cn"
-            ip = "geoip:us\ngeoip:cn"
-            outbound = 0
+    @Test fun pureDomainDnsStillWorksButAddressSetsUseConnectionRouting() {
+        val (_, simple) = buildConfigWithRules(listOf(nativeRule().apply { domains = "full:blocked.example"; outbound = -2 }))
+        assertTrue(dnsRules(simple).any { it["action"]?.asString == "reject" })
+        for (r in listOf(sets(nativeRule(), ref("geoip-cn")), nativeRule().apply { ipIsPrivate = true }, nativeRule().apply { ip = "203.0.113.0/24" })) {
+            val (_, json) = buildConfigWithRules(listOf(r))
+            assertFalse(dnsRules(json).any { it["action"]?.asString in listOf("evaluate", "reject") || it.has("match_response") })
         }
-
-        val (config, _) = buildConfigWithRules(listOf(rule))
-        val ruleSets = config.route.rule_set
-        val tags = ruleSets.map { it.tag }
-
-        val sortedTags = tags.sorted()
-        assertEquals("Rule-set declarations must be sorted alphabetically by tag", sortedTags, tags)
     }
 
-    @Test
-    fun testRuleSetTagCollisionSafety() {
-        // 1. Direct generateRuleSet with an identical basename URL
-        val ruleList = listOf(
-            "geosite:cn",
-            "https://custom-provider.example.com/geosite-cn.srs"
-        )
-        val ruleSets = mutableListOf<SingBoxOptions.RuleSet>()
-        generateRuleSet(ruleList, ruleSets)
-
-        assertEquals(2, ruleSets.size)
-        val tag1 = ruleSets[0].tag
-        val tag2 = ruleSets[1].tag
-        org.junit.Assert.assertNotEquals("Tags must never collide", tag1, tag2)
-        assertEquals("geosite-cn", tag1)
-        assertEquals("user-geosite-cn.srs", tag2)
-
-        // 2. Full ConfigBuilder integration proving both declarations and rule references survive
-        val rule1 = RuleEntity().apply {
-            name = "Official Geosite Rule"
-            domains = "geosite:cn"
-            outbound = 0
+    @Test fun invalidInputAndAmbiguousCustomConditionsAreRejected() {
+        for (r in listOf(
+            nativeRule().apply { domains = "geosite:cn" },
+            nativeRule().apply { ip = "geoip:cn" },
+            nativeRule().apply { domains = "example.com"; port = "invalid" },
+            nativeRule().apply { sourcePort = "65536" },
+            nativeRule().apply { port = "500:100" },
+            nativeRule().apply { domains = "example.com"; config = """{"type":"logical","mode":"and","rules":[{"port":[443]}]}""" }
+        )) {
+            try { buildConfigWithRules(listOf(r)); org.junit.Assert.fail("Invalid rule must fail: " + r) }
+            catch (e: IllegalStateException) { assertTrue(e.message.orEmpty().startsWith("Rule ")) }
         }
-        val rule2 = RuleEntity().apply {
-            name = "User Custom SRS Rule"
-            domains = "https://custom-provider.example.com/geosite-cn.srs"
-            outbound = 0
-        }
-
-        val (config, json) = buildConfigWithRules(listOf(rule1, rule2))
-        val declaredTags = config.route.rule_set.map { it.tag }
-
-        assertTrue("Must retain official geosite-cn", declaredTags.contains("geosite-cn"))
-        assertTrue("Must retain user-namespaced custom SRS tag", declaredTags.contains("user-geosite-cn.srs"))
-        assertEquals("Both rule-sets must be preserved without collision loss", 2, declaredTags.size)
-
-        val routeRules = json.getAsJsonObject("route").getAsJsonArray("rules").map { it.asJsonObject }
-        val r1 = routeRules.firstOrNull { it.has("rule_set") && it.getAsJsonArray("rule_set").map { s -> s.asString }.contains("geosite-cn") }
-        val r2 = routeRules.firstOrNull { it.has("rule_set") && it.getAsJsonArray("rule_set").map { s -> s.asString }.contains("user-geosite-cn.srs") }
-        assertNotNull("Rule 1 must target official geosite-cn", r1)
-        assertNotNull("Rule 2 must target user custom user-geosite-cn.srs", r2)
     }
 
-    @Test
-    fun testSourceGeoIPSemantics() {
-        val rule = RuleEntity().apply {
-            name = "Source Rule"
-            source = "geoip:cn"
-            outbound = 0
+    /** Golden cases are generated through RuleEntity -> ConfigSnapshot -> Rust JNI.
+     * The Go test reads the SAME checked-in configurations and replaces only set
+     * data and host-incompatible transports, never the generated user rules. */
+    @Test fun generatedConfigurationsMatchCoreFixtures() {
+        val cases = com.google.gson.JsonArray()
+        fun add(name: String, rule: RuleEntity, checks: String, extra: List<RuleEntity> = emptyList()) {
+            val (_, config) = buildConfigWithRules(listOf(rule) + extra)
+            cases.add(JsonObject().apply {
+                addProperty("name", name)
+                add("config", config)
+                add("checks", JsonParser.parseString(checks))
+            })
         }
-
-        val (_, json) = buildConfigWithRules(listOf(rule))
-        val routeRules = json.getAsJsonObject("route").getAsJsonArray("rules")
-
-        val matchingRule = routeRules.map { it.asJsonObject }.firstOrNull { r ->
-            r.has("rule_set") && r.getAsJsonArray("rule_set").map { it.asString }.contains("geoip-cn")
+        val matrix = """[
+            {"domain":"cn.example","source":"192.0.2.1:1234","destination":"8.8.8.8:443","want":"bypass"},
+            {"domain":"other.example","source":"192.0.2.1:1234","destination":"203.0.113.1:443","want":"bypass"},
+            {"domain":"cn.example","source":"192.0.2.1:1234","destination":"203.0.113.1:443","want":"bypass"},
+            {"domain":"other.example","source":"192.0.2.1:1234","destination":"8.8.8.8:443","want":"proxy"},
+            {"domain":"cn.example","source":"192.0.2.1:1234","destination":"203.0.113.1:80","want":"proxy"}
+        ]"""
+        add("domain-set-and-ip-set", sets(nativeRule().apply { port = "443" }, ref("geosite-cn"), ref("geoip-cn")), matrix)
+        add("domain-set-and-cidr", sets(nativeRule().apply { port = "443"; ip = "203.0.113.0/24" }, ref("geosite-cn")), matrix)
+        add("domain-set-and-private", sets(nativeRule().apply { port = "443"; ipIsPrivate = true }, ref("geosite-cn")), matrix.replace("203.0.113.1", "10.0.0.1"))
+        add("native-domain-and-ip", nativeRule().apply { domains = "full:cn.example"; ip = "203.0.113.0/24"; port = "443" }, matrix)
+        add("source-destination-isolation", sets(nativeRule().apply { port = "443"; sourcePort = "1234" }, ref("geoip-source", "source"), ref("geoip-cn")), """[
+            {"source":"192.168.10.1:1234","destination":"203.0.113.1:443","want":"bypass"},
+            {"source":"203.0.113.1:1234","destination":"192.168.10.1:443","want":"proxy"},
+            {"source":"192.168.10.1:1234","destination":"8.8.8.8:443","want":"proxy"},
+            {"source":"192.168.10.1:4321","destination":"203.0.113.1:443","want":"proxy"},
+            {"source":"192.168.10.1:1234","destination":"203.0.113.1:80","want":"proxy"},
+            {"source":"192.0.2.1:1234","destination":"203.0.113.1:443","want":"proxy"}
+        ]""")
+        add("source-set-or-cidr", sets(nativeRule().apply { source = "192.0.2.0/24"; ip = "203.0.113.0/24" }, ref("geoip-source", "source")), """[
+            {"source":"192.168.10.1:1234","destination":"203.0.113.1:443","want":"bypass"},
+            {"source":"192.0.2.1:1234","destination":"203.0.113.1:443","want":"bypass"},
+            {"source":"198.51.100.1:1234","destination":"203.0.113.1:443","want":"proxy"},
+            {"source":"192.0.2.1:1234","destination":"8.8.8.8:443","want":"proxy"}
+        ]""")
+        add("whole-rule-invert", sets(nativeRule().apply { port = "443"; config = """{"invert":true}""" }, ref("geosite-cn"), ref("geoip-cn")),
+            matrix.replace("\"bypass\"", "\"TEMP\"").replace("\"proxy\"", "\"bypass\"").replace("\"TEMP\"", "\"proxy\""))
+        add("custom-port-replacement", sets(nativeRule().apply { port = "80"; config = """{"port":[443]}""" }, ref("geosite-cn"), ref("geoip-cn")), matrix)
+        add("custom-port-append", sets(nativeRule().apply { port = "80"; config = """{"port+":[443]}""" }, ref("geosite-cn"), ref("geoip-cn")),
+            matrix.replace("\"destination\":\"203.0.113.1:80\",\"want\":\"proxy\"", "\"destination\":\"203.0.113.1:80\",\"want\":\"bypass\""))
+        add("explicit-custom-and", nativeRule().apply { config = """{"type":"logical","mode":"and","rules":[{"domain":["cn.example"]},{"ip_cidr":["203.0.113.0/24"]}]}""" }, """[
+            {"domain":"cn.example","destination":"203.0.113.1:443","want":"bypass"},
+            {"domain":"cn.example","destination":"8.8.8.8:443","want":"proxy"},
+            {"domain":"other.example","destination":"203.0.113.1:443","want":"proxy"}
+        ]""")
+        add("network-only", nativeRule().apply { network = "udp" }, """[
+            {"network":"udp","destination":"203.0.113.1:443","want":"bypass"},
+            {"network":"tcp","destination":"203.0.113.1:443","want":"proxy"}
+        ]""")
+        add("protocol-only", nativeRule().apply { protocol = "tls" }, """[
+            {"protocol":"tls","destination":"203.0.113.1:443","want":"bypass"},
+            {"protocol":"http","destination":"203.0.113.1:443","want":"proxy"}
+        ]""")
+        add("source-port-only", nativeRule().apply { sourcePort = "1234" }, """[
+            {"source":"192.0.2.1:1234","destination":"203.0.113.1:443","want":"bypass"},
+            {"source":"192.0.2.1:4321","destination":"203.0.113.1:443","want":"proxy"}
+        ]""")
+        add("first-rule-priority", nativeRule().apply { domains = "cn.example"; outbound = -2 }, """[
+            {"domain":"cn.example","destination":"203.0.113.1:443","want":"reject"},
+            {"domain":"other.example","destination":"203.0.113.1:443","want":"bypass"}
+        ]""", listOf(nativeRule().apply { ip = "203.0.113.0/24" }))
+        add("same-set-both-directions", sets(nativeRule(), ref("geoip-cn", "source"), ref("geoip-cn")), """[
+            {"source":"203.0.113.1:1234","destination":"203.0.113.2:443","want":"bypass"},
+            {"source":"203.0.113.1:1234","destination":"8.8.8.8:443","want":"proxy"},
+            {"source":"192.0.2.1:1234","destination":"203.0.113.2:443","want":"proxy"}
+        ]""")
+        add("source-set-or-private", sets(nativeRule().apply { sourceIpIsPrivate = true; ip = "203.0.113.0/24" }, ref("geoip-cn", "source")), """[
+            {"source":"203.0.113.1:1234","destination":"203.0.113.2:443","want":"bypass"},
+            {"source":"10.0.0.1:1234","destination":"203.0.113.2:443","want":"bypass"},
+            {"source":"192.0.2.1:1234","destination":"203.0.113.2:443","want":"proxy"}
+        ]""")
+        add("additional-set-constraint", sets(nativeRule().apply { ip = "203.0.113.0/24" }, ref("geosite-cn", "rule")), """[
+            {"domain":"cn.example","destination":"203.0.113.2:443","want":"bypass"},
+            {"domain":"other.example","destination":"203.0.113.2:443","want":"proxy"},
+            {"domain":"cn.example","destination":"8.8.8.8:443","want":"proxy"}
+        ]""")
+        for (enabled in listOf(false, true)) {
+            add(if (enabled) "transport-block" else "transport-baseline", nativeRule().apply { ip = "127.0.0.1/32" },
+                """[{"destination":"127.0.0.1:443","want":"bypass"},{"destination":"198.51.100.1:443","want":"proxy"},{"destination":"198.51.100.2:443","want":"RESULT"}]""".replace("RESULT", if (enabled) "reject" else "proxy"),
+                listOf(nativeRule().apply { ip = "198.51.100.2/32"; outbound = -2; this.enabled = enabled }))
         }
-        assertNotNull("Must generate route rule with geoip-cn rule-set", matchingRule)
-        assertEquals(
-            "rule_set_ip_cidr_match_source must be true for source GeoIP",
-            true,
-            matchingRule?.get("rule_set_ip_cidr_match_source")?.asBoolean
-        )
-    }
-
-    @Test
-    fun testDestinationGeoIPSemantics() {
-        val rule = RuleEntity().apply {
-            name = "Dest Rule"
-            ip = "geoip:cn"
-            outbound = 0
-        }
-
-        val (_, json) = buildConfigWithRules(listOf(rule))
-        val routeRules = json.getAsJsonObject("route").getAsJsonArray("rules")
-
-        val matchingRule = routeRules.map { it.asJsonObject }.firstOrNull { r ->
-            r.has("rule_set") && r.getAsJsonArray("rule_set").map { it.asString }.contains("geoip-cn")
-        }
-        assertNotNull("Must generate route rule with geoip-cn rule-set", matchingRule)
-        assertNull(
-            "rule_set_ip_cidr_match_source must NOT be set for destination GeoIP",
-            matchingRule?.get("rule_set_ip_cidr_match_source")
-        )
-    }
-
-    @Test
-    fun testPrivateIPSemantics() {
-        val rule = RuleEntity().apply {
-            name = "Private IP Rule"
-            ip = "geoip:private"
-            source = "geoip:private"
-            outbound = 0
-        }
-
-        val (config, json) = buildConfigWithRules(listOf(rule))
-        val routeRules = json.getAsJsonObject("route").getAsJsonArray("rules")
-
-        val matchingRule = routeRules.map { it.asJsonObject }.firstOrNull { r ->
-            r.has("ip_is_private") && r.get("ip_is_private").asBoolean
-        }
-        assertNotNull("Must generate ip_is_private rule", matchingRule)
-        assertEquals(true, matchingRule?.get("ip_is_private")?.asBoolean)
-        assertEquals(true, matchingRule?.get("source_ip_is_private")?.asBoolean)
-
-        // Ensure no pseudo rule-set "geoip-private" is declared
-        val ruleSets = config.route.rule_set ?: emptyList()
-        assertFalse("geoip:private must NOT produce a rule-set declaration", ruleSets.any { it.tag.contains("private") })
-    }
-
-    @Test
-    fun testDnsResponseGeoIpGeneration() {
-        val rule = RuleEntity().apply {
-            name = "DNS response GeoIP"
-            domains = "domain:example.com"
-            ip = "geoip:cn"
-            outbound = -1L
-        }
-
-        val (config, json) = buildConfigWithRules(listOf(rule))
-        val rules = dnsRules(json)
-        val evaluateIndex = rules.indexOfFirst {
-            it.get("action")?.asString == "evaluate" &&
-                it.get("server")?.asString == "dns-remote" &&
-                it.getAsJsonArray("domain_suffix")?.map { value -> value.asString }?.contains("example.com") == true
-        }
-        assertTrue("GeoIP response rule must be preceded by a dns-remote evaluate", evaluateIndex >= 0)
-
-        val responseRule = rules.drop(evaluateIndex + 1).first {
-            it.get("type")?.asString == "logical"
-        }
-        assertEquals("and", responseRule.get("mode").asString)
-        assertEquals("route", responseRule.get("action").asString)
-        assertEquals("dns-direct", responseRule.get("server").asString)
-
-        val children = logicalChildren(responseRule)
-        val queryChild = children.first { it.has("domain_suffix") }
-        val responseChild = children.first { it.get("match_response")?.asBoolean == true }
-        assertEquals(listOf("example.com"), queryChild.getAsJsonArray("domain_suffix").map { it.asString })
-        assertEquals(listOf("geoip-cn"), responseChild.getAsJsonArray("rule_set").map { it.asString })
-        assertFalse("Response child must not absorb the query predicate", responseChild.has("domain_suffix"))
-
-        assertEquals(1, config.route.rule_set.count { it.tag == "geoip-cn" })
-        val jsonStr = json.toString()
-        assertFalse(jsonStr.contains("\"geoip\""))
-        assertFalse(jsonStr.contains("source_geoip"))
-        assertFalse(jsonStr.contains("rule_set_ip_cidr_accept_empty"))
-        assertFalse(jsonStr.contains("download_detour"))
-    }
-
-    @Test
-    fun testDnsResponsePrivateGeneration() {
-        val rule = RuleEntity().apply {
-            name = "DNS response private"
-            ip = "geoip:private"
-            outbound = 0L
-        }
-
-        val (config, json) = buildConfigWithRules(listOf(rule))
-        val rules = dnsRules(json)
-        val evaluateRule = rules.first { it.get("action")?.asString == "evaluate" }
-        assertEquals("dns-remote", evaluateRule.get("server").asString)
-
-        val responseRule = rules.first { it.get("match_response")?.asBoolean == true }
-        assertEquals(true, responseRule.get("ip_is_private").asBoolean)
-        assertEquals("route", responseRule.get("action").asString)
-        assertEquals("dns-remote", responseRule.get("server").asString)
-        assertFalse(responseRule.has("rule_set"))
-        assertFalse(config.route.rule_set.any { it.tag == "geoip-private" })
-    }
-
-    @Test
-    fun testDnsResponseCidrGeneration() {
-        val rule = RuleEntity().apply {
-            name = "DNS response CIDR"
-            ip = "1.2.3.0/24"
-            outbound = -1L
-        }
-
-        val (_, json) = buildConfigWithRules(listOf(rule))
-        val rules = dnsRules(json)
-        val evaluateRule = rules.first { it.get("action")?.asString == "evaluate" }
-        assertEquals("dns-remote", evaluateRule.get("server").asString)
-
-        val responseRule = rules.first { it.get("match_response")?.asBoolean == true }
-        assertEquals(listOf("1.2.3.0/24"), responseRule.getAsJsonArray("ip_cidr").map { it.asString })
-        assertEquals("route", responseRule.get("action").asString)
-        assertEquals("dns-direct", responseRule.get("server").asString)
-    }
-
-    @Test
-    fun testDnsDomainAndResponseIpUsesLogicalAnd() {
-        val rule = RuleEntity().apply {
-            name = "DNS domain AND response IP"
-            domains = "geosite:cn"
-            ip = "geoip:cn"
-            outbound = -1L
-        }
-
-        val (_, json) = buildConfigWithRules(listOf(rule))
-        val logicalRule = dnsRules(json).first { it.get("type")?.asString == "logical" }
-        assertEquals("and", logicalRule.get("mode").asString)
-
-        val children = logicalChildren(logicalRule)
-        val queryChild = children.first { it.get("match_response") == null }
-        val responseChild = children.first { it.get("match_response")?.asBoolean == true }
-        assertEquals(listOf("geosite-cn"), queryChild.getAsJsonArray("rule_set").map { it.asString })
-        assertEquals(listOf("geoip-cn"), responseChild.getAsJsonArray("rule_set").map { it.asString })
-        assertFalse("Query and response rule-sets must not be OR-merged", queryChild.getAsJsonArray("rule_set").map { it.asString }.contains("geoip-cn"))
-        assertFalse("Query and response rule-sets must not be OR-merged", responseChild.getAsJsonArray("rule_set").map { it.asString }.contains("geosite-cn"))
-    }
-
-    @Test
-    fun testDnsResponseRuleOrdering() {
-        val first = RuleEntity().apply {
-            name = "First DNS response rule"
-            domains = "domain:first.example"
-            ip = "10.0.0.0/8"
-            outbound = -1L
-        }
-        val second = RuleEntity().apply {
-            name = "Second DNS response rule"
-            domains = "domain:second.example"
-            ip = "geoip:private"
-            outbound = -2L
-        }
-
-        val (_, json) = buildConfigWithRules(listOf(first, second))
-        val generated = dnsRules(json).filter {
-            it.get("action")?.asString == "evaluate" || it.get("type")?.asString == "logical"
-        }
-        assertEquals(4, generated.size)
-        assertEquals("evaluate", generated[0].get("action").asString)
-        assertEquals(listOf("first.example"), generated[0].getAsJsonArray("domain_suffix").map { it.asString })
-        assertEquals("logical", generated[1].get("type").asString)
-        assertEquals("route", generated[1].get("action").asString)
-        assertEquals("evaluate", generated[2].get("action").asString)
-        assertEquals(listOf("second.example"), generated[2].getAsJsonArray("domain_suffix").map { it.asString })
-        assertEquals("logical", generated[3].get("type").asString)
-        assertEquals("reject", generated[3].get("action").asString)
-    }
-
-    @Test
-    fun testSharedHttpClientAndNoDownloadDetour() {
-        val rule = RuleEntity().apply {
-            name = "Remote Rule"
-            domains = "geosite:cn"
-            ip = "geoip:cn"
-            outbound = 0
-        }
-
-        val (config, _) = buildConfigWithRules(listOf(rule))
-        val jsonStr = gson.toJson(config)
-
-        assertFalse("Generated config must NOT contain deprecated download_detour", jsonStr.contains("download_detour"))
-        assertEquals("default-http-client", config.route.default_http_client)
-        for (rs in config.route.rule_set) {
-            assertEquals("default-http-client", rs.http_client)
-            assertEquals("binary", rs.format)
-            assertEquals("remote", rs.type)
-        }
+        val output = File("build/route-semantics/generated.json").apply { parentFile!!.mkdirs() }
+        output.writeText(cases.toString())
+        val golden = File("src/test/resources/native-route-semantics.json")
+        if (System.getenv("UPDATE_NATIVE_RULE_FIXTURE") == "1") golden.writeText(cases.toString())
+        assertTrue("Generate the native rule fixture explicitly", golden.isFile)
+        assertEquals(JsonParser.parseString(golden.readText()), cases)
     }
 }

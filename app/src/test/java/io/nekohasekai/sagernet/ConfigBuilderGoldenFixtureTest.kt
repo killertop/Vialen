@@ -11,6 +11,7 @@ import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.ProxyGroup
 import io.nekohasekai.sagernet.database.RuleEntity
+import io.nekohasekai.sagernet.database.RouteRuleSet
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.database.preference.RoomPreferenceDataStore
 import io.nekohasekai.sagernet.fmt.buildConfig
@@ -62,6 +63,9 @@ class ConfigBuilderGoldenFixtureTest {
         @JvmStatic
         fun setupDir() {
             fixtureDir.mkdirs()
+            io.mockk.mockkStatic(android.widget.Toast::class)
+            every { android.widget.Toast.makeText(any(), any<Int>(), any()) } returns mockk(relaxed = true)
+            every { android.widget.Toast.makeText(any(), any<CharSequence>(), any()) } returns mockk(relaxed = true)
 
             val mockApp = mockk<SagerNet>(relaxed = true)
             every { mockApp.getDatabasePath(any()) } returns File("/tmp/test_mock_db")
@@ -182,7 +186,7 @@ class ConfigBuilderGoldenFixtureTest {
         val json = if (generatedObj is String) generatedObj else gson.toJson(generatedObj)
         val canonical = canonicalize(json)
         val fixtureFile = File(fixtureDir, "$name.json")
-        if (!fixtureFile.exists()) {
+        if (!fixtureFile.exists() || (name == "full_ruleset_config_1_12" && System.getenv("UPDATE_NATIVE_RULE_FIXTURE") == "1")) {
             fixtureFile.writeText(canonical)
         }
         val expected = canonicalize(fixtureFile.readText())
@@ -474,15 +478,16 @@ class ConfigBuilderGoldenFixtureTest {
             name = "BypassChina"
             enabled = true
             outbound = -1L // bypass / direct
-            domains = "domain:cn\ngeosite:cn"
-            ip = "geoip:cn\ngeoip:private"
+            domains = "domain:cn"
+            ipIsPrivate = true
+            ruleSets = RouteRuleSet.encode(listOf(RouteRuleSet.official("geosite", "cn"), RouteRuleSet.official("geoip", "cn")))
         }
         val rule2 = RuleEntity().apply {
             id = 11L
             name = "BlockAds"
             enabled = true
             outbound = -2L // block
-            domains = "geosite:category-ads-all"
+            ruleSets = RouteRuleSet.encode(listOf(RouteRuleSet.official("geosite", "category-ads-all")))
         }
 
         every { SagerDatabase.proxyDao.getById(1L) } returns ssEntity

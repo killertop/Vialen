@@ -140,7 +140,6 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var enableDnsRouting by configurationStore.boolean(Key.ENABLE_DNS_ROUTING) { true }
     var enableFakeDns by configurationStore.boolean(Key.ENABLE_FAKEDNS) { true }
 
-    var rulesProvider by configurationStore.stringToInt(Key.RULES_PROVIDER)
     var logLevel by configurationStore.stringToInt(Key.LOG_LEVEL)
     var logBufSize by configurationStore.int(Key.LOG_BUF_SIZE) { 0 }
     var acquireWakeLock by configurationStore.boolean(Key.ACQUIRE_WAKE_LOCK)
@@ -256,6 +255,9 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var routeOutbound by profileCacheStore.stringToInt(Key.ROUTE_OUTBOUND)
     var routeOutboundRule by profileCacheStore.long(Key.ROUTE_OUTBOUND + "Long")
     var routePackages by profileCacheStore.string(Key.ROUTE_PACKAGES)
+    var routeRuleSets by profileCacheStore.string(Key.ROUTE_RULE_SETS)
+    var routeIpPrivate by profileCacheStore.boolean(Key.ROUTE_IP_PRIVATE)
+    var routeSourcePrivate by profileCacheStore.boolean(Key.ROUTE_SOURCE_PRIVATE)
 
     var frontProxy by profileCacheStore.long(Key.GROUP_FRONT_PROXY + "Long")
     var landingProxy by profileCacheStore.long(Key.GROUP_LANDING_PROXY + "Long")

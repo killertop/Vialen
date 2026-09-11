@@ -5,11 +5,17 @@
         <io.nekohasekai.sagernet.widget.AppListPreference app:key="routePackages" app:title="@string/apps" />
         <EditTextPreference app:key="routeDomain" app:title="@string/ui_rule_domain" app:useSimpleSummaryProvider="true" />
         <EditTextPreference app:key="routeIP" app:title="@string/ui_rule_destination_ip" app:useSimpleSummaryProvider="true" />
+        <Preference app:key="routeDestinationSets" app:title="@string/route_destination_sets" />
+        <SwitchPreferenceCompat app:key="routeIpPrivate" app:title="@string/route_private_destination" />
         <EditTextPreference android:layout_width="match_parent" android:layout_height="match_parent" app:key="routePort" app:title="@string/ui_rule_destination_port" app:useSimpleSummaryProvider="true" />
         <EditTextPreference app:key="routeSource" app:title="@string/ui_rule_source_ip" app:useSimpleSummaryProvider="true" />
+        <Preference app:key="routeSourceSets" app:title="@string/route_source_sets" />
+        <SwitchPreferenceCompat app:key="routeSourcePrivate" app:title="@string/route_private_source" />
         <EditTextPreference app:key="routeSourcePort" app:title="@string/ui_rule_source_port" app:useSimpleSummaryProvider="true" />
         <moe.matsuri.nb4a.ui.SimpleMenuPreference app:entries="@array/route_protocol_entry" app:entryValues="@array/route_protocol_value" app:key="routeNetwork" app:title="@string/ui_rule_network" app:useSimpleSummaryProvider="true" />
         <EditTextPreference app:key="routeProtocol" app:title="@string/ui_rule_protocol" app:useSimpleSummaryProvider="true" />
+        <Preference app:key="routeGeneralSets" app:title="@string/route_general_sets" />
+        <Preference app:selectable="false" app:summary="@string/route_native_semantics" />
     </PreferenceCategory>
     <PreferenceCategory app:title="@string/ui_rule_action">
         <io.nekohasekai.sagernet.widget.OutboundPreference app:key="routeOutbound" app:title="@string/ui_rule_action" app:useSimpleSummaryProvider="true" />

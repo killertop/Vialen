@@ -77,10 +77,6 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
 
     // nb4a interface
 
-    override fun useOfficialAssets(): Boolean {
-        return DataStore.rulesProvider == 0
-    }
-
     override fun selector_OnProxySelected(selectorTag: String, tag: String) {
         if (selectorTag != "proxy") {
             Logs.d("other selector: $selectorTag")

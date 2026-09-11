@@ -32,6 +32,7 @@ import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
 import io.nekohasekai.sagernet.database.RuleEntity
+import io.nekohasekai.sagernet.database.RouteRuleSet
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
 import io.nekohasekai.sagernet.ktx.Logs
@@ -84,6 +85,9 @@ class RouteSettingsActivity(
             else -> 3
         }
         DataStore.routePackages = packages.joinToString("\n")
+        DataStore.routeRuleSets = ruleSets
+        DataStore.routeIpPrivate = ipIsPrivate
+        DataStore.routeSourcePrivate = sourceIpIsPrivate
     }
 
     fun RuleEntity.serialize() {
@@ -103,6 +107,9 @@ class RouteSettingsActivity(
             else -> DataStore.routeOutboundRule
         }
         packages = DataStore.routePackages.split("\n").filter { it.isNotBlank() }.toSet()
+        ruleSets = RouteRuleSet.encode(RouteRuleSet.decode(DataStore.routeRuleSets))
+        ipIsPrivate = DataStore.routeIpPrivate
+        sourceIpIsPrivate = DataStore.routeSourcePrivate
 
         if (DataStore.editingId == 0L) {
             enabled = true
@@ -122,6 +129,15 @@ class RouteSettingsActivity(
         addPreferencesFromResource(R.xml.route_preferences)
 
         editConfigPreference = findPreference(Key.SERVER_CONFIG)!!
+        for ((key, direction) in listOf("routeDestinationSets" to "destination", "routeSourceSets" to "source", "routeGeneralSets" to "rule")) {
+            findPreference<Preference>(key)!!.apply {
+                summary = RouteRuleSet.decode(DataStore.routeRuleSets).filter { it.match == direction }.joinToString("\n") { it.name }
+                setOnPreferenceClickListener {
+                    RouteRuleSetDialogs(this@RouteSettingsActivity, direction) { updateRuleSetSummaries() }.show()
+                    true
+                }
+            }
+        }
     }
 
     override fun onResume() {
@@ -339,6 +355,14 @@ class RouteSettingsActivity(
                     .showNow(supportFragmentManager, "form.unsaved")
             }
         } else finish()
+    }
+
+    internal fun updateRuleSetSummaries() {
+        val fragment = supportFragmentManager.findFragmentById(R.id.settings) as? PreferenceFragmentCompat ?: return
+        for ((key, direction) in listOf("routeDestinationSets" to "destination", "routeSourceSets" to "source", "routeGeneralSets" to "rule")) {
+            fragment.findPreference<Preference>(key)?.summary = RouteRuleSet.decode(DataStore.routeRuleSets)
+                .filter { it.match == direction }.joinToString("\n") { it.name }
+        }
     }
 
     override fun onSupportNavigateUp(): Boolean {

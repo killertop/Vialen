@@ -13,45 +13,6 @@
           "any"
         ],
         "server": "dns-direct"
-      },
-      {
-        "action": "evaluate",
-        "domain_suffix": [
-          "cn"
-        ],
-        "rule_set": [
-          "geosite-cn"
-        ],
-        "server": "dns-remote"
-      },
-      {
-        "action": "route",
-        "mode": "and",
-        "rules": [
-          {
-            "domain_suffix": [
-              "cn"
-            ],
-            "rule_set": [
-              "geosite-cn"
-            ]
-          },
-          {
-            "ip_is_private": true,
-            "match_response": true,
-            "rule_set": [
-              "geoip-cn"
-            ]
-          }
-        ],
-        "server": "dns-direct",
-        "type": "logical"
-      },
-      {
-        "action": "reject",
-        "rule_set": [
-          "geosite-category-ads-all"
-        ]
       }
     ],
     "servers": [
@@ -128,7 +89,7 @@
       {
         "format": "binary",
         "http_client": "default-http-client",
-        "tag": "geoip-cn",
+        "tag": "rs:binary:https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
         "type": "remote",
         "update_interval": "24h",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs"
@@ -136,7 +97,7 @@
       {
         "format": "binary",
         "http_client": "default-http-client",
-        "tag": "geosite-category-ads-all",
+        "tag": "rs:binary:https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
         "type": "remote",
         "update_interval": "24h",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs"
@@ -144,7 +105,7 @@
       {
         "format": "binary",
         "http_client": "default-http-client",
-        "tag": "geosite-cn",
+        "tag": "rs:binary:https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
         "type": "remote",
         "update_interval": "24h",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs"
@@ -167,19 +128,33 @@
         ]
       },
       {
-        "domain_suffix": [
-          "cn"
-        ],
-        "ip_is_private": true,
+        "action": "route",
+        "mode": "or",
         "outbound": "bypass",
-        "rule_set": [
-          "geoip-cn"
-        ]
+        "rules": [
+          {
+            "rule_set": [
+              "rs:binary:https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs"
+            ]
+          },
+          {
+            "rule_set": [
+              "rs:binary:https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs"
+            ]
+          },
+          {
+            "domain_suffix": [
+              "cn"
+            ],
+            "ip_is_private": true
+          }
+        ],
+        "type": "logical"
       },
       {
         "action": "reject",
         "rule_set": [
-          "geosite-category-ads-all"
+          "rs:binary:https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs"
         ]
       },
       {

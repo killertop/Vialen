@@ -46,7 +46,6 @@ object Key {
 
     const val NETWORK_CHANGE_RESET_CONNECTIONS = "networkChangeResetConnections"
     const val WAKE_RESET_CONNECTIONS = "wakeResetConnections"
-    const val RULES_PROVIDER = "rulesProvider"
     const val LOG_LEVEL = "logLevel"
     const val LOG_BUF_SIZE = "logBufSize"
     const val MTU = "mtu"
@@ -134,6 +133,9 @@ object Key {
     const val ROUTE_PROTOCOL = "routeProtocol"
     const val ROUTE_OUTBOUND = "routeOutbound"
     const val ROUTE_PACKAGES = "routePackages"
+    const val ROUTE_RULE_SETS = "routeRuleSets"
+    const val ROUTE_IP_PRIVATE = "routeIpPrivate"
+    const val ROUTE_SOURCE_PRIVATE = "routeSourcePrivate"
 
     const val GROUP_NAME = "groupName"
     const val GROUP_TYPE = "groupType"

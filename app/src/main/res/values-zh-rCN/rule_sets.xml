@@ -1,0 +1,22 @@
+<resources>
+    <string name="route_destination_sets">目标规则集（任一匹配）</string>
+    <string name="route_source_sets">源 IP 规则集（任一匹配）</string>
+    <string name="route_general_sets">附加规则集约束</string>
+    <string name="route_private_destination">目标为私有 IP</string>
+    <string name="route_private_source">来源为私有 IP</string>
+    <string name="route_native_semantics">域名、目标 IP 和目标规则集满足任一即可；来源地址另成一组，满足任一即可。两组与端口、网络、协议、应用、附加规则集约束须同时满足。规则集内部逻辑不变。源地址请选择仅含 IP 的集合。复杂连接规则不会直接复制为 DNS 规则。</string>
+    <string name="route_set_add">添加规则集</string>
+    <string name="route_set_custom">HTTPS 规则集地址</string>
+    <string name="route_set_local">已导入的本地规则集</string>
+    <string name="route_set_empty_local">请先在规则集文件页面导入 .srs 或 .json 文件。</string>
+    <string name="route_set_name">显示名称</string>
+    <string name="route_set_url">HTTPS 地址</string>
+    <string name="route_set_files">规则集文件</string>
+    <string name="route_set_cn_ip">中国 IP</string>
+    <string name="route_set_cn_domain">中国域名</string>
+    <string name="route_set_ads">广告域名</string>
+    <string name="route_set_remove">移除此规则集引用？</string>
+    <string name="route_set_import_error">请导入有效的 .srs 二进制或 .json 源格式规则集，不支持旧数据库文件。</string>
+    <string name="route_set_in_use">路由规则仍在引用此文件，请先移除引用再删除。</string>
+    <string name="route_dns_not_projected">部分路由条件无法安全应用于 DNS，该规则及后续规则仅作用于连接，DNS 使用已配置的默认策略。</string>
+</resources>
