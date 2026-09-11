@@ -27,7 +27,14 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
         }
         binding.brandFeedback.setOnClickListener { requireContext().launchCustomTab("https://github.com/killertop/Vialen/issues") }
         binding.brandSource.setOnClickListener { requireContext().launchCustomTab("https://github.com/killertop/Vialen") }
-        binding.brandLicenses.setOnClickListener { requireContext().launchCustomTab("https://github.com/killertop/Vialen/blob/main/LICENSE") }
+        binding.brandLicenses.setOnClickListener {
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.ui_licenses).setMessage(R.string.ui_license_body)
+                .setPositiveButton(android.R.string.ok, null)
+                .setNeutralButton(R.string.ui_source) { _, _ ->
+                    requireContext().launchCustomTab("https://github.com/killertop/Vialen")
+                }.show()
+        }
         binding.brandCredits.setOnClickListener {
             com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
                 .setTitle(R.string.ui_credits).setMessage(R.string.ui_credits_body)

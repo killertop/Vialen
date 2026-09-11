@@ -83,4 +83,5 @@
     <string name="ui_localhost_help">127.0.0.1 means this phone. For a remote node, replace it with your server address.</string>
     <string name="ui_common_protocols">Common protocols</string>
     <string name="ui_other_protocols">Other protocols</string>
+    <string name="ui_license_body">Vialen\nCopyright © 2026 Vialen contributors\n\nVialen-specific modifications and additions are distributed under GNU GPL version 3 or later.\n\nProject: github.com/killertop/Vialen\n\nThird-party and inherited code retain their original copyright and license notices. See the repository LICENSE and source files for details.</string>
 </resources>

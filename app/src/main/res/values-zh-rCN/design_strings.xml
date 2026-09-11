@@ -83,4 +83,5 @@
     <string name="ui_localhost_help">127.0.0.1 指本机。配置远程节点时，请替换为实际服务器地址。</string>
     <string name="ui_common_protocols">常用协议</string>
     <string name="ui_other_protocols">其他协议</string>
+    <string name="ui_license_body">Vialen\nCopyright © 2026 Vialen contributors\n\nVialen 自身的修改与新增内容以 GNU GPL 第 3 版或更高版本发布。\n\n项目：github.com/killertop/Vialen\n\n第三方及继承代码保留原有版权和许可声明，详情见仓库 LICENSE 与源文件。</string>
 </resources>

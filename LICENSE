@@ -1,4 +1,8 @@
-Copyright (C) 2021 by nekohasekai <contact-sagernet@sekai.icu>
+Vialen
+
+Copyright (C) 2026 Vialen contributors
+Vialen-specific modifications and additions.
+Project: https://github.com/killertop/Vialen
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -12,3 +16,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+Upstream copyright notice (retained for inherited code):
+Copyright (C) 2021 by nekohasekai <contact-sagernet@sekai.icu>
