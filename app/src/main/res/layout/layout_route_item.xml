@@ -3,14 +3,10 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/content"
+    style="@style/Widget.Vialen.PearlCard"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="4dp"
-    app:cardBackgroundColor="@color/vialen_surface"
-    app:strokeColor="@color/vialen_outline"
-    app:cardElevation="0dp"
-    app:cardCornerRadius="16dp"
-    app:strokeWidth="1dp">
+    android:layout_margin="4dp">
 
     <LinearLayout
         android:id="@+id/content_lin"

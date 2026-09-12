@@ -203,8 +203,6 @@ class ConfigurationFragment @JvmOverloads constructor(
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Import guidance belongs to the home page, not the node-selection dialog.
-        view.findViewById<View>(R.id.home_import_hint).isVisible = !select
         if (!select) {
             toolbar.inflateMenu(R.menu.add_profile_menu)
             toolbar.setOnMenuItemClickListener(this)
@@ -1557,7 +1555,8 @@ class ConfigurationFragment @JvmOverloads constructor(
                 com.google.android.material.divider.MaterialDividerItemDecoration(
                     requireContext(), LinearLayout.VERTICAL
                 ).apply {
-                    dividerColor = requireContext().getColour(R.color.vialen_outline)
+                    // Retain the original 1dp item offset, without drawing through card gaps.
+                    dividerColor = Color.TRANSPARENT
                     dividerThickness = dp2px(1)
                     dividerInsetStart = dp2px(4)
                     dividerInsetEnd = dp2px(4)
@@ -1935,7 +1934,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 // Ignore queued colors from a previous bind or selection click.
                 if (!valid(expectedBinding)) return
                 profileCard.setCardBackgroundColor(requireContext().getColour(
-                    if (selected) R.color.vialen_selected_background else R.color.vialen_surface
+                    if (selected) R.color.vialen_pearl_selected else R.color.vialen_surface
                 ))
             }
 

@@ -20,7 +20,7 @@
             android:layout_height="match_parent"
             android:padding="12dp"
             android:clipToPadding="false"
-            android:background="@color/vialen_list_background"
+            android:background="@android:color/transparent"
             android:scrollbarSize="0dp"
             app:fastScrollAutoHide="true"
             app:fastScrollThumbColor="@color/vialen_accent"

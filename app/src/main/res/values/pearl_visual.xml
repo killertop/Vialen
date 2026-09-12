@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Main-screen skin only; shared dialog/editor surfaces remain unchanged. -->
+    <color name="vialen_pearl_background">#F7F8FA</color>
+    <color name="vialen_pearl_edge">#F0F4FC</color>
+    <color name="vialen_pearl_outline">#E9EDF3</color>
+    <color name="vialen_pearl_selected">#F1F5FF</color>
+    <dimen name="vialen_pearl_corner">16dp</dimen>
+    <dimen name="vialen_pearl_node_corner">12dp</dimen>
+    <dimen name="vialen_pearl_elevation">1dp</dimen>
+    <dimen name="vialen_pearl_settings_inset">8dp</dimen>
+    <style name="Widget.Vialen.PearlCard" parent="Widget.MaterialComponents.CardView">
+        <item name="cardBackgroundColor">@color/vialen_surface</item>
+        <item name="cardCornerRadius">@dimen/vialen_pearl_corner</item>
+        <item name="cardElevation">@dimen/vialen_pearl_elevation</item>
+        <item name="strokeColor">@color/vialen_pearl_outline</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+</resources>

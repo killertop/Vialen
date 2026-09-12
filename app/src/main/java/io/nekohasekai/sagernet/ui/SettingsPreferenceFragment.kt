@@ -43,10 +43,11 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
         super.onViewCreated(view, savedInstanceState)
 
         listView.layoutManager = FixedLinearLayoutManager(listView)
-        // Section bands and dividers belong only to global settings, not protocol forms.
-        setDivider(android.graphics.drawable.ColorDrawable(
-            androidx.core.content.ContextCompat.getColor(requireContext(), R.color.vialen_outline)))
+        // Preserve the existing divider offsets and all preference hit areas. Draw the
+        // grouped pearl surfaces below rows instead of wrapping/reparenting preferences.
+        setDivider(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
         setDividerHeight(resources.displayMetrics.density.toInt().coerceAtLeast(1))
+        listView.addItemDecoration(io.nekohasekai.sagernet.widget.PreferenceSurfaceDecoration(requireContext()))
     }
 
     private val reloadListener = Preference.OnPreferenceChangeListener { _, _ ->

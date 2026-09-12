@@ -11,6 +11,7 @@
         android:id="@+id/coordinator"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="@drawable/vialen_pearl_background"
         android:clipChildren="false">
 
         <androidx.coordinatorlayout.widget.CoordinatorLayout
@@ -39,9 +40,10 @@
             android:elevation="0dp"
             android:nextFocusDown="@+id/stats"
             app:backgroundTint="@color/vialen_service_background"
+            app:elevation="3dp"
             app:tint="@color/vialen_service_foreground"
             app:layout_anchor="@id/stats"
-            app:pressedTranslationZ="6dp"
+            app:pressedTranslationZ="2dp"
             app:srcCompat="@drawable/ic_service_idle" />
 
         <TextView
