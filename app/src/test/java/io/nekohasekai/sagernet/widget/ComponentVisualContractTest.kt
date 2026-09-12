@@ -6,9 +6,12 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Rect
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.LayerDrawable
 import android.view.ContextThemeWrapper
 import android.view.View
+import android.widget.CompoundButton
+import android.widget.Switch
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SwitchCompat
 import androidx.test.core.app.ApplicationProvider
@@ -29,25 +32,38 @@ class ComponentVisualContractTest {
         ContextThemeWrapper(ApplicationProvider.getApplicationContext(), R.style.Theme_SagerNet)
     )
 
-    private fun SwitchCompat.dp(value: Int): Int =
+    private fun View.dp(value: Int): Int =
         (value * resources.displayMetrics.density).roundToInt()
 
     @Test
     fun switchKeepsAccessibleSizeAndInsetKnobAtBothEndpoints() {
         val view = newSwitch()
+        assertSwitchGeometry(view, view.switchMinWidth, view.trackDrawable, view.thumbDrawable)
+    }
+
+    @Test
+    fun platformSettingsSwitchKeepsTheSameGeometryAndTouchTarget() {
+        val view = Switch(ContextThemeWrapper(
+            ApplicationProvider.getApplicationContext(), R.style.Theme_SagerNet))
+        assertSwitchGeometry(view, view.switchMinWidth, view.trackDrawable, view.thumbDrawable)
+    }
+
+    private fun assertSwitchGeometry(
+        view: CompoundButton, minimumWidth: Int, trackDrawable: Drawable, thumbDrawable: Drawable
+    ) {
         val unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
         view.measure(unspecified, unspecified)
         view.layout(0, 0, view.measuredWidth, view.measuredHeight)
 
         assertTrue("Switch touch width must be at least 48dp", view.width >= view.dp(48))
         assertTrue("Switch touch height must be at least 48dp", view.height >= view.dp(48))
-        assertEquals(view.dp(52), view.switchMinWidth)
-        assertEquals(view.dp(52), view.trackDrawable.intrinsicWidth)
-        assertEquals(view.dp(32), view.trackDrawable.intrinsicHeight)
-        assertEquals(view.dp(22), view.thumbDrawable.intrinsicWidth)
-        assertEquals(view.dp(32), view.thumbDrawable.intrinsicHeight)
+        assertEquals(view.dp(52), minimumWidth)
+        assertEquals(view.dp(52), trackDrawable.intrinsicWidth)
+        assertEquals(view.dp(28), trackDrawable.intrinsicHeight)
+        assertEquals(view.dp(20), thumbDrawable.intrinsicWidth)
+        assertEquals(view.dp(28), thumbDrawable.intrinsicHeight)
         val padding = Rect()
-        view.trackDrawable.getPadding(padding)
+        trackDrawable.getPadding(padding)
         assertEquals(view.dp(4), padding.left)
         assertEquals(view.dp(4), padding.right)
 
@@ -59,16 +75,16 @@ class ComponentVisualContractTest {
                 view.isChecked = checked
                 view.jumpDrawablesToCurrentState()
                 view.draw(canvas)
-                val track = view.trackDrawable.bounds
-                val knob = (view.thumbDrawable as LayerDrawable).getDrawable(1).bounds
+                val track = trackDrawable.bounds
+                val knob = (thumbDrawable as LayerDrawable).getDrawable(1).bounds
                 assertEquals(view.dp(52), track.width())
-                assertEquals(view.dp(32), track.height())
-                assertEquals(view.dp(22), knob.width())
-                assertEquals(view.dp(22), knob.height())
+                assertEquals(view.dp(28), track.height())
+                assertEquals(view.dp(20), knob.width())
+                assertEquals(view.dp(20), knob.height())
                 assertTrue("Knob must stay inset from the left edge", knob.left >= track.left + view.dp(4))
                 assertTrue("Knob must stay inset from the right edge", knob.right <= track.right - view.dp(4))
-                assertEquals(view.dp(5), knob.top - track.top)
-                assertEquals(view.dp(5), track.bottom - knob.bottom)
+                assertEquals(view.dp(4), knob.top - track.top)
+                assertEquals(view.dp(4), track.bottom - knob.bottom)
                 if (checked) {
                     assertEquals(view.dp(4), track.right - knob.right)
                 } else {
