@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="vialen_route_help_title">Vialen routing help</string>
+    <string name="vialen_route_help_body">Enabled rules are evaluated from top to bottom. The first matching rule determines the traffic action.\n\nEdit a rule to set matching conditions and choose its action. Drag rules to adjust their order. Disabled rules do not participate in matching.\n\nRemote rule sets are third-party data sources. Their download addresses identify the data provider, not the Vialen project.</string>
+</resources>

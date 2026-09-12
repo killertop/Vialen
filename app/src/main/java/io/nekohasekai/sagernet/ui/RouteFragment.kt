@@ -321,7 +321,11 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
         inner class DocumentHolder(binding: LayoutEmptyRouteBinding) : RecyclerView.ViewHolder(binding.root) {
             fun bind() {
                 itemView.setOnClickListener {
-                    it.context.launchCustomTab("https://matsuridayo.github.io/nb4a-route/")
+                    MaterialAlertDialogBuilder(it.context)
+                        .setTitle(R.string.vialen_route_help_title)
+                        .setMessage(R.string.vialen_route_help_body)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
                 }
             }
         }

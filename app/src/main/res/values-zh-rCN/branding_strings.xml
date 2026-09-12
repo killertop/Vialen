@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="vialen_route_help_title">Vialen 路由帮助</string>
+    <string name="vialen_route_help_body">已启用的规则从上到下匹配，首条命中规则决定流量去向。\n\n编辑规则可设置匹配条件和执行动作；拖动规则可调整顺序。关闭的规则不参与匹配。\n\n远程规则集属于第三方数据源，其下载地址表示数据提供方，不是 Vialen 项目地址。</string>
+</resources>
