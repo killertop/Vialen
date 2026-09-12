@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="navigation_drawer_title">Navigation menu</string>
+    <string name="navigation_connection_section">Connections</string>
+    <string name="navigation_app_section">App</string>
+</resources>

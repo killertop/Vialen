@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingBottom="24dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="24dp"
+        android:paddingTop="24dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="24dp">
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:importantForAccessibility="no"
+            app:srcCompat="@mipmap/ic_launcher" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:text="@string/app_name"
+            android:textAppearance="@style/TextAppearance.Vialen.PanelTitle"
+            android:textColor="@color/vialen_text_primary" />
+
+        <androidx.appcompat.widget.AppCompatImageButton
+            android:id="@+id/navigation_close"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/close"
+            android:padding="12dp"
+            app:srcCompat="@drawable/ic_navigation_close"
+            app:tint="@color/vialen_text_secondary" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/navigation_connection_section"
+        style="@style/Widget.Vialen.DrawerSection"
+        android:text="@string/navigation_connection_section" />
+
+    <com.google.android.material.card.MaterialCardView
+        style="@style/Widget.Vialen.PearlCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp">
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/nav_configuration"
+                style="@style/Widget.Vialen.DrawerItem"
+                android:text="@string/menu_configuration"
+                app:icon="@drawable/ic_settings_description_outline" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/nav_group"
+                style="@style/Widget.Vialen.DrawerItem"
+                android:text="@string/menu_group"
+                app:icon="@drawable/ic_settings_layers_outline" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/nav_route"
+                style="@style/Widget.Vialen.DrawerItem"
+                android:text="@string/menu_route"
+                app:icon="@drawable/ic_settings_route_outline" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <TextView
+        android:id="@+id/navigation_app_section"
+        style="@style/Widget.Vialen.DrawerSection"
+        android:layout_marginTop="24dp"
+        android:text="@string/navigation_app_section" />
+
+    <com.google.android.material.card.MaterialCardView
+        style="@style/Widget.Vialen.PearlCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp">
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/nav_settings"
+                style="@style/Widget.Vialen.DrawerItem"
+                android:text="@string/settings"
+                app:icon="@drawable/ic_settings_settings_outline" />
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:background="@color/vialen_pearl_outline"
+                android:importantForAccessibility="no" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/nav_about"
+                style="@style/Widget.Vialen.DrawerItem"
+                android:text="@string/menu_about"
+                app:icon="@drawable/ic_navigation_info_outline" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+</LinearLayout>

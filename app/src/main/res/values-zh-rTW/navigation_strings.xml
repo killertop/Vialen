@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="navigation_drawer_title">導覽選單</string>
+    <string name="navigation_connection_section">連線管理</string>
+    <string name="navigation_app_section">應用</string>
+</resources>

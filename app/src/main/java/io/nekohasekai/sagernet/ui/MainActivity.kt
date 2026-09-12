@@ -5,7 +5,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.RemoteException
 import android.view.KeyEvent
-import android.view.MenuItem
 import android.view.View
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
@@ -19,7 +18,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import androidx.preference.PreferenceDataStore
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.navigation.NavigationView
+import io.nekohasekai.sagernet.widget.VialenNavigationView
 import com.google.android.material.snackbar.Snackbar
 import io.nekohasekai.sagernet.BuildConfig
 import io.nekohasekai.sagernet.GroupType
@@ -52,11 +51,10 @@ import moe.matsuri.nb4a.utils.Util
 
 class MainActivity : ThemedActivity(),
     SagerConnection.Callback,
-    OnPreferenceDataStoreChangeListener,
-    NavigationView.OnNavigationItemSelectedListener {
+    OnPreferenceDataStoreChangeListener {
 
     lateinit var binding: LayoutMainBinding
-    lateinit var navigation: NavigationView
+    lateinit var navigation: VialenNavigationView
     private var renderedState = BaseService.State.Idle
     private var pendingPage: Int? = null
     private var hasProfiles = false
@@ -99,7 +97,9 @@ class MainActivity : ThemedActivity(),
         binding = LayoutMainBinding.inflate(layoutInflater)
         binding.fab.initProgress(binding.fabProgress)
         navigation = binding.navView
-        navigation.setNavigationItemSelectedListener(this)
+        navigation.onItemSelected = { id -> onNavigationItemSelected(id) }
+        navigation.onCloseRequested = { binding.drawerLayout.closeDrawers() }
+        binding.drawerLayout.setDrawerTitle(GravityCompat.START, getString(R.string.navigation_drawer_title))
         supportFragmentManager.registerFragmentLifecycleCallbacks(pageCallbacks, false)
 
         if (savedInstanceState == null) {
@@ -253,9 +253,9 @@ class MainActivity : ThemedActivity(),
         }
     }
 
-    override fun onNavigationItemSelected(item: MenuItem): Boolean {
-        if (item.isChecked) binding.drawerLayout.closeDrawers() else {
-            return displayFragmentWithId(item.itemId)
+    private fun onNavigationItemSelected(@IdRes id: Int): Boolean {
+        if (navigation.checkedItemId == id) binding.drawerLayout.closeDrawers() else {
+            return displayFragmentWithId(id)
         }
         return true
     }
@@ -322,7 +322,7 @@ class MainActivity : ThemedActivity(),
 
             else -> return false
         }
-        navigation.menu.findItem(id).isChecked = true
+        navigation.setCheckedItem(id)
         return true
     }
 
