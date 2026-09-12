@@ -140,18 +140,28 @@
         <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.Vialen.Dialog</item>
         <item name="materialAlertDialogBodyTextStyle">@style/Widget.Vialen.DialogBody</item>
         <item name="materialAlertDialogTitleTextStyle">@style/Widget.Vialen.DialogTitle</item>
+        <item name="android:windowElevation">6dp</item>
         <item name="buttonBarPositiveButtonStyle">
             @style/Widget.MaterialComponents.Button.TextButton.Dialog.Primary
         </item>
         <item name="buttonBarNegativeButtonStyle">
-            @style/Widget.MaterialComponents.Button.TextButton.Dialog.Primary
+            @style/Widget.Vialen.DialogButton.Secondary
         </item>
         <item name="buttonBarNeutralButtonStyle">
-            @style/Widget.MaterialComponents.Button.TextButton.Dialog.Flush.Primary
+            @style/Widget.Vialen.DialogButton.Neutral
         </item>
     </style>
     <style name="Widget.MaterialComponents.Button.TextButton.Dialog.Primary">
-        <item name="android:textColor">?primaryOrTextPrimary</item>
+        <item name="android:textColor">@color/vialen_dialog_action_primary</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+    <style name="Widget.Vialen.DialogButton.Secondary" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/vialen_dialog_action_secondary</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+    <style name="Widget.Vialen.DialogButton.Neutral" parent="Widget.MaterialComponents.Button.TextButton.Dialog.Flush">
+        <item name="android:textColor">@color/vialen_dialog_action_secondary</item>
+        <item name="android:textAllCaps">false</item>
     </style>
     <style name="Widget.MaterialComponents.Button.TextButton.Dialog.Flush.Primary">
         <item name="android:textColor">?primaryOrTextPrimary</item>
@@ -192,10 +202,22 @@
         <item name="android:colorControlNormal">@color/vialen_toolbar_icon</item>
     </style>
     <style name="Widget.Vialen.Switch" parent="Widget.AppCompat.CompoundButton.Switch">
+        <item name="android:thumb">@drawable/vialen_switch_thumb</item>
+        <item name="track">@drawable/vialen_switch_track</item>
+        <item name="switchMinWidth">52dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="showText">false</item>
+        <item name="splitTrack">false</item>
         <item name="thumbTint">@color/vialen_switch_thumb</item>
         <item name="trackTint">@color/vialen_switch_track</item>
     </style>
     <style name="Widget.Vialen.PlatformSwitch" parent="android:style/Widget.Material.CompoundButton.Switch">
+        <item name="android:thumb">@drawable/vialen_switch_thumb</item>
+        <item name="android:track">@drawable/vialen_switch_track</item>
+        <item name="android:switchMinWidth">52dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:showText">false</item>
+        <item name="android:splitTrack">false</item>
         <item name="android:thumbTint">@color/vialen_switch_thumb</item>
         <item name="android:trackTint">@color/vialen_switch_track</item>
     </style>
@@ -217,10 +239,12 @@
     </style>
     <style name="Widget.Vialen.DialogTitle" parent="MaterialAlertDialog.MaterialComponents.Title.Text">
         <item name="android:textColor">@color/vialen_text_primary_tint</item>
+        <item name="android:gravity">start|center_vertical</item>
+        <item name="android:textAlignment">viewStart</item>
     </style>
     <style name="ShapeAppearanceOverlay.Vialen.Dialog" parent="">
         <item name="cornerFamily">rounded</item>
-        <item name="cornerSize">20dp</item>
+        <item name="cornerSize">12dp</item>
     </style>
     <style name="Widget.Vialen.Preference" parent="Preference.Material">
         <item name="iconSpaceReserved">false</item>

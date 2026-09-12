@@ -52,9 +52,10 @@ abstract class VialenPreferenceFragment : PreferenceFragmentCompat() {
 
 private fun Dialog.stylePreferenceSurface() {
     val density = context.resources.displayMetrics.density
-    val shape = MaterialShapeDrawable(ShapeAppearanceModel.builder().setAllCornerSizes(20 * density).build())
+    val shape = MaterialShapeDrawable(ShapeAppearanceModel.builder().setAllCornerSizes(12 * density).build())
     shape.fillColor = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.vialen_surface))
     window?.setBackgroundDrawable(InsetDrawable(shape, (24 * density).toInt()))
+    window?.decorView?.elevation = 6 * density
 }
 
 class VialenEditPreferenceDialog : EditTextPreferenceDialogFragmentCompat() {

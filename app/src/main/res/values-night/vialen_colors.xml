@@ -19,8 +19,10 @@
     <color name="vialen_disabled">#667085</color>
     <color name="vialen_ripple">#2993B2FF</color>
     <color name="vialen_switch_track_unchecked">#344054</color>
-    <color name="vialen_switch_track_checked">#3C527C</color>
-    <color name="vialen_switch_thumb_unchecked">#B0BDCF</color>
+    <color name="vialen_switch_track_checked">@color/vialen_brand</color>
+    <color name="vialen_switch_thumb_disabled">#98A2B3</color>
+    <color name="vialen_switch_track_disabled">#2A3444</color>
+    <color name="vialen_switch_track_disabled_checked">#354B7A</color>
     <color name="vialen_legacy_system_bar">#182230</color>
     <color name="vialen_snackbar_background">#EDF2F8</color>
     <color name="vialen_snackbar_text">#202939</color>

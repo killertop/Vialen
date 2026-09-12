@@ -15,6 +15,9 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.nekohasekai.sagernet.aidl.ISagerNetService
 import io.nekohasekai.sagernet.bg.BaseService.State
 import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.database.SagerDatabase
+import io.nekohasekai.sagernet.database.ProxyGroup
+import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.preference.KeyValuePair
 import io.nekohasekai.sagernet.database.preference.PublicDatabase
 import io.nekohasekai.sagernet.ui.MainActivity
@@ -153,7 +156,17 @@ class MainUiRecoveryNativeTest {
         } }
     }
 
-    @Test fun settingsAndBottomBarPreferenceSurviveRecreation() = withMain { scenario ->
+    @Test fun settingsAndBottomBarPreferenceSurviveRecreation() {
+        // Connection controls intentionally stay hidden on an empty installation.
+        // Own a fixture instead of depending on the user's saved profiles.
+        val group = SagerDatabase.groupDao.createGroup(ProxyGroup(name = "Bottom bar fixture"))
+        val bean = io.nekohasekai.sagernet.fmt.socks.SOCKSBean().apply {
+            initializeDefaultValues(); serverAddress = "127.0.0.1"; serverPort = 9
+        }
+        val proxy = SagerDatabase.proxyDao.addProxy(ProxyEntity(groupId = group, socksBean = bean))
+        DataStore.selectedGroup = group
+        DataStore.selectedProxy = proxy
+        try { withMain { scenario ->
         for (show in listOf(false, true)) {
             scenario.onActivity {
                 DataStore.showBottomBar = show
@@ -171,6 +184,10 @@ class MainUiRecoveryNativeTest {
                 assertTrue(it.supportFragmentManager.findFragmentById(R.id.fragment_holder) is SettingsFragment)
                 assertEquals(show, it.binding.stats.allowShow)
             }
+        }
+        } } finally {
+            SagerDatabase.proxyDao.deleteById(proxy)
+            SagerDatabase.groupDao.deleteById(group)
         }
     }
 
