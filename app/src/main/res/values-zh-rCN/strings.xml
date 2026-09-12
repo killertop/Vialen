@@ -267,7 +267,7 @@
     <string name="standard">标准</string>
     <string name="unavailable">不可用</string>
     <string name="always_show_address">显示 IP 地址</string>
-    <string name="always_show_address_sum">在节点卡片上显示服务器地址（IP 或域名）</string>
+    <string name="always_show_address_sum">在节点卡片上显示 IP 或域名</string>
     <string name="clear_traffic_statistics">清空流量统计数据</string>
     <string name="connection_test">连接测试</string>
     <string name="connection_test_clear_results">清理测试结果</string>

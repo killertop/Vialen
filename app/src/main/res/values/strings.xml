@@ -309,7 +309,7 @@
     <string name="available" translatable="false">%dms</string>
     <string name="unavailable">Unavailable</string>
     <string name="always_show_address">Show IP address</string>
-    <string name="always_show_address_sum">Display the server address (IP or domain) on node cards</string>
+    <string name="always_show_address_sum">Display the IP address or domain on node cards</string>
     <string name="clear_traffic_statistics">Clear traffic statistics</string>
     <string name="connection_test">Connection test</string>
     <string name="connection_test_clear_results">Clear test results</string>
