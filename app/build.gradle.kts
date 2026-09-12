@@ -44,8 +44,6 @@ android {
         localeFilters += listOf("en", "zh-rCN", "zh-rHK", "zh-rTW")
     }
     sourceSets {
-        getByName("test").assets.directories.add("$projectDir/schemas")
-        getByName("androidTest").assets.directories.add("$projectDir/schemas")
         getByName("test").kotlin.directories.add("src/sharedTest/java")
         getByName("androidTest").kotlin.directories.add("src/sharedTest/java")
     }
@@ -63,24 +61,6 @@ tasks.withType<Test>().configureEach {
         .withPathSensitivity(PathSensitivity.NONE)
     systemProperty("vialen.core.host", rootProject.file("core/build/core-host").absolutePath)
     systemProperty("vialen.core.testBackend", "io.nekohasekai.sagernet.core.HostCoreBackend")
-}
-
-// Robolectric's binary AssetManager reads the local-test resource APK. Copying
-// schemas into merge-assets directories at Test.doFirst is too late to reach it.
-// Add fixtures only to local-test packages, never production APKs/AABs.
-tasks.configureEach {
-    if (name.startsWith("package") && name.endsWith("UnitTestForUnitTest")) {
-        inputs.dir(file("schemas"))
-        doLast {
-            outputs.files.asFileTree.matching { include("**/apk-for-local-test.ap_") }.forEach { archive ->
-                ant.withGroovyBuilder {
-                    "zip"("destfile" to archive, "update" to true) {
-                        "zipfileset"("dir" to file("schemas"), "prefix" to "assets")
-                    }
-                }
-            }
-        }
-    }
 }
 
 val buildGoHost = tasks.register<Exec>("buildGoHost") {
@@ -138,25 +118,13 @@ dependencies {
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
-    testImplementation(libs.snakeyaml)
-    androidTestImplementation(libs.snakeyaml)
-    testImplementation(libs.ini4j)
-    androidTestImplementation(libs.ini4j)
     testImplementation(libs.junit)
-    testImplementation(libs.sqlite.jdbc)
     testImplementation(libs.mockk)
-    testImplementation(libs.room.testing)
-    androidTestImplementation(libs.room.testing)
     testImplementation(libs.core)
     testImplementation(libs.test.ext.junit)
     testImplementation(libs.robolectric)
 
     constraints {
-        // Room migration serializers use interface defaults introduced in 1.8.1.
-        // Instrumentation loads the app APK first, so both APKs need the same ABI.
-        implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:${libs.versions.serialization.get()}") {
-            because("Room migration serializers require GeneratedSerializer interface defaults")
-        }
         // Robolectric and MockK inspect JDK classes in the Java 25 test process.
         // Keep these instrumentation libraries out of the Android runtime.
         for (module in listOf("asm", "asm-commons", "asm-tree")) {

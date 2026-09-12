@@ -405,9 +405,9 @@ def check_locales(path, badging):
         configs[config_file] = language_names
     properties = dict(line.split("=", 1) for line in (ROOT / "app/src/main/res/resources.properties").read_text().splitlines() if "=" in line)
     require(properties.get("unqualifiedResLocale") == "en-US", "Default source locale is not en-US")
-    filters = re.findall(r'resourceConfigurations\s*\+=\s*listOf\(([^)]*)\)', (ROOT / "app/build.gradle.kts").read_text())
+    filters = re.findall(r'localeFilters\s*\+=\s*listOf\(([^)]*)\)', (ROOT / "app/build.gradle.kts").read_text())
     require(len(filters) == 1 and set(re.findall(r'"([^"]+)"', filters[0])) == {"en", "zh-rCN", "zh-rHK", "zh-rTW"},
-            "Unexpected source resourceConfigurations")
+            "Unexpected source localeFilters")
     strings = ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()
     source_strings = {item.get("name"): "".join(item.itertext()) for item in strings.findall("string")}
     english = {"connect": "Connect", "settings": "Settings"}
@@ -417,7 +417,7 @@ def check_locales(path, badging):
                 "Default English string not proven: " + name)
     return {"aapt_locales": sorted(names), "locale_config_resource": config_ids[0], "locale_config_variants": configs,
             "source_default_locale": "en-US", "default_english_strings_verified_in_apk_and_source": english,
-            "source_resource_configurations": ["en", "zh-rCN", "zh-rHK", "zh-rTW"],
+            "source_locale_filters": ["en", "zh-rCN", "zh-rHK", "zh-rTW"],
             "resource_dump_sha256": hashlib.sha256(resources.encode()).hexdigest()}
 
 
@@ -426,7 +426,26 @@ def apk(folder):
     path = next(folder.glob("*.apk"))
     require(path.name.endswith("-arm64-v8a-unsigned.apk"), "Expected explicit unsigned APK name")
     check_archive(path, "lib")
-    badging = (folder / "badging.txt").read_text()
+    badging = run("aapt2", "dump", "badging", str(path))
+    require((folder / "badging.txt").read_text().strip() == badging,
+            "Recorded badging differs from current APK")
+    apk_library = "lib/arm64-v8a/libgojni.so"
+    aar_library = "jni/arm64-v8a/libgojni.so"
+    aar_path = folder.parent / "core/libcore.aar"
+    with zipfile.ZipFile(path) as apk_archive, zipfile.ZipFile(aar_path) as aar_archive:
+        require(apk_archive.namelist().count(apk_library) == 1 and
+                aar_archive.namelist().count(aar_library) == 1,
+                "Missing or duplicate libgojni.so in APK/core AAR")
+        apk_bytes = apk_archive.read(apk_library)
+        aar_bytes = aar_archive.read(aar_library)
+    apk_library_sha = hashlib.sha256(apk_bytes).hexdigest()
+    aar_library_sha = hashlib.sha256(aar_bytes).hexdigest()
+    require(apk_library_sha == aar_library_sha, "APK libgojni.so differs from core handoff AAR")
+    native_evidence = {
+        "apk_entry": apk_library, "aar_entry": aar_library,
+        "apk_sha256": apk_library_sha, "aar_sha256": aar_library_sha,
+        "bytes": len(apk_bytes), "verified_equal": True,
+    }
     require("package: name='com.vialen.app'" in badging, "Unexpected package ID")
     require("application-debuggable" not in badging, "Debuggable APK")
     require("native-code: 'arm64-v8a'" in badging, "Unexpected badging ABI")
@@ -442,6 +461,8 @@ def apk(folder):
         "schema": 1, "source_sha": current["source_sha"], "signing": "unsigned", "publishable": False,
         "files": {p.name: record(p) for p in sorted(folder.iterdir()) if p.is_file() and p.name != "release-manifest.json"},
         "core_manifest_sha256": digest(folder.parent / "core/core-manifest.json"),
+        "native_core_handoff": native_evidence,
+        "badging_verified_against_current_apk": True,
         "runtime_validation": "not performed by this workflow; no device/OEM/real-subscription claim",
         "formal_release_requires": ["approved signing identity and signed-artifact revalidation", "controlled release URL", "explicit publication approval"]})
 

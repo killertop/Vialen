@@ -1,6 +1,5 @@
 [versions]
 coroutines-android = "1.11.0"
-serialization = "1.8.1"
 core-ktx = "1.19.0"
 recyclerview = "1.4.0"
 activity-ktx = "1.13.0"
@@ -22,12 +21,8 @@ kryo = "5.6.2"
 guava = "33.7.1-android"
 recyclerview-fastscroll = "2.0.1"
 room = "2.8.5"
-roomigrant = "0.3.4"
 desugar-jdk-libs = "2.1.5"
-snakeyaml = "2.7"
-ini4j = "0.5.4"
 junit = "4.13.2"
-sqlite-jdbc = "3.53.4.0"
 mockk = "1.14.11"
 core = "1.7.0"
 robolectric = "4.17"
@@ -69,15 +64,9 @@ recyclerview-fastscroll = { module = "com.simplecityapps:recyclerview-fastscroll
 room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
-roomigrant-lib = { module = "com.github.MatrixDev.Roomigrant:RoomigrantLib", version.ref = "roomigrant" }
-roomigrant-compiler = { module = "com.github.MatrixDev.Roomigrant:RoomigrantCompiler", version.ref = "roomigrant" }
 desugar-jdk-libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar-jdk-libs" }
-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
-ini4j = { module = "org.ini4j:ini4j", version.ref = "ini4j" }
 junit = { module = "junit:junit", version.ref = "junit" }
-sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
-room-testing = { module = "androidx.room:room-testing", version.ref = "room" }
 core = { module = "androidx.test:core", version.ref = "core" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 runner = { module = "androidx.test:runner", version.ref = "runner" }

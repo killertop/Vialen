@@ -68,4 +68,4 @@ Java Bean 只作现有表单的临时投影。保存时将编辑差异合并回�
 
 `NewClientCoreNativeTest` 记录 1000 节点导入、保存/重读、编译阶段耗时及 PSS/ART 分配量；它不把主机微基准当作手机端速度，也不在未做可比实验时声称比 Rust 更快。
 
-本地版本为 1.7.4，源码 VERSION_CODE=62（ARM64 APK versionCode=310）。207 项 JVM 测试零失败、零跳过；Go business race、完整 libcore 测试、Debug/AndroidTest/Release 构建及 Release lint 通过。APK 无 Rust 库，AAR/APK 的 ARM64 与 ELF 16 KiB 对齐检查通过。真机安装、UI、VPN、手机端性能尚未验证；Release APK 为未签名候选，不作为已验收发行版。所有删除的旧实现和专用兼容测试均移入系统垃圾篓，可恢复；原工作树与旧数据库保留。
+本地版本为 1.7.4，源码 VERSION_CODE=62（ARM64 APK versionCode=310）。210 项 JVM 测试零失败、零跳过；Go business race、完整 libcore 测试、Debug/AndroidTest/Release 构建及 Release lint 通过。APK 无 Rust 库，AAR/APK 的 ARM64 与 ELF 16 KiB 对齐检查通过。真机安装、UI、VPN、手机端性能尚未验证；Release APK 为未签名候选，不作为已验收发行版。所有删除的旧实现和专用兼容测试均移入系统垃圾篓，可恢复；原工作树与旧数据库保留。

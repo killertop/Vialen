@@ -4,7 +4,6 @@ import android.app.Activity
 import android.app.Application
 import android.content.Intent
 import androidx.appcompat.widget.Toolbar
-import org.json.JSONObject
 import android.os.Bundle
 import android.os.Parcel
 import android.view.View
@@ -22,6 +21,8 @@ import io.nekohasekai.sagernet.database.preference.PublicDatabase
 import io.nekohasekai.sagernet.database.preference.KeyValuePair
 import io.nekohasekai.sagernet.ui.profile.SocksSettingsActivity
 import moe.matsuri.nb4a.ui.MTUPreference
+import moe.matsuri.nb4a.proxy.config.ConfigSettingActivity
+import com.google.gson.JsonParser
 import io.nekohasekai.sagernet.ui.GroupSettingsActivity
 import io.nekohasekai.sagernet.ui.RouteSettingsActivity
 import io.nekohasekai.sagernet.ui.form.FormDraftState
@@ -171,9 +172,9 @@ class FormLifecycleNativeTest {
     }
 
     @Test fun configDraftRecreatesWithoutSavingAndInvalidJsonStaysOpen() {
-        DataStore.serverCustom = "{}"
+        DataStore.serverConfig = "{}"
         ActivityScenario.launch<ConfigEditActivity>(Intent(context, ConfigEditActivity::class.java)
-            .putExtra("key", Key.SERVER_CUSTOM)).useWithCleanup { scenario ->
+            .putExtra("key", Key.SERVER_CONFIG)).useWithCleanup { scenario ->
             scenario.onActivity { it.binding.editor.setTextContent("{invalid") }
             scenario.recreate()
             scenario.onActivity {
@@ -188,7 +189,7 @@ class FormLifecycleNativeTest {
                     .dismissNow()
                 it.saveAndExit()
                 assertFalse(it.isFinishing)
-                assertEquals("{}", DataStore.serverCustom)
+                assertEquals("{}", DataStore.serverConfig)
             }
         }
     }
@@ -400,7 +401,7 @@ class FormLifecycleNativeTest {
         }
     }
 
-    private fun editCustomJson(scenario: ActivityScenario<SocksSettingsActivity>, menuId: Int, text: String) {
+    private fun editRawJson(scenario: ActivityScenario<ConfigSettingActivity>, text: String) {
         val resumed = CountDownLatch(1)
         var editor: ConfigEditActivity? = null
         val application = context.applicationContext as Application
@@ -418,11 +419,13 @@ class FormLifecycleNativeTest {
         application.registerActivityLifecycleCallbacks(observer)
         try {
             scenario.onActivity { activity ->
-                val item = activity.findViewById<Toolbar>(R.id.toolbar).menu.findItem(menuId)
-                assertNotNull(item)
-                assertTrue(activity.onOptionsItemSelected(item))
+                val fragment = activity.supportFragmentManager.findFragmentById(R.id.settings)
+                    as io.nekohasekai.sagernet.ui.VialenPreferenceFragment
+                val preference = requireNotNull(fragment.findPreference<moe.matsuri.nb4a.ui.EditConfigPreference>(Key.SERVER_CONFIG))
+                assertTrue(preference.isVisible)
+                preference.performClick()
             }
-            assertTrue("New profile JSON action launches editor", resumed.await(10, TimeUnit.SECONDS))
+            assertTrue("Raw configuration preference launches editor", resumed.await(10, TimeUnit.SECONDS))
             instrumentation.runOnMainSync {
                 requireNotNull(editor).apply { binding.editor.setTextContent(text); saveAndExit() }
             }
@@ -435,22 +438,37 @@ class FormLifecycleNativeTest {
         }
     }
 
-    @Test fun newProfileCustomJsonSurvivesRecreationAndPersists() {
+    @Test fun ordinaryProfileDoesNotExposeCustomOverlayMenus() {
+        ActivityScenario.launch<SocksSettingsActivity>(Intent(context, SocksSettingsActivity::class.java)).useWithCleanup { scenario ->
+            ready(scenario)
+            repeat(2) { pass ->
+                if (pass == 1) { scenario.recreate(); ready(scenario) }
+                scenario.onActivity { activity ->
+                    val menu = activity.findViewById<Toolbar>(R.id.toolbar).menu
+                    for (id in listOf(R.id.action_custom_config_json, R.id.action_custom_outbound_json)) {
+                        assertFalse("Ordinary profiles must not expose overlay editing", menu.findItem(id)?.isVisible == true)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test fun rawConfigurationSurvivesRecreationAndPersistsCompleteDocument() {
         val id = SagerDatabase.groupDao.createGroup(ProxyGroup().apply { name = "forms-json" })
+        val raw = """{"outbounds":[{"type":"socks","tag":"fixture","server":"127.0.0.1","server_port":1080,"username":"synthetic","password":"synthetic"}],"route":{"final":"fixture"},"experimental":{"cache_file":{"enabled":false}}}"""
         try {
-            ActivityScenario.launch<SocksSettingsActivity>(Intent(context, SocksSettingsActivity::class.java)).useWithCleanup { scenario ->
+            ActivityScenario.launch<ConfigSettingActivity>(Intent(context, ConfigSettingActivity::class.java)).useWithCleanup { scenario ->
                 ready(scenario)
                 scenario.onActivity {
                     DataStore.editingGroup = id
-                    DataStore.serverAddress = "127.0.0.1"
-                    DataStore.serverPort = 1080
+                    DataStore.profileName = "forms-raw"
                 }
-                editCustomJson(scenario, R.id.action_custom_config_json, "{\"test_config\":true}")
-                editCustomJson(scenario, R.id.action_custom_outbound_json, "{\"test_outbound\":true}")
+                editRawJson(scenario, raw)
                 scenario.recreate(); ready(scenario)
-                lateinit var activity: SocksSettingsActivity
+                lateinit var activity: ConfigSettingActivity
                 scenario.onActivity {
                     activity = it
+                    assertEquals(JsonParser.parseString(raw), JsonParser.parseString(DataStore.serverConfig))
                     assertTrue(DataStore.dirty)
                     it.onBackPressedDispatcher.onBackPressed()
                     it.onSupportNavigateUp()
@@ -462,9 +480,16 @@ class FormLifecycleNativeTest {
                         .dismissNow()
                 }
                 runBlocking { activity.saveAndExit() }
-                val saved = SagerDatabase.proxyDao.getByGroup(id).single().requireBean()
-                assertTrue(JSONObject(saved.customConfigJson).getBoolean("test_config"))
-                assertTrue(JSONObject(saved.customOutboundJson).getBoolean("test_outbound"))
+                val row = SagerDatabase.proxyDao.getByGroup(id).single()
+                assertEquals(ProxyEntity.TYPE_CONFIG, row.type)
+                val saved = ProfileDocument.decode(row.document)
+                assertEquals("raw_config", saved.kind)
+                assertEquals("config", saved.scope)
+                assertEquals("forms-raw", saved.name)
+                assertNull(saved.profile)
+                assertEquals(JsonParser.parseString(raw), JsonParser.parseString(saved.content))
+                // Re-read the Room row rather than relying on the form's Bean projection.
+                assertEquals(saved, ProfileDocument.decode(SagerDatabase.proxyDao.getById(row.id)!!.document))
             }
         } finally {
             SagerDatabase.proxyDao.deleteByGroup(id)
@@ -477,7 +502,7 @@ class FormLifecycleNativeTest {
         val token = FormDraftState.begin()
         val large = "{\"payload\":\"" + "x".repeat(1_200_000) + "\"}"
         try {
-            DataStore.serverCustom = large
+            DataStore.serverConfig = large
             FormDraftState.save(saved, token)
             val parcel = Parcel.obtain()
             try {
@@ -487,7 +512,7 @@ class FormLifecycleNativeTest {
             FormDraftState.begin()
             TempDatabase.profileCacheDao.reset()
             FormDraftState.restore(saved)
-            assertEquals(large, DataStore.serverCustom)
+            assertEquals(large, DataStore.serverConfig)
         } finally { FormDraftState.discard(token) }
     }
 

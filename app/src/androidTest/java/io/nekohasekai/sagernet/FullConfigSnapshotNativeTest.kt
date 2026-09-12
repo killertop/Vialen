@@ -41,31 +41,29 @@ class FullConfigSnapshotNativeTest {
                 val snapshot=ConfigSnapshot.capture(chain,false,false)
                 val fresh=snapshot.generate().result
                 val actual=JsonParser.parseString(fresh.config)
-                if (selector) {
-                    val outbounds=actual.asJsonObject.getAsJsonArray("outbounds")
-                    val chainTag="c-${chain.id}-0-${b.id}"
-                    assertEquals("g-${a.id}", fresh.profileTagMap.getValue(a.id))
-                    assertEquals(chainTag, fresh.profileTagMap.getValue(chain.id))
-                    assertEquals("g-${a.id}", outbounds.single {
-                        it.asJsonObject.get("tag")?.asString==chainTag
-                    }.asJsonObject.get("detour").asString)
-                }
-                // This test owns the chain and snapshot boundary. The legacy oracle has
-                // separate logging policy and predates native rule-set references; comparing
-                // its complete config would compare different inputs on a configured phone.
+                val outbounds=actual.asJsonObject.getAsJsonArray("outbounds")
+                val selectedTag=actual.asJsonObject.getAsJsonObject("route")["final"].asString
+                assertEquals("selected",selectedTag)
+                val selectorOutbound=outbounds.single { it.asJsonObject["tag"]?.asString==selectedTag }.asJsonObject
+                assertEquals("selector",selectorOutbound["type"].asString)
+                val chainTag=fresh.profileTagMap.getValue(chain.id)
+                assertEquals(chainTag,selectorOutbound["default"].asString)
+                val candidateTags=selectorOutbound.getAsJsonArray("outbounds").map { it.asString }.toSet()
+                assertEquals(fresh.profileTagMap.values.toSet(),candidateTags)
+                assertEquals(if(selector) setOf(a.id,b.id,chain.id) else setOf(chain.id),fresh.profileTagMap.keys)
+                candidateTags.forEach { tag -> assertTrue(outbounds.any { it.asJsonObject["tag"]?.asString==tag }) }
                 assertTrue(snapshot.ruleNames.containsKey(rules.single()))
                 assertTrue(actual.asJsonObject.getAsJsonObject("route").getAsJsonArray("rules").any {
                     it.toString().contains("snapshot.example") && it.toString().contains("192.0.2.0/24")
                 })
-                assertEquals("proxy", actual.asJsonObject.getAsJsonObject("route")["final"].asString)
                 assertEquals(if(selector) group.id else -1L, fresh.selectorGroupId)
-                val chainTag=if(selector) "c-${chain.id}-0-${b.id}" else "proxy"
-                val outbounds=actual.asJsonObject.getAsJsonArray("outbounds")
                 val hop=outbounds.single { it.asJsonObject["tag"].asString==chainTag }.asJsonObject
                 assertEquals("127.0.0.1",hop["server"].asString)
                 assertEquals(1081,hop["server_port"].asInt)
-                assertEquals("g-${a.id}",hop["detour"].asString)
-                val front=outbounds.single { it.asJsonObject["tag"].asString=="g-${a.id}" }.asJsonObject
+                val secondHopTag=hop["detour"].asString
+                assertNotEquals(chainTag,secondHopTag)
+                val front=outbounds.single { it.asJsonObject["tag"].asString==secondHopTag }.asJsonObject
+                assertFalse(front.has("detour"))
                 assertEquals("127.0.0.1",front["server"].asString)
                 assertEquals(1080,front["server_port"].asInt)
                 assertEquals(setOf(a.id,b.id,chain.id),fresh.trafficMap.getValue(chainTag).map { it.id }.toSet())
