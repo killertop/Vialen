@@ -158,34 +158,49 @@ class MainUiRecoveryNativeTest {
         } }
     }
 
-    @Test fun settingsAndBottomBarPreferenceSurviveRecreation() {
-        // Connection controls intentionally stay hidden on an empty installation.
-        // Own a fixture instead of depending on the user's saved profiles.
-        val group = SagerDatabase.groupDao.createGroup(ProxyGroup(name = "Bottom bar fixture"))
-        val bean = io.nekohasekai.sagernet.core.Profile(name = "", type = "socks", server = "127.0.0.1",
+    @Test fun connectionControlsStayOnHomeAcrossPageRecreation() {
+        // Own a fixture: an empty installation intentionally has no connection controls.
+        val group = SagerDatabase.groupDao.createGroup(ProxyGroup(name = "Home controls fixture"))
+        val profile = io.nekohasekai.sagernet.core.Profile(name = "", type = "socks", server = "127.0.0.1",
             port = 9, socks = io.nekohasekai.sagernet.core.Profile.Socks())
-        val proxy = SagerDatabase.proxyDao.addProxy(ProxyEntity(groupId = group).putProfile(bean))
+        val proxy = SagerDatabase.proxyDao.addProxy(ProxyEntity(groupId = group).putProfile(profile))
         DataStore.selectedGroup = group
         DataStore.selectedProxy = proxy
+        DataStore.configurationStore.putBoolean("managedRuntimeNoticeAcknowledged", true)
         try { withMain { scenario ->
-        for (show in listOf(false, true)) {
-            scenario.onActivity {
-                DataStore.showBottomBar = show
-                it.displayFragmentWithId(R.id.nav_settings)
-                it.supportFragmentManager.executePendingTransactions()
+            for ((page, name) in listOf(
+                R.id.nav_settings to "SettingsFragment",
+                R.id.nav_group to "GroupFragment",
+                R.id.nav_route to "RouteFragment",
+                R.id.nav_about to "AboutFragment",
+                R.id.nav_configuration to "ConfigurationFragment",
+            )) {
+                val show = page == R.id.nav_configuration
+                scenario.onActivity {
+                    it.displayFragmentWithId(page)
+                    it.supportFragmentManager.executePendingTransactions()
+                }
+                fun matches(activity: MainActivity) =
+                    activity.supportFragmentManager.findFragmentById(R.id.fragment_holder)?.javaClass?.simpleName == name &&
+                        activity.binding.fab.visibility == if (show) View.VISIBLE else View.GONE
+                awaitView(scenario, ::matches)
+                scenario.recreate()
+                isolate(scenario)
+                awaitView(scenario, ::matches)
+                scenario.onActivity {
+                    assertEquals(show, it.binding.stats.allowShow)
+                    if (page == R.id.nav_settings) {
+                        val settings = it.supportFragmentManager.findFragmentById(R.id.settings)
+                            as io.nekohasekai.sagernet.ui.SettingsPreferenceFragment
+                        val adapter = settings.listView.adapter as androidx.preference.PreferenceGroupAdapter
+                        for (key in listOf("proxyApps", "uiEditApps", "remoteDns", "mixedPort",
+                            "uiDetailedDiagnostics", "globalAllowInsecure", "tunImplementation", "acquireWakeLock")) {
+                            assertTrue("Setting must be exposed without expansion: $key",
+                                adapter.getPreferenceAdapterPosition(key) >= 0)
+                        }
+                    }
+                }
             }
-            awaitView(scenario) { it.binding.fab.visibility == if (show) View.VISIBLE else View.GONE }
-            scenario.recreate()
-            isolate(scenario)
-            awaitView(scenario) {
-                it.supportFragmentManager.findFragmentById(R.id.fragment_holder) is SettingsFragment &&
-                    it.binding.fab.visibility == if (show) View.VISIBLE else View.GONE
-            }
-            scenario.onActivity {
-                assertTrue(it.supportFragmentManager.findFragmentById(R.id.fragment_holder) is SettingsFragment)
-                assertEquals(show, it.binding.stats.allowShow)
-            }
-        }
         } } finally {
             SagerDatabase.proxyDao.deleteById(proxy)
             SagerDatabase.groupDao.deleteById(group)

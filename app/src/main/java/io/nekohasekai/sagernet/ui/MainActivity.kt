@@ -278,7 +278,7 @@ class MainActivity : ThemedActivity(),
 
     private fun syncPageControls(fragment: Fragment?) {
         if (fragment == null || !::binding.isInitialized) return
-        val showControls = (fragment is ConfigurationFragment || DataStore.showBottomBar) &&
+        val showControls = fragment is ConfigurationFragment &&
             (hasProfiles || renderedState.canStop)
         binding.stats.allowShow = showControls
         connection.updateConnectionId(TrafficObservation.connectionId(activityStarted, showControls))
@@ -397,9 +397,6 @@ class MainActivity : ThemedActivity(),
 
     override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {
         when (key) {
-            Key.SHOW_BOTTOM_BAR -> runOnUiThread {
-                syncPageControls(supportFragmentManager.findFragmentById(R.id.fragment_holder))
-            }
             Key.SERVICE_MODE -> onBinderDied()
             Key.PROXY_APPS, Key.BYPASS_MODE, Key.INDIVIDUAL -> {
                 if (DataStore.serviceState.canStop) {

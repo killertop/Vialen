@@ -131,7 +131,8 @@ class SelectorCallbackNativeTest {
                     // No direct selectMain invocation: only the native callback may change this.
                     assertTrue("Native callback did not synchronously change traffic owner", loop.isSelected(b.id))
                     awaitCondition { callback.selected.get() == b.id }
-                    assertEquals(ServiceNotification.genTitle(editedB), proxy.displayProfileName)
+                    assertEquals(editedB.displayName(), ServiceNotification.genTitle(editedB))
+                    assertEquals(editedB.displayName(), proxy.displayProfileName)
                     awaitCondition { db.proxyDao().getById(a.id)!!.tx > a.tx }
                     val savedA = checkNotNull(db.proxyDao().getById(a.id))
                     assertTrue(savedA.rx > a.rx)

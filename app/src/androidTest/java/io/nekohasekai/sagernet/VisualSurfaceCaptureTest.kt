@@ -92,7 +92,6 @@ class VisualSurfaceCaptureTest {
             // Covered by publicBefore's exact type/byte snapshot and finally restoration.
             DataStore.configurationStore.putBoolean("managedRuntimeNoticeAcknowledged", true)
             if (requestedSection == "polish") {
-                DataStore.showBottomBar = false
                 DataStore.alwaysShowAddress = false
             }
             createFixtures()

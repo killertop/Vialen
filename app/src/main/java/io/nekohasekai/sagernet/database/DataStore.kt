@@ -109,8 +109,6 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     // Legacy values deliberately retained for backup/audit, no longer runtime policy inputs.
     var appTLSVersion by configurationStore.string(Key.APP_TLS_VERSION)
-    var showBottomBar by configurationStore.boolean(Key.SHOW_BOTTOM_BAR)
-
     var allowInsecureOnRequest by configurationStore.boolean(Key.ALLOW_INSECURE_ON_REQUEST)
     var networkChangeResetConnections by configurationStore.boolean(Key.NETWORK_CHANGE_RESET_CONNECTIONS) { true }
     var wakeResetConnections by configurationStore.boolean(Key.WAKE_RESET_CONNECTIONS)
@@ -131,8 +129,6 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var allowAccess by configurationStore.boolean(Key.ALLOW_ACCESS)
     // Retained for old backup provenance; TrafficSampling owns the runtime cadence.
     var speedInterval by configurationStore.stringToInt(Key.SPEED_INTERVAL)
-    var showGroupInNotification by configurationStore.boolean("showGroupInNotification")
-
     var globalCustomConfig by configurationStore.string(Key.GLOBAL_CUSTOM_CONFIG) { "" }
 
     var remoteDns by configurationStore.string(Key.REMOTE_DNS) { "https://dns.google/dns-query" }

@@ -51,7 +51,6 @@ class VisualConnectionCaptureTest {
         }
         try {
             DataStore.configurationStore.putBoolean("isAutoConnect", false)
-            DataStore.showBottomBar = true
             run {
                 val label = "light"
                 val scenario = ActivityScenario.launch(MainActivity::class.java)

@@ -202,7 +202,6 @@ class FocusedUiVisualNativeTest {
         DataStore.selectedGroup = fixtureGroup
         DataStore.selectedProxy = fixtureProfile
         DataStore.rulesFirstCreate = true
-        DataStore.showBottomBar = false
     }
 
     private fun restoreRoom() {

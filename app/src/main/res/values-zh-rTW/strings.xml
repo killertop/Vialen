@@ -268,8 +268,8 @@
     <string name="probe_interval">負載平衡器觀測間隔</string>
     <string name="standard">標準</string>
     <string name="unavailable">無法使用</string>
-    <string name="always_show_address">始終顯示位址</string>
-    <string name="always_show_address_sum">使用在設定檔卡片中顯示伺服器位址</string>
+    <string name="always_show_address">顯示 IP 位址</string>
+    <string name="always_show_address_sum">在節點卡片上顯示伺服器位址（IP 或網域）</string>
     <string name="clear_traffic_statistics">清除流量統計資料</string>
     <string name="connection_test">連線測試</string>
     <string name="connection_test_tcp_ping_unavailable">TCPing 無法使用</string>
@@ -388,4 +388,5 @@
     <string name="packet_encoding">封包編碼</string>
     <string name="vialen_releases">Vialen 版本發佈</string>
     <string name="close">關閉</string>
+    <string name="ui_app_routing">應用程式分流</string>
 </resources>
