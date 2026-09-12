@@ -72,7 +72,7 @@ class VisualSurfaceCaptureTest {
         val requestedMode = arguments.getString("vialenVisualMode") ?: "all"
         val requestedSection = arguments.getString("vialenVisualSection") ?: "all"
         require(requestedMode in setOf("light", "dark", "all")) { "Invalid vialenVisualMode=$requestedMode" }
-        require(requestedSection in setOf("main", "forms", "standalone", "conditions", "compact", "all")) { "Invalid vialenVisualSection=$requestedSection" }
+        require(requestedSection in setOf("main", "forms", "standalone", "conditions", "compact", "typography", "all")) { "Invalid vialenVisualSection=$requestedSection" }
         checkNoStartedService()
         check(activities().isEmpty()) { "Close app activities before this isolated capture run" }
         output = File(checkNotNull(context.getExternalFilesDir(null)), "ui-v1.6/${System.currentTimeMillis()}")
@@ -114,6 +114,9 @@ class VisualSurfaceCaptureTest {
                 }
                 if (requestedSection == "compact") {
                     activeSurface = "$label/compact"; captureCompact(label)
+                }
+                if (requestedSection == "typography") {
+                    activeSurface = "$label/typography"; captureTypography(label)
                 }
             }
         } catch (error: Throwable) {
@@ -225,6 +228,57 @@ class VisualSurfaceCaptureTest {
         }
         DataStore.selectedGroup = emptyGroupId
         withActivity(MainActivity::class.java) { shot("$mode/configuration-empty-group", it) }
+        DataStore.selectedGroup = groupId
+    }
+
+    /** Targeted text-role regression, independent of installed-app enumeration permissions. */
+    private fun captureTypography(mode: String) {
+        withActivity(MainActivity::class.java) { activity ->
+            await("typography fixture profile bound") {
+                descendants(activity.window.decorView).filterIsInstance<TextView>()
+                    .any { it.id == R.id.profile_name && it.text.toString().startsWith("QA Blue") }
+            }
+            shot("$mode/typography-nodes", activity)
+            onMain { check(activity.findViewById<View>(R.id.action_add).performClick()) }
+            shot("$mode/typography-add-sheet", activity)
+            val label = context.getString(R.string.ui_manual_config)
+            await("manual configuration action visible") {
+                instrumentation.uiAutomation.rootInActiveWindow?.findAccessibilityNodeInfosByText(label)
+                    ?.any { it.text?.toString() == label } == true
+            }
+            var node = instrumentation.uiAutomation.rootInActiveWindow
+                .findAccessibilityNodeInfosByText(label).first { it.text?.toString() == label }
+            while (!node.isClickable) node = checkNotNull(node.parent)
+            check(node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK))
+            shot("$mode/typography-protocol-picker", activity)
+            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+            for ((id, name) in listOf(R.id.nav_group to "groups", R.id.nav_route to "routes",
+                R.id.nav_settings to "settings", R.id.nav_about to "about")) {
+                onMain { activity.displayFragmentWithId(id) }
+                shot("$mode/typography-$name", activity)
+            }
+        }
+        withActivity(AssetsActivity::class.java) { shot("$mode/typography-assets", it) }
+        withActivity(GroupSettingsActivity::class.java, { putExtra("id", groupId) }) {
+            clickPreference(it, "groupName")
+            shot("$mode/typography-group-name", it)
+            dismissFloating(it)
+        }
+        withActivity(RouteSettingsActivity::class.java, { putExtra("id", ruleId) }) {
+            clickPreference(it, "routeName")
+            shot("$mode/typography-route-name", it)
+            dismissFloating(it)
+        }
+        withActivity(io.nekohasekai.sagernet.ui.profile.SocksSettingsActivity::class.java, { putExtra("id", profileId) }) {
+            clickPreference(it, "profileName")
+            shot("$mode/typography-profile-name", it)
+            dismissFloating(it)
+            clickPreference(it, "serverAddress")
+            shot("$mode/typography-technical-address", it)
+            dismissFloating(it)
+        }
+        DataStore.selectedGroup = emptyGroupId
+        withActivity(MainActivity::class.java) { shot("$mode/typography-empty-group", it) }
         DataStore.selectedGroup = groupId
     }
 

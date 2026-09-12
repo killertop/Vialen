@@ -8,6 +8,7 @@ import android.view.View
 import android.widget.EditText
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
+import androidx.core.widget.TextViewCompat
 import androidx.preference.*
 import com.google.android.material.shape.MaterialShapeDrawable
 import com.google.android.material.shape.ShapeAppearanceModel
@@ -69,6 +70,10 @@ class VialenEditPreferenceDialog : EditTextPreferenceDialogFragmentCompat() {
             input.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
             input.setSingleLine()
             input.imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE
+        }
+        // Do not replace input listeners, validation, password layouts or keyboard behavior.
+        if ((preference as EditTextPreference).dialogLayoutResource == R.layout.layout_preference_input) {
+            TextViewCompat.setTextAppearance(input, PreferenceTypography.inputAppearance(preference.key))
         }
         alert.getButton(AlertDialog.BUTTON_POSITIVE).apply {
             setText(R.string.ui_save)

@@ -57,9 +57,8 @@
                         android:id="@+id/profile_name"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:textAppearance="@style/TextAppearance.Vialen.ListTitle"
                         android:textColor="?android:attr/textColorPrimary"
-                        android:textStyle="bold"
                         tools:text="@string/profile_name" />
                 </LinearLayout>
 
@@ -131,7 +130,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/server_address"
-                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    android:textAppearance="@style/TextAppearance.Vialen.Secondary"
                     android:textColor="?android:attr/textColorSecondary" />
 
                 <LinearLayout
@@ -144,7 +143,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/traffic"
-                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    android:textAppearance="@style/TextAppearance.Vialen.Secondary"
                     android:textColor="?android:attr/textColorSecondary" />
 
             </LinearLayout>
@@ -161,7 +160,7 @@
                     android:id="@+id/profile_type"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    android:textAppearance="@style/TextAppearance.Vialen.Secondary"
                     android:textColor="?attr/accentOrTextSecondary" />
 
                 <LinearLayout
@@ -174,7 +173,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="4dp"
-                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    android:textAppearance="@style/TextAppearance.Vialen.Secondary"
                     android:textColor="?attr/accentOrTextSecondary" />
 
             </LinearLayout>

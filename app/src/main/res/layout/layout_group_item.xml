@@ -46,16 +46,15 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="8dp"
-                    android:textAppearance="?android:attr/textAppearanceMedium"
+                    android:textAppearance="@style/TextAppearance.Vialen.ListTitle"
                     android:textColor="?android:attr/textColorPrimary"
-                    android:textStyle="bold"
                     tools:text="@string/group_name" />
 
                 <TextView
                     android:id="@+id/group_user"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    android:textAppearance="@style/TextAppearance.Vialen.Secondary"
                     android:textColor="?android:attr/textColorSecondary"
                     tools:text="user name" />
             </LinearLayout>
@@ -109,7 +108,7 @@
                     android:id="@+id/group_traffic"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    android:textAppearance="@style/TextAppearance.Vialen.Secondary"
                     android:textColor="?attr/accentOrTextSecondary"
                     android:visibility="gone"
                     tools:text="@string/subscription_traffic" />
@@ -118,7 +117,7 @@
                     android:id="@+id/group_status"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    android:textAppearance="@style/TextAppearance.Vialen.Secondary"
                     android:textColor="?attr/accentOrTextSecondary"
                     tools:text="@string/group_status_empty" />
 

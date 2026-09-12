@@ -43,7 +43,7 @@
                 android:minHeight="48dp"
                 android:paddingTop="12dp"
                 android:maxLines="6"
-                android:typeface="monospace" />
+                android:textAppearance="@style/TextAppearance.Vialen.Input" />
         </com.google.android.material.textfield.TextInputLayout>
     </LinearLayout>
 </ScrollView>

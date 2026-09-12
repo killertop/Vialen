@@ -49,9 +49,8 @@
                     android:id="@+id/asset_name"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textAppearance="?android:attr/textAppearanceMedium"
-                    android:textColor="?android:attr/textColorPrimary"
-                    android:textStyle="bold" />
+                    android:textAppearance="@style/TextAppearance.Vialen.ListTitle"
+                    android:textColor="?android:attr/textColorPrimary" />
             </LinearLayout>
 
         </LinearLayout>
@@ -64,7 +63,7 @@
             android:layout_marginBottom="8dp"
             android:maxLines="2"
             android:ellipsize="middle"
-            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textAppearance="@style/TextAppearance.Vialen.Secondary"
             android:textColor="?attr/accentOrTextSecondary" />
 
         <LinearLayout
@@ -87,7 +86,7 @@
                     android:id="@+id/asset_status"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    android:textAppearance="@style/TextAppearance.Vialen.Secondary"
                     android:textColor="?attr/accentOrTextSecondary" />
 
             </LinearLayout>
@@ -108,7 +107,7 @@
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="16dp"
             android:layout_marginBottom="12dp"
-            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textAppearance="@style/TextAppearance.Vialen.Secondary"
             android:textColor="?attr/colorError"
             android:visibility="gone" />
 

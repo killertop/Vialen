@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Semantic text roles. Keep color and geometry at the existing call sites. -->
+    <style name="TextAppearance.Vialen.Body" parent="TextAppearance.AppCompat.Subhead">
+        <item name="android:textSize">16sp</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="fontFamily">sans-serif</item>
+        <item name="android:textStyle">normal</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+    <style name="TextAppearance.Vialen.ListTitle" parent="TextAppearance.Vialen.Body">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="fontFamily">sans-serif-medium</item>
+    </style>
+    <style name="TextAppearance.Vialen.Secondary" parent="TextAppearance.Vialen.Body">
+        <item name="android:textSize">14sp</item>
+    </style>
+    <style name="TextAppearance.Vialen.Section" parent="TextAppearance.Vialen.ListTitle">
+        <item name="android:textSize">14sp</item>
+    </style>
+    <style name="TextAppearance.Vialen.PanelTitle" parent="TextAppearance.Vialen.Body">
+        <item name="android:textSize">22sp</item>
+    </style>
+    <style name="TextAppearance.Vialen.Input" parent="TextAppearance.Vialen.Body" />
+    <style name="TextAppearance.Vialen.Input.Technical" parent="TextAppearance.Vialen.Input">
+        <item name="android:fontFamily">monospace</item>
+        <item name="fontFamily">monospace</item>
+    </style>
+    <style name="TextAppearance.Vialen.Navigation" parent="TextAppearance.Vialen.Body" />
+    <style name="Widget.Vialen.NavigationButton" parent="Widget.MaterialComponents.Button.TextButton">
+        <item name="android:textAppearance">@style/TextAppearance.Vialen.Navigation</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+</resources>

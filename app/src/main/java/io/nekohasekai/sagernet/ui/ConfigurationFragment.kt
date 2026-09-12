@@ -28,6 +28,7 @@ import androidx.core.view.isGone
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.core.view.size
+import androidx.core.widget.TextViewCompat
 import java.io.IOException
 import java.io.OutputStream
 import androidx.fragment.app.Fragment
@@ -379,7 +380,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
         content.addView(android.widget.TextView(context).apply {
             setText(R.string.ui_add_node)
-            textSize = 22f
+            TextViewCompat.setTextAppearance(this, R.style.TextAppearance_Vialen_PanelTitle)
             setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.vialen_text_primary))
             setPadding(0, 0, 0, dp2px(16))
         })
@@ -403,7 +404,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         action(R.string.ui_manual_config) { showProtocolPicker(actions) }
         content.addView(android.widget.TextView(context).apply {
             setText(R.string.ui_import_hint)
-            textSize = 14f
+            TextViewCompat.setTextAppearance(this, R.style.TextAppearance_Vialen_Secondary)
             setPadding(0, dp2px(16), 0, 0)
         })
         sheet.setContentView(content)
@@ -440,7 +441,8 @@ class ConfigurationFragment @JvmOverloads constructor(
                 override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
                     val row = super.getView(position, convertView, parent) as android.widget.TextView
                     val heading = !isEnabled(position)
-                    row.textSize = if (heading) 13f else 16f
+                    TextViewCompat.setTextAppearance(row, if (heading) R.style.TextAppearance_Vialen_Section
+                        else R.style.TextAppearance_Vialen_Body)
                     row.setTextColor(androidx.core.content.ContextCompat.getColor(context,
                         if (heading) R.color.vialen_text_secondary else R.color.vialen_text_primary))
                     return row
