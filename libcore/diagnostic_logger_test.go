@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	sblog "github.com/sagernet/sing-box/log"
 )
@@ -41,7 +40,9 @@ func TestDiagnosticExistingAndFutureLoggers(t *testing.T) {
 	SetDiagnosticMode(true)
 	existing.Debug("existing-debug")
 	newLogger().Trace("future-trace")
-	diagnostics.set(true, time.Now().Add(-diagnosticDuration))
+	diagnostics.mu.Lock()
+	diagnostics.deadline = diagnostics.deadline.Add(-diagnosticDuration)
+	diagnostics.mu.Unlock()
 	existing.Debug("hidden-expired")
 	existing.Info("expired-info")
 	SetDiagnosticMode(true)

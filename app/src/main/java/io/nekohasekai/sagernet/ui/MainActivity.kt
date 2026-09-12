@@ -61,6 +61,7 @@ class MainActivity : ThemedActivity(),
     private var pendingPage: Int? = null
     private var hasProfiles = false
     private var availabilityVersion = 0L
+    private var activityStarted = false
 
     fun refreshProfileAvailability() {
         val version = ++availabilityVersion
@@ -300,6 +301,7 @@ class MainActivity : ThemedActivity(),
         val showControls = (fragment is ConfigurationFragment || DataStore.showBottomBar) &&
             (hasProfiles || renderedState.canStop)
         binding.stats.allowShow = showControls
+        connection.updateConnectionId(TrafficObservation.connectionId(activityStarted, showControls))
         binding.fab.pageAllowsControls = showControls
         if (showControls) binding.fab.show() else binding.fab.hide()
         updateConnectionSummary(showControls)
@@ -371,7 +373,7 @@ class MainActivity : ThemedActivity(),
         changeState(state, msg, true)
     }
 
-    val connection = SagerConnection(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND, true)
+    val connection = SagerConnection(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_BACKGROUND, true)
     override fun onServiceConnected(service: ISagerNetService) = changeState(
         try {
             BaseService.State.values()[service.state]
@@ -430,11 +432,13 @@ class MainActivity : ThemedActivity(),
     }
 
     override fun onStart() {
-        connection.updateConnectionId(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND)
+        activityStarted = true
         super.onStart()
+        syncPageControls(supportFragmentManager.findFragmentById(R.id.fragment_holder))
     }
 
     override fun onStop() {
+        activityStarted = false
         connection.updateConnectionId(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_BACKGROUND)
         super.onStop()
     }
