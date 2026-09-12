@@ -183,6 +183,8 @@ class ConfigurationFragment @JvmOverloads constructor(
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // Import guidance belongs to the home page, not the node-selection dialog.
+        view.findViewById<View>(R.id.home_import_hint).isVisible = !select
         if (!select) {
             toolbar.inflateMenu(R.menu.add_profile_menu)
             toolbar.setOnMenuItemClickListener(this)

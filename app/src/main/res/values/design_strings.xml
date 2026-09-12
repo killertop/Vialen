@@ -5,11 +5,12 @@
     <string name="ui_choose_protocol">Choose protocol</string>
     <string name="ui_search_protocol">Search protocols</string>
     <string name="ui_empty_title">Add your first node</string>
-    <string name="ui_empty_body">Import a subscription link or node configuration to get connected.</string>
+    <string name="ui_empty_body">Import a provider subscription or an individual node link, then select a node to connect.</string>
     <string name="ui_empty_group_title">No nodes in this group</string>
     <string name="ui_empty_group_body">Add a node or update this subscription to populate the group.</string>
     <string name="ui_empty_select">No nodes available to select</string>
-    <string name="ui_import_hint">Subscription links, QR codes and configuration files are supported.</string>
+    <string name="ui_home_import_hint">Import provider subscriptions or individual node links</string>
+    <string name="ui_import_hint">Use Add subscription for provider subscriptions or Import from Clipboard for individual node links. QR codes and configuration files are also supported.</string>
     <string name="ui_save">Save</string>
     <string name="ui_discard">Discard changes</string>
     <string name="ui_keep_editing">Keep editing</string>
