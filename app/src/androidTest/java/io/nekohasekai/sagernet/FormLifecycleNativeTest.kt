@@ -39,6 +39,7 @@ import java.util.concurrent.TimeUnit
 /** Run only on an attached physical device; uses the production Activities and Room DAO. */
 @RunWith(AndroidJUnit4::class)
 class FormLifecycleNativeTest {
+    @get:Rule(order = Int.MIN_VALUE) val foreground = BenchmarkForegroundRule(requireRetainedHost = false)
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val context get() = instrumentation.targetContext
     private lateinit var cache: List<KeyValuePair>

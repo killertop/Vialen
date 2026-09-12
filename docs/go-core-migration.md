@@ -1,6 +1,6 @@
 # Vialen 新客户端：Kotlin + Go
 
-状态：新架构已实现，本地构建与合同测试通过；真机断开，本轮设备验收未完成。采用全新数据库，不提供旧客户端数据迁移。
+状态：新架构已实现，本地构建、合同测试与 53 项真机回归通过。采用全新数据库，不提供旧客户端数据迁移。
 
 ## 架构决定
 
@@ -43,6 +43,8 @@ Java Bean 只作现有表单的临时投影。保存时将编辑差异合并回�
 
 订阅部分解析错误或空结果不能替换已保存的组。有意义的省略警告对手动操作可见。来源标识 `sourceKey` 与本地 Profile ID/Room ID 分离；刷新中的重复来源先按完整语义匹配，再按明确顺序匹配。数据库事务结束后通知 UI。
 
+路由条件在同一类别内取 OR，不同类别之间取 AND。选中的规则集引用之间取 OR，并与目的 IP 等其他条件共同满足；规则集内部逻辑保持不变。本地 SRS 只携带本地路径，远程集合才携带下载出站与首次启动文件。真机同时覆盖了匹配转发、不匹配拦截和首次启动本地缓存，避免仅凭编译成功判断语义正确。
+
 导入文本最多 16 MiB、节点最多 10,000；ZIP 同时限制总解压预算与条目数。JSON 传输另有 20 MiB 编码后上限。取消订阅任务会取消原生请求并等待其退出，取消后不会进入数据库提交。
 
 ## 新客户端的功能取舍
@@ -68,4 +70,17 @@ Java Bean 只作现有表单的临时投影。保存时将编辑差异合并回�
 
 `NewClientCoreNativeTest` 记录 1000 节点导入、保存/重读、编译阶段耗时及 PSS/ART 分配量；它不把主机微基准当作手机端速度，也不在未做可比实验时声称比 Rust 更快。
 
-本地版本为 1.7.4，源码 VERSION_CODE=62（ARM64 APK versionCode=310）。210 项 JVM 测试零失败、零跳过；Go business race、完整 libcore 测试、Debug/AndroidTest/Release 构建及 Release lint 通过。APK 无 Rust 库，AAR/APK 的 ARM64 与 ELF 16 KiB 对齐检查通过。真机安装、UI、VPN、手机端性能尚未验证；Release APK 为未签名候选，不作为已验收发行版。所有删除的旧实现和专用兼容测试均移入系统垃圾篓，可恢复；原工作树与旧数据库保留。
+本地版本为 1.7.4，源码 VERSION_CODE=62（ARM64 APK versionCode=310）。211 项 JVM 测试零失败、零跳过；Go business race、完整 libcore 测试、Debug/AndroidTest/Release 构建及 Release lint 通过。APK 无 Rust 库，AAR/APK 的 ARM64 与 ELF 16 KiB 对齐检查通过。原生来源校验使用固定 NDK 重现 AGP 的 strip，再精确比较 AAR 与 APK 中的库，保留工具版本、输入与输出哈希。
+
+2026-09-12 在已连接的 25113PN0EC（Android 17 / API 37）上完成 53 项测试，整批 50.139 秒、零失败、零忽略：
+
+- 真实 gomobile 导入、批量校验、Room 往返、编译与核心构造，订阅更新及不完整结果保护。
+- 原生 HTTP 取消后连接退出、16 MiB 响应上限、涵盖响应体等待的 30 秒总超时。
+- selector 实际切换、Binder 名称更新、流量独立统计与编辑保留。
+- 实际 TUN HTTP 流量、本地二进制 SRS、远程 SRS 首次启动缓存、停止重连和节点切换；不匹配测试在同一 VPN 会话前后各验证成功流量，再核对负向连接 EOF/reset 与代理接入计数。
+- WorkManager 在同一后台 PID 完成两个请求 UUID，具有 Worker SUCCESS、原生请求退出、VPN 移除、偏好和恢复文件清理证据。
+- 25 项真实 Activity 表单、主页状态、列表回收、排序、失败恢复与重建测试。
+
+验收后数据库完整性正常，组、节点、规则和偏好内容与测试前逐行一致；无运行中的 instrumentation、Debug 服务或 TUN。手机保持原始 1220×2656、520 dpi、字号 1.0；首页空态已实际查看。一次 Debug 采样中，1000 节点导入 72.25 ms、保存重读 303.34 ms、编译 224.71 ms、核心构造关闭 138.92 ms，总计 739.22 ms；PSS 从 153019 KiB 到 210977 KiB。这是单设备验收采样，不是 Release 基准或 Rust 对照，不据此承诺吞吐、耗电或内存改善。真实蜂窝/Wi-Fi 切换、长时间耗电与所有协议的远端服务器互通未在本轮覆盖。
+
+证据目录：`/redacted/Downloads/CodeX/reviews/vialen-go-migration-baseline-20260912-155758/phone-20260912`，其中 `native-all-final.log` 保存 53 项测试回执，`final-device-summary.json` 保存数据与系统状态回读，`work-final-evidence.log` 保存请求 UUID/PID 和清理证据。Release APK 为未签名构建候选，未作为正式发行版发布。所有删除的旧实现和专用兼容测试均移入系统垃圾篓，可恢复；原工作树与旧数据库保留。

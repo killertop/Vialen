@@ -14,6 +14,8 @@ import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.database.preference.KeyValuePair
 import io.nekohasekai.sagernet.database.preference.PublicDatabase
 import io.nekohasekai.sagernet.fmt.ConfigBuildResult
+import io.nekohasekai.sagernet.fmt.TAG_PROXY
+import io.nekohasekai.sagernet.fmt.TAG_BYPASS
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
 import kotlinx.coroutines.*
@@ -94,10 +96,10 @@ class SelectorCallbackNativeTest {
                     val tagA = "g-${a.id}"
                     val tagB = "g-${b.id}"
                     val config = """{"outbounds":[
-                        {"type":"selector","tag":"proxy","outbounds":["$tagA","$tagB"],"default":"$tagA"},
+                        {"type":"selector","tag":"$TAG_PROXY","outbounds":["$tagA","$tagB"],"default":"$tagA"},
                         {"type":"socks","tag":"$tagA","server":"127.0.0.1","server_port":${fixtureA.port}},
                         {"type":"socks","tag":"$tagB","server":"127.0.0.1","server_port":${fixtureB.port}},
-                        {"type":"direct","tag":"bypass"}],"route":{"final":"proxy"}}"""
+                        {"type":"direct","tag":"$TAG_BYPASS"}],"route":{"final":"$TAG_PROXY"}}"""
                     val proxy = ProxyInstance(a, service)
                     instance = proxy
                     proxy.config = ConfigBuildResult(config, emptyList(), a.id,

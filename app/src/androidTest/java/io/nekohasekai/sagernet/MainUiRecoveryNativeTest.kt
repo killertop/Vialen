@@ -36,6 +36,8 @@ import java.util.concurrent.TimeUnit
 /** Synthetic service results exercise production UI; never a VPN/connectivity acceptance test. */
 @RunWith(AndroidJUnit4::class)
 class MainUiRecoveryNativeTest {
+    @get:Rule(order = Int.MIN_VALUE) val foreground = BenchmarkForegroundRule(requireRetainedHost = false)
+
     companion object {
         @Volatile private var cleanupFailed = false
     }
@@ -243,7 +245,7 @@ class MainUiRecoveryNativeTest {
             activity.binding.stats.testConnection()
             val field = activity.binding.stats.javaClass.getDeclaredField("testJob").apply { isAccessible = true }
             job = field.get(activity.binding.stats) as Job
-            assertEquals(activity.getString(R.string.connection_test_testing),
+            assertEquals(activity.getString(R.string.ui_connectivity_testing),
                 activity.binding.stats.findViewById<TextView>(R.id.status).text.toString())
         }
         assertTrue("Controlled call entered", call.entered.await(10, TimeUnit.SECONDS))
@@ -277,8 +279,15 @@ class MainUiRecoveryNativeTest {
             }
             finishTest(call, job)
             scenario.onActivity {
-                assertEquals(it.getString(if (selector) R.string.vpn_connected else R.string.not_connected),
+                // Service state and connectivity-test state occupy separate lines.
+                val connectivity = if (selector) it.getString(R.string.ui_connectivity_check_hint) else ""
+                assertEquals(connectivity,
                     it.binding.stats.findViewById<TextView>(R.id.status).text.toString())
+                val serviceStatus = if (!selector) R.string.not_connected else
+                    if (DataStore.serviceMode == Key.MODE_VPN) R.string.ui_vpn_service_connected
+                    else R.string.ui_proxy_service_connected
+                assertEquals(it.getString(serviceStatus),
+                    it.binding.stats.findViewById<TextView>(R.id.service_status).text.toString())
                 assertTrue(it.binding.stats.isEnabled)
             }
         }

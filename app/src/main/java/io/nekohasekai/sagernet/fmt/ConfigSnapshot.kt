@@ -178,7 +178,8 @@ internal class ConfigSnapshot private constructor(
                         val set = sets.getOrPut(key) {
                             obj("id" to "set-${sets.size}", "type" to if (location.startsWith("https://")) "remote" else "local",
                                 "format" to ref.format, "url" to location.takeIf { it.startsWith("https://") },
-                                "path" to location.takeUnless { it.startsWith("https://") }, "initial_path" to snap["initial_path"], "download_detour" to "direct")
+                                "path" to location.takeUnless { it.startsWith("https://") }, "initial_path" to snap["initial_path"]?.takeIf { location.startsWith("https://") },
+                                "download_detour" to "direct".takeIf { location.startsWith("https://") })
                         }
                         set["id"].asString
                     }.distinct()

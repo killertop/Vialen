@@ -258,7 +258,7 @@ class WorkConnectedOnlyNativeTest {
             assertTrue(db.groupDao().getById(group.id)!!.subscription!!.lastUpdated > 0)
             assertEquals(BaseService.State.Connected.ordinal, connection.service!!.state)
             assertEquals(pid, shell("pidof ${app.packageName}:bg").trim())
-            println("WORK_CONNECTED_ONLY stopped_skipped=true connected_nonce=true vpn_nonce=true same_bg_pid=$pid")
+            println("WORK_CONNECTED_ONLY stopped_skipped=true connected_nonce=true vpn_nonce=true same_bg_pid=$pid worker_ids=${requests.joinToString(",")}")
         }, {
             var serviceRemoved = false
             profileState.cleanupSteps({ checkpoint() }, {
@@ -327,6 +327,7 @@ class WorkConnectedOnlyNativeTest {
                     }
                 })
                 check(recovery.delete()) { "Could not remove completed recovery journal" }
+                println("WORK_CONNECTED_ONLY_CLEANUP workers_returned=true http_thread_exited=true vpn_removed=true preferences_restored=true recovery_removed=true")
             })
         })
     }

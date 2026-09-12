@@ -132,6 +132,24 @@ class RuleSetModernizationTest {
         }
     }
 
+    @Test fun realSnapshotCompilesLocalBinaryRuleSetWithoutRemoteOptions() {
+        val path = File(System.getProperty("java.io.tmpdir"), "vialen-local-regression.srs").absolutePath
+        val local = io.nekohasekai.sagernet.database.RouteRuleSet("local", path, format = "binary")
+        // Executes production ConfigSnapshot.capture -> CoreClient -> Go compiler.
+        // Compilation validates paths and references without reading the SRS file.
+        val config = buildConfigWithRules(listOf(sets(nativeRule(), local)))
+        val declared = config.getAsJsonObject("route").getAsJsonArray("rule_set").single().asJsonObject
+        assertEquals("local", declared["type"].asString)
+        assertEquals(path, declared["path"].asString)
+        assertFalse(declared.has("url"))
+        assertFalse(declared.has("http_client"))
+        assertFalse(declared.has("download_detour"))
+        assertFalse(declared.has("initial_path"))
+        val tag = declared["tag"].asString
+        assertTrue(routes(config).any { it["rule_set"]?.toString()?.contains(tag) == true })
+        assertTrue(dnsRules(config).isEmpty())
+    }
+
     @Test fun connectionOnlyRulesSurviveAndNeverBecomeDnsBlocks() {
         for (r in listOf(nativeRule().apply { sourcePort = "1234" }, nativeRule().apply { network = "tcp" }, nativeRule().apply { protocol = "tls" })) {
             val json = buildConfigWithRules(listOf(r))

@@ -22,7 +22,7 @@ import (
 )
 
 // These configurations are independently regenerated and asserted by
-// RuleSetModernizationTest through the actual database snapshot and Rust JNI.
+// RuleSetModernizationTest through the actual database snapshot and Go core API.
 func TestGeneratedNativeRouteSemantics(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "app", "src", "test", "resources", "native-route-semantics.json"))
 	if err != nil {

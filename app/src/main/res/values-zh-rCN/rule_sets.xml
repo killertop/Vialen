@@ -1,10 +1,10 @@
 <resources>
     <string name="route_destination_sets">目标规则集（任一匹配）</string>
     <string name="route_source_sets">源 IP 规则集（任一匹配）</string>
-    <string name="route_general_sets">附加规则集约束</string>
+    <string name="route_general_sets">其他规则集（任一匹配）</string>
     <string name="route_private_destination">目标为私有 IP</string>
     <string name="route_private_source">来源为私有 IP</string>
-    <string name="route_native_semantics">域名、目标 IP 和目标规则集满足任一即可；来源地址另成一组，满足任一即可。两组与端口、网络、协议、应用、附加规则集约束须同时满足。规则集内部逻辑不变。源地址请选择仅含 IP 的集合。复杂连接规则不会直接复制为 DNS 规则。</string>
+    <string name="route_native_semantics">同类条件满足任一即可，不同类别须同时满足。所有已选规则集引用满足任一即可，并须与目标 IP 等其他条件同时满足。规则集内部逻辑不变。源地址请选择仅含 IP 的集合。复杂连接规则不会直接复制为 DNS 规则。</string>
     <string name="route_set_add">添加规则集</string>
     <string name="route_set_custom">HTTPS 规则集地址</string>
     <string name="route_set_local">已导入的本地规则集</string>

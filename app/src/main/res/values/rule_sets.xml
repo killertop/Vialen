@@ -1,10 +1,10 @@
 <resources>
     <string name="route_destination_sets">Destination rule sets (OR)</string>
     <string name="route_source_sets">Source IP rule sets (OR)</string>
-    <string name="route_general_sets">Additional rule-set constraint</string>
+    <string name="route_general_sets">Other rule sets (OR)</string>
     <string name="route_private_destination">Private destination IP</string>
     <string name="route_private_source">Private source IP</string>
-    <string name="route_native_semantics">Domain, destination IP and destination sets match ANY. Source addresses form a separate ANY group. These groups, ports, network, protocol, apps and the additional rule-set constraint must ALL match. Rule sets retain their internal logic. Use IP-only sets for source matching. Complex connection rules are not copied to DNS.</string>
+    <string name="route_native_semantics">Conditions within the same category match ANY; different categories must ALL match. All selected rule-set references match ANY, and must also match together with the other conditions, including destination IP. Rule sets retain their internal logic. Use IP-only sets for source matching. Complex connection rules are not copied to DNS.</string>
     <string name="route_set_add">Add rule set</string>
     <string name="route_set_custom">HTTPS rule-set URL</string>
     <string name="route_set_local">Imported local rule set</string>

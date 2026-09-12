@@ -10,8 +10,8 @@ import org.junit.rules.TestRule
 import org.junit.runner.Description
 import org.junit.runners.model.Statement
 
-/** An inert debug Activity owns foreground; launch and cleanup are outside measured work. */
-class BenchmarkForegroundRule : TestRule {
+/** An inert debug Activity starts in foreground; UI scenarios may replace its task. */
+class BenchmarkForegroundRule(private val requireRetainedHost: Boolean = true) : TestRule {
     override fun apply(base: Statement, description: Description): Statement = object : Statement() {
         override fun evaluate() {
             val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -39,8 +39,10 @@ class BenchmarkForegroundRule : TestRule {
                 resumed()
                 Log.i("BenchmarkForeground", "case=${description.methodName} stage=before state=RESUMED")
                 base.evaluate()
-                resumed()
-                Log.i("BenchmarkForeground", "case=${description.methodName} stage=after state=RESUMED")
+                if (requireRetainedHost) {
+                    resumed()
+                    Log.i("BenchmarkForeground", "case=${description.methodName} stage=after state=RESUMED")
+                }
             } finally {
                 instrumentation.runOnMainSync {
                     val monitor = ActivityLifecycleMonitorRegistry.getInstance()

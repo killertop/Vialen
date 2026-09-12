@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit
 /** Opt-in physical-device UI tests. Restores all rules and settings even after reset coverage. */
 @RunWith(AndroidJUnit4::class)
 class ListRecoveryNativeTest {
+    @get:Rule(order = Int.MIN_VALUE) val foreground = BenchmarkForegroundRule(requireRetainedHost = false)
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private lateinit var originalRules: List<RuleEntity>
     private lateinit var config: List<KeyValuePair>

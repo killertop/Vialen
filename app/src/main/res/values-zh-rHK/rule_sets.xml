@@ -1,0 +1,4 @@
+<resources>
+    <string name="route_general_sets">其他規則集（任一匹配）</string>
+    <string name="route_native_semantics">同類條件滿足任一即可，不同類別須同時滿足。所有已選規則集引用滿足任一即可，並須與目標 IP 等其他條件同時滿足。規則集內部邏輯不變。來源位址請選擇僅含 IP 的集合。複雜連線規則不會直接複製為 DNS 規則。</string>
+</resources>

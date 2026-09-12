@@ -10,13 +10,14 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
 /** SOCKS endpoint for a synthetic destination. It never opens an upstream socket. */
-internal class LoopbackSocksFixture(private val nonce: String) : AutoCloseable {
+internal class LoopbackSocksFixture(private val nonce: String, private val allowedHosts: Set<String> = setOf("198.18.0.254")) : AutoCloseable {
     private val listener = ServerSocket(0, 16, InetAddress.getByName("127.0.0.1"))
     private val active = CopyOnWriteArraySet<Socket>()
     private val clients = Executors.newCachedThreadPool { task -> Thread(task, "rust-socks-client").apply { isDaemon = true } }
     val port get() = listener.localPort
     val requests = AtomicInteger()
     private val connectionIds = AtomicInteger()
+    val acceptedConnections get() = connectionIds.get()
     private val completed = AtomicInteger()
     private val failed = AtomicInteger()
     private val events = java.util.ArrayDeque<String>()
@@ -76,9 +77,9 @@ internal class LoopbackSocksFixture(private val nonce: String) : AutoCloseable {
             3 -> ByteArray(input.readUnsignedByte()).also(input::readFully).toString(Charsets.UTF_8)
             else -> error("Unexpected address family")
         }
-        trace.target = if (host == "198.18.0.254") "expected_host" else "unexpected"
+        trace.target = if (host in allowedHosts) "expected_host" else "unexpected"
         record(trace, "target_check")
-        check(host == "198.18.0.254" && input.readUnsignedShort() == 80)
+        check(host in allowedHosts && input.readUnsignedShort() == 80)
         trace.target = "expected"
         record(trace, "target_matched")
         output.write(byteArrayOf(5,0,0,1,127,0,0,1,0,0)); output.flush()
