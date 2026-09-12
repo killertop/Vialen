@@ -14,7 +14,7 @@
         android:paddingStart="24dp"
         android:paddingTop="24dp"
         android:paddingEnd="12dp"
-        android:paddingBottom="24dp">
+        android:paddingBottom="16dp">
 
         <androidx.appcompat.widget.AppCompatImageView
             android:layout_width="32dp"
@@ -59,7 +59,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/nav_configuration"
                 style="@style/Widget.Vialen.DrawerItem"
@@ -81,7 +82,7 @@
     <TextView
         android:id="@+id/navigation_app_section"
         style="@style/Widget.Vialen.DrawerSection"
-        android:layout_marginTop="24dp"
+        android:layout_marginTop="16dp"
         android:text="@string/navigation_app_section" />
 
     <com.google.android.material.card.MaterialCardView
@@ -96,7 +97,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/nav_settings"
                 style="@style/Widget.Vialen.DrawerItem"
