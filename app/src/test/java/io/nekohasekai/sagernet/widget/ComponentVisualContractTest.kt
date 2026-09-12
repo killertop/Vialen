@@ -44,12 +44,12 @@ class ComponentVisualContractTest {
         assertEquals(view.dp(52), view.switchMinWidth)
         assertEquals(view.dp(52), view.trackDrawable.intrinsicWidth)
         assertEquals(view.dp(32), view.trackDrawable.intrinsicHeight)
-        assertEquals(view.dp(24), view.thumbDrawable.intrinsicWidth)
+        assertEquals(view.dp(22), view.thumbDrawable.intrinsicWidth)
         assertEquals(view.dp(32), view.thumbDrawable.intrinsicHeight)
         val padding = Rect()
         view.trackDrawable.getPadding(padding)
-        assertEquals(view.dp(2), padding.left)
-        assertEquals(view.dp(2), padding.right)
+        assertEquals(view.dp(4), padding.left)
+        assertEquals(view.dp(4), padding.right)
 
         // Draw only to update drawable bounds; no screenshot or pixel-color assertions.
         val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
@@ -63,16 +63,16 @@ class ComponentVisualContractTest {
                 val knob = (view.thumbDrawable as LayerDrawable).getDrawable(1).bounds
                 assertEquals(view.dp(52), track.width())
                 assertEquals(view.dp(32), track.height())
-                assertEquals(view.dp(24), knob.width())
-                assertEquals(view.dp(24), knob.height())
-                assertTrue("Knob must stay inset from the left edge", knob.left >= track.left + view.dp(2))
-                assertTrue("Knob must stay inset from the right edge", knob.right <= track.right - view.dp(2))
-                assertEquals(view.dp(4), knob.top - track.top)
-                assertEquals(view.dp(4), track.bottom - knob.bottom)
+                assertEquals(view.dp(22), knob.width())
+                assertEquals(view.dp(22), knob.height())
+                assertTrue("Knob must stay inset from the left edge", knob.left >= track.left + view.dp(4))
+                assertTrue("Knob must stay inset from the right edge", knob.right <= track.right - view.dp(4))
+                assertEquals(view.dp(5), knob.top - track.top)
+                assertEquals(view.dp(5), track.bottom - knob.bottom)
                 if (checked) {
-                    assertEquals(view.dp(2), track.right - knob.right)
+                    assertEquals(view.dp(4), track.right - knob.right)
                 } else {
-                    assertEquals(view.dp(2), knob.left - track.left)
+                    assertEquals(view.dp(4), knob.left - track.left)
                 }
             }
         } finally {

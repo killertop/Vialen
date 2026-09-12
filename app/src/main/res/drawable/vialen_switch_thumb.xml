@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A 24dp white knob, vertically inset in the 32dp track. Native switch
-     measurement keeps the 52dp track; the widget retains a 48dp touch height. -->
+<!-- A 22dp white knob with 5dp vertical clearance. Together with the track
+     padding, native measurement keeps 52dp width and 4dp endpoint clearance. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:width="24dp" android:height="32dp">
+    <item android:width="22dp" android:height="32dp">
         <shape android:shape="rectangle">
-            <size android:width="24dp" android:height="32dp" />
+            <size android:width="22dp" android:height="32dp" />
             <solid android:color="@android:color/transparent" />
         </shape>
     </item>
-    <item android:width="24dp" android:height="24dp" android:gravity="center">
+    <item android:width="22dp" android:height="22dp" android:gravity="center">
         <shape android:shape="oval">
             <solid android:color="@android:color/white" />
         </shape>
