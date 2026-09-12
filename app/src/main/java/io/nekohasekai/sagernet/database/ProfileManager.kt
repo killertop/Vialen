@@ -165,6 +165,12 @@ object ProfileManager {
         iterator { onUpdated(profile, false) }
     }
 
+    /** Persist a completed batch without stale profile fields or per-profile UI notifications. */
+    suspend fun updateConnectionTestResults(results: List<ConnectionTestResult>) {
+        if (results.isEmpty()) return
+        SagerDatabase.proxyDao.updateConnectionTestResults(results)
+    }
+
     suspend fun updateProfile(profiles: List<ProxyEntity>) {
         SagerDatabase.proxyDao.updateProxy(profiles)
         profiles.forEach {

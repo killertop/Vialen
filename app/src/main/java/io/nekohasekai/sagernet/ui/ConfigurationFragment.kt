@@ -49,6 +49,8 @@ import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.aidl.TrafficData
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.proto.UrlTest
+import io.nekohasekai.sagernet.bg.proto.runUrlTestBatch
+import io.nekohasekai.sagernet.database.ConnectionTestResult
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.GroupManager
 import io.nekohasekai.sagernet.database.ProfileManager
@@ -97,12 +99,21 @@ import io.nekohasekai.sagernet.ui.profile.VMessSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.WireGuardSettingsActivity
 import io.nekohasekai.sagernet.widget.QRCodeDialog
 import io.nekohasekai.sagernet.widget.UndoSnackbarManager
+import io.nekohasekai.sagernet.widget.UrlTestDialog
+import io.nekohasekai.sagernet.widget.UrlTestDialogState
+import io.nekohasekai.sagernet.widget.UrlTestPhase
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import moe.matsuri.nb4a.Protocols
@@ -114,9 +125,12 @@ import moe.matsuri.nb4a.ui.ConnectionTestNotification
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.UnknownHostException
+import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import java.util.zip.ZipInputStream
 
 class ConfigurationFragment @JvmOverloads constructor(
@@ -138,6 +152,8 @@ class ConfigurationFragment @JvmOverloads constructor(
     private var pendingExportProfileId: Long? = null
     private var pendingImportGroupId: Long? = null
     private var pendingImportOriginGroupId: Long? = null
+    private var urlTestDialog: UrlTestDialog? = null
+    private var backgroundUrlTest: (() -> Unit)? = null
 
     val alwaysShowAddress by lazy { DataStore.alwaysShowAddress }
 
@@ -187,6 +203,8 @@ class ConfigurationFragment @JvmOverloads constructor(
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // Import guidance belongs to the home page, not the node-selection dialog.
+        view.findViewById<View>(R.id.home_import_hint).isVisible = !select
         if (!select) {
             toolbar.inflateMenu(R.menu.add_profile_menu)
             toolbar.setOnMenuItemClickListener(this)
@@ -273,6 +291,10 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     override fun onDestroyView() {
+        backgroundUrlTest?.invoke()
+        backgroundUrlTest = null
+        urlTestDialog?.dismiss()
+        urlTestDialog = null
         DataStore.profileCacheStore.unregisterChangeListener(this)
 
         if (::adapter.isInitialized) {
@@ -981,69 +1003,154 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
     }
 
+    private data class CompletedUrlTest(
+        val result: ConnectionTestResult,
+        val name: String,
+        val protocol: String,
+        val description: String,
+    )
+
     @OptIn(DelicateCoroutinesApi::class)
     fun urlTest() {
-        if (DataStore.runningTest) return else DataStore.runningTest = true
-        val test = TestDialog()
-        val dialog = test.builder.show()
-        val testJobs = mutableListOf<Job>()
+        if (DataStore.runningTest) return
         val group = DataStore.currentGroup()
-
-        val mainJob = runOnDefaultDispatcher {
-            val profilesList = SagerDatabase.proxyDao.getByGroup(group.id)
-            test.proxyN = profilesList.size
-            val profiles = ConcurrentLinkedQueue(profilesList)
-            repeat(DataStore.connectionTestConcurrent) {
-                testJobs.add(launch(Dispatchers.IO) {
-                    val urlTest = UrlTest() // note: this is NOT in bg process
-                    while (isActive) {
-                        val profile = profiles.poll() ?: break
-                        profile.status = 0
-
-                        try {
-                            val result = urlTest.doTest(profile)
-                            profile.status = 1
-                            profile.ping = result
-                        } catch (e: Exception) {
-                            profile.status = 3
-                            profile.error = e.readableMessage
-                        }
-
-                        test.update(profile)
-                    }
-                })
-            }
-
-            testJobs.joinAll()
-
-            runOnMainDispatcher {
-                test.cancel()
-            }
-        }
-        test.cancel = {
-            test.dialogStatus.set(2)
-            dialog.dismiss()
-            runOnDefaultDispatcher {
+        val application = requireContext().applicationContext
+        val state = AtomicReference(UrlTestDialogState())
+        val background = AtomicBoolean(false)
+        val stopRequested = AtomicBoolean(false)
+        val startedAt = SystemClock.elapsedRealtime()
+        val concurrency = DataStore.connectionTestConcurrent
+        val urlTest = UrlTest() // One immutable URL/timeout snapshot for this entire run.
+        lateinit var mainJob: Job
+        val dialog = UrlTestDialog(requireContext(), group.displayName(), onStop = {
+            // The paced view may still show Stop just after the batch has finished.
+            // Never turn an already terminal session back into an unfinishable stopping state.
+            val phase = state.get().phase
+            if (phase == UrlTestPhase.PREPARING || phase == UrlTestPhase.RUNNING) {
+                stopRequested.set(true)
+                state.updateAndGet { it.copy(phase = UrlTestPhase.STOPPING) }
                 mainJob.cancel()
-                testJobs.forEach { it.cancel() }
-                test.results.forEach {
-                    try {
-                        ProfileManager.updateProfile(it)
-                    } catch (e: Exception) {
-                        Logs.w(e)
-                    }
+            }
+        }, onBackground = {
+            backgroundUrlTest?.invoke()
+            urlTestDialog?.dismiss()
+            urlTestDialog = null
+        })
+        urlTestDialog = dialog
+        backgroundUrlTest = { background.set(true) }
+        val dialogRef = WeakReference(dialog)
+        val notification = ConnectionTestNotification(
+            application, "[${group.displayName()}] ${getString(R.string.url_test_dialog_title)}"
+        )
+        dialog.show()
+        DataStore.runningTest = true
+
+        // One paced renderer replaces a main-thread job and notification per node.
+        // The background run retains no Activity; destroying the view hands progress to the notification.
+        runOnMainDispatcher {
+            var rendered: UrlTestDialogState? = null
+            var notified = -1
+            while (true) {
+                val current = state.get()
+                val terminal = current.phase == UrlTestPhase.FINISHED ||
+                    current.phase == UrlTestPhase.STOPPED || current.phase == UrlTestPhase.ERROR
+                val visible = if (terminal) current else current.copy(
+                    elapsedMillis = ((SystemClock.elapsedRealtime() - startedAt) / 1000) * 1000
+                )
+                if (!terminal && background.get() && notified != current.completed) {
+                    notification.updateNotification(current.completed, current.total, false)
+                    notified = current.completed
                 }
-                GroupManager.postReload(DataStore.currentGroupId())
-                DataStore.runningTest = false
+                if (!background.get() && visible != rendered) {
+                    dialogRef.get()?.render(visible)
+                    rendered = visible
+                }
+                if (terminal) {
+                    if (current.phase == UrlTestPhase.FINISHED) {
+                        // Briefly expose the final counts, then return to the updated node list.
+                        delay(1200)
+                        dialogRef.get()?.dismiss()
+                    }
+                    break
+                }
+                delay(150)
             }
         }
-        test.minimize = {
-            test.dialogStatus.set(1)
-            test.notification = ConnectionTestNotification(
-                dialog.context,
-                "[${group.displayName()}] ${getString(R.string.connection_test)}"
-            )
-            dialog.hide()
+
+        mainJob = runOnMainDispatcher {
+            var failure: Throwable? = null
+            try {
+                withContext(Dispatchers.Default) {
+                    runUrlTestBatch(
+                        load = { SagerDatabase.proxyDao.getByGroup(group.id) },
+                        concurrency = concurrency,
+                        test = { profile ->
+                            val result = try {
+                                ConnectionTestResult(profile.id, 1, urlTest.doTest(profile), null)
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (error: Exception) {
+                                // Native request aborts and cleanup failures must not become failed nodes.
+                                if (!currentCoroutineContext().isActive) Logs.w(error)
+                                currentCoroutineContext().ensureActive()
+                                ConnectionTestResult(profile.id, 3, 0, error.readableMessage)
+                            }
+                            val description = if (result.status == 1) {
+                                application.getString(R.string.available, result.ping)
+                            } else {
+                                val error = result.error.orEmpty()
+                                Protocols.genFriendlyMsg(error).takeIf { it != error }
+                                    ?: application.getString(R.string.unavailable)
+                            }
+                            CompletedUrlTest(result, profile.displayName(), profile.displayType(), description)
+                        },
+                        save = { results ->
+                            ProfileManager.updateConnectionTestResults(results.map { it.result })
+                            if (results.isNotEmpty()) GroupManager.postReload(group.id)
+                        },
+                        onStarted = { total ->
+                            state.updateAndGet { it.copy(total = total, phase =
+                                if (stopRequested.get()) UrlTestPhase.STOPPING else UrlTestPhase.RUNNING) }
+                        },
+                        onResult = { completed ->
+                            val available = completed.result.status == 1
+                            state.updateAndGet { it.copy(
+                                completed = it.completed + 1,
+                                available = it.available + if (available) 1 else 0,
+                                failed = it.failed + if (available) 0 else 1,
+                                lastName = completed.name,
+                                lastProtocol = completed.protocol,
+                                lastResult = completed.description,
+                                lastSuccess = available,
+                            ) }
+                        },
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                // A failed save during cancellation is attached by runUrlTestBatch.
+                failure = cancelled.suppressed.firstOrNull()
+                failure?.let { Logs.w(it) }
+            } catch (error: Exception) {
+                failure = error
+                Logs.w(error)
+            } finally {
+                withContext(NonCancellable + Dispatchers.Main.immediate) {
+                    // The batch has now joined every native worker and persisted its stable snapshot.
+                    // Clear the shared notification before another run can acquire the running flag.
+                    val completed = state.get()
+                    notification.updateNotification(completed.completed, completed.total, true)
+                    DataStore.runningTest = false
+                    state.updateAndGet { it.copy(
+                        phase = when {
+                            failure != null -> UrlTestPhase.ERROR
+                            stopRequested.get() -> UrlTestPhase.STOPPED
+                            else -> UrlTestPhase.FINISHED
+                        },
+                        elapsedMillis = SystemClock.elapsedRealtime() - startedAt,
+                        error = failure?.readableMessage,
+                    ) }
+                }
+            }
         }
     }
 

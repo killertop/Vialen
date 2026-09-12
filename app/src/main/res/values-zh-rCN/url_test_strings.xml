@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="url_test_dialog_title">URL 测试</string>
+    <string name="url_test_preparing">正在准备测试…</string>
+    <string name="url_test_running">正在测试节点…</string>
+    <string name="url_test_stopping">正在停止测试…</string>
+    <string name="url_test_finished">测试完成</string>
+    <string name="url_test_stopped">测试已停止</string>
+    <string name="url_test_error">测试异常中断</string>
+    <string name="url_test_counts">已完成 %1$d / %2$d</string>
+    <string name="url_test_statistics">可用 %1$d · 失败 %2$d</string>
+    <string name="url_test_latest">最近完成</string>
+    <string name="url_test_waiting">等待首个测试结果</string>
+    <string name="url_test_waiting_detail">节点测试完成后将在此显示结果</string>
+    <string name="url_test_stop">停止测试</string>
+    <string name="url_test_background">后台继续</string>
+    <string name="url_test_done">完成</string>
+    <string name="url_test_elapsed">已用时 %1$d 秒</string>
+    <string name="url_test_no_result">暂无已完成结果</string>
+    <string name="url_test_available">可用</string>
+    <string name="url_test_failed">失败</string>
+</resources>

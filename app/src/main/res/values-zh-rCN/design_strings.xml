@@ -5,11 +5,12 @@
     <string name="ui_choose_protocol">选择协议</string>
     <string name="ui_search_protocol">搜索协议</string>
     <string name="ui_empty_title">添加第一个节点</string>
-    <string name="ui_empty_body">导入订阅链接或节点配置，即可开始连接。</string>
+    <string name="ui_empty_body">支持机场订阅和单节点链接导入，添加后选择节点即可连接。</string>
     <string name="ui_empty_group_title">此分组还没有节点</string>
     <string name="ui_empty_group_body">添加节点，或更新此订阅以获取节点。</string>
     <string name="ui_empty_select">暂无可选择的节点</string>
-    <string name="ui_import_hint">支持订阅链接、二维码和配置文件。</string>
+    <string name="ui_home_import_hint">支持机场订阅和单节点链接导入</string>
+    <string name="ui_import_hint">机场订阅可点“添加订阅”；单节点链接可从剪切板导入，也支持二维码和配置文件。</string>
     <string name="ui_save">保存</string>
     <string name="ui_discard">放弃修改</string>
     <string name="ui_keep_editing">继续编辑</string>

@@ -1,6 +1,6 @@
 # Vialen 新客户端：Kotlin + Go
 
-状态：新架构已实现，本地构建、合同测试与 53 项真机回归通过。采用全新数据库，不提供旧客户端数据迁移。
+状态：新架构已实现，迁移初验完成 53 项真机回归。1.7.6 已修复后续审查发现的四项问题并整合主页和 URL 测试改动，222 项 JVM 回归及构建检查通过；手机 ADB 离线，新增真机用例待补。采用全新数据库，不提供旧客户端数据迁移。最新验证边界见 [1.7.6 审查修复记录](../qa/go-core-review-fixes-1.7.6.md)。
 
 ## 架构决定
 
@@ -70,7 +70,7 @@ Java Bean 只作现有表单的临时投影。保存时将编辑差异合并回�
 
 `NewClientCoreNativeTest` 记录 1000 节点导入、保存/重读、编译阶段耗时及 PSS/ART 分配量；它不把主机微基准当作手机端速度，也不在未做可比实验时声称比 Rust 更快。
 
-本地版本为 1.7.4，源码 VERSION_CODE=62（ARM64 APK versionCode=310）。211 项 JVM 测试零失败、零跳过；Go business race、完整 libcore 测试、Debug/AndroidTest/Release 构建及 Release lint 通过。APK 无 Rust 库，AAR/APK 的 ARM64 与 ELF 16 KiB 对齐检查通过。原生来源校验使用固定 NDK 重现 AGP 的 strip，再精确比较 AAR 与 APK 中的库，保留工具版本、输入与输出哈希。
+迁移初验版本为 1.7.4，源码 VERSION_CODE=62（ARM64 APK versionCode=310）。211 项 JVM 测试零失败、零跳过；Go business race、完整 libcore 测试、Debug/AndroidTest/Release 构建及 Release lint 通过。APK 无 Rust 库，AAR/APK 的 ARM64 与 ELF 16 KiB 对齐检查通过。原生来源校验使用固定 NDK 重现 AGP 的 strip，再精确比较 AAR 与 APK 中的库，保留工具版本、输入与输出哈希。
 
 2026-09-12 在已连接的 25113PN0EC（Android 17 / API 37）上完成 53 项测试，整批 50.139 秒、零失败、零忽略：
 

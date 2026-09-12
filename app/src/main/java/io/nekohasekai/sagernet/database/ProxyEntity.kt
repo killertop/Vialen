@@ -355,6 +355,16 @@ class ProxyEntity(
         @Update
         fun updateProxy(proxy: ProxyEntity): Int
 
+        @Query("UPDATE proxy_entities SET status = :status, ping = :ping, error = :error WHERE id = :id")
+        fun updateConnectionTestResult(id: Long, status: Int, ping: Int, error: String?): Int
+
+        @Transaction
+        fun updateConnectionTestResults(results: List<ConnectionTestResult>) {
+            results.forEach { result ->
+                updateConnectionTestResult(result.id, result.status, result.ping, result.error)
+            }
+        }
+
         @Update
         fun updateProxy(proxies: List<ProxyEntity>): Int
 
