@@ -32,6 +32,8 @@ flowchart TB
 
 节点保存为 `ProfileDocument(kind=node, profile=Profile)`，链保存有序引用，完整配置和原始出站分别使用独立文档。Room 使用新的数据库名和 version 1；不读取、删除或迁移旧文件。
 
+2026-09-12 用户在正式包覆盖安装出现空白首页后明确确认“以全新客户端开始”。新客户端使用 `vialen_preferences.db` 与 `vialen_profiles.db`，以空白节点列表和默认设置起步；旧 `configuration.db` 与 `sager_net.db` 不纳入兼容、恢复或清理范围。空白首页属于已接受的首次使用行为。当前未验证旧生产数据库的完整性，不能用空列表判断旧数据已被删除，也不能将独立 Debug 包的数据回归结果视为旧生产数据保全证明。
+
 Java Bean 只作现有表单的临时投影。保存时将编辑差异合并回原始 Profile，保留表单没有表达的请求头、TLS、WireGuard 参数等。Room 真正持久化 `document` 列；重读和编辑后重读都有独立测试。
 
 业务桥接只有四类操作：
