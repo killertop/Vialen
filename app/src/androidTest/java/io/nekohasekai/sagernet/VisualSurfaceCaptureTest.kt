@@ -7,6 +7,7 @@ import android.os.ParcelFileDescriptor
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import com.google.android.material.chip.Chip
 import androidx.appcompat.app.AppCompatDelegate
@@ -27,6 +28,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleCallback
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
+import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.database.preference.KeyValuePair
 import io.nekohasekai.sagernet.database.preference.PublicDatabase
@@ -72,7 +74,7 @@ class VisualSurfaceCaptureTest {
         val requestedMode = arguments.getString("vialenVisualMode") ?: "all"
         val requestedSection = arguments.getString("vialenVisualSection") ?: "all"
         require(requestedMode in setOf("light", "dark", "all")) { "Invalid vialenVisualMode=$requestedMode" }
-        require(requestedSection in setOf("main", "forms", "standalone", "conditions", "compact", "typography", "all")) { "Invalid vialenVisualSection=$requestedSection" }
+        require(requestedSection in setOf("main", "forms", "standalone", "conditions", "compact", "typography", "polish", "all")) { "Invalid vialenVisualSection=$requestedSection" }
         checkNoStartedService()
         check(activities().isEmpty()) { "Close app activities before this isolated capture run" }
         output = File(checkNotNull(context.getExternalFilesDir(null)), "ui-v1.6/${System.currentTimeMillis()}")
@@ -93,6 +95,10 @@ class VisualSurfaceCaptureTest {
             DataStore.configurationStore.putBoolean("isAutoConnect", false)
             // Covered by publicBefore's exact type/byte snapshot and finally restoration.
             DataStore.configurationStore.putBoolean("managedRuntimeNoticeAcknowledged", true)
+            if (requestedSection == "polish") {
+                DataStore.showBottomBar = false
+                DataStore.alwaysShowAddress = false
+            }
             createFixtures()
             for ((mode, label) in listOf(2 to "light", 1 to "dark").filter { requestedMode == "all" || it.second == requestedMode }) {
                 DataStore.nightTheme = mode
@@ -114,6 +120,9 @@ class VisualSurfaceCaptureTest {
                 }
                 if (requestedSection == "compact") {
                     activeSurface = "$label/compact"; captureCompact(label)
+                }
+                if (requestedSection == "polish") {
+                    activeSurface = "$label/polish"; capturePolish(label)
                 }
                 if (requestedSection == "typography") {
                     activeSurface = "$label/typography"; captureTypography(label)
@@ -144,7 +153,7 @@ class VisualSurfaceCaptureTest {
                 .put("requestedMode", requestedMode).put("requestedSection", requestedSection)
                 .put("lastSurface", activeSurface)
                 .put("screenshots", captures).put("failure", failure?.toString() ?: JSONObject.NULL)
-                .put("meaning", "Actual rendered screenshots; no visual quality, protocol or release PASS implied")
+                .put("meaning", "Actual rendered screenshots; polish simulated-service-state images use UI-only fixture states and mock speeds, never real VPN state or network test evidence; no visual quality, protocol or release PASS implied")
                 .put("excluded", JSONArray(listOf("VPN/permission handoff and transient shortcuts", "camera grant/decoding",
                     "remote dashboard/remote subscriptions", "all transport conditional permutations", "real connection states")))
             File(output, "capture-index.json").writeText(report.toString(2))
@@ -229,6 +238,146 @@ class VisualSurfaceCaptureTest {
         DataStore.selectedGroup = emptyGroupId
         withActivity(MainActivity::class.java) { shot("$mode/configuration-empty-group", it) }
         DataStore.selectedGroup = groupId
+    }
+
+    /** Opt-in UI fixtures only; never starts a service or executes a connectivity test. */
+    private fun capturePolish(mode: String) {
+        checkNoStartedService()
+        withActivity(MainActivity::class.java) { activity ->
+            await("polish fixture profile bound") {
+                descendants(activity.window.decorView).filterIsInstance<TextView>()
+                    .any { it.id == R.id.profile_name && it.text.toString().startsWith("QA Blue") }
+            }
+            shot("$mode/polish-node-list", activity)
+            val originalState = DataStore.serviceState
+            val originalFooter = mutableMapOf<Int, CharSequence>()
+            onMain {
+                for (id in listOf(R.id.service_status, R.id.status, R.id.tx, R.id.rx)) {
+                    originalFooter[id] = activity.findViewById<TextView>(id).text.toString()
+                }
+            }
+            try {
+                for (state in listOf(BaseService.State.Stopped, BaseService.State.Connecting, BaseService.State.Connected)) {
+                    onMain { activity.stateChanged(state, "QA simulated UI state", null) }
+                    settle()
+                    onMain {
+                        if (state == BaseService.State.Connected) {
+                            val title = activity.findViewById<TextView>(R.id.service_status)
+                            val expectedTitle = context.getText(if (DataStore.serviceMode == Key.MODE_VPN)
+                                R.string.ui_vpn_service_connected else R.string.ui_proxy_service_connected).toString()
+                            check(title.text.toString().contains(expectedTitle)) { "Wrong connected service title" }
+                            activity.binding.stats.updateSpeed(128L * 1024, 1024L * 1024)
+                            activity.findViewById<TextView>(R.id.status).text = context.getText(R.string.ui_connectivity_testing)
+                            check(title.text.toString().contains(expectedTitle)) { "Speed/subtitle overwrote service title" }
+                        } else if (state == BaseService.State.Stopped) {
+                            check(activity.findViewById<TextView>(R.id.status).text.isEmpty()) { "Stopped state retained secondary hint" }
+                        }
+                    }
+                    shot("$mode/polish-footer-simulated-service-state-${state.name.lowercase()}", activity)
+                    check(DataStore.serviceState == state) { "Service callback replaced simulated UI state: $state" }
+                    checkNoStartedService()
+                }
+                onMain {
+                    activity.stateChanged(BaseService.State.Stopped, null, null)
+                    check(activity.findViewById<TextView>(R.id.status).text.isEmpty()) {
+                        "Connected-to-stopped transition retained testing subtitle"
+                    }
+                }
+            } finally {
+                onMain {
+                    activity.stateChanged(originalState, null, null)
+                    activity.binding.stats.updateSpeed(0, 0)
+                    originalFooter.forEach { (id, text) -> activity.findViewById<TextView>(id).text = text }
+                }
+                settle()
+                check(DataStore.serviceState == originalState) { "Simulated UI state was not restored" }
+                checkNoStartedService()
+            }
+            onMain { activity.displayFragmentWithId(R.id.nav_settings) }
+            await { preferenceFragment(activity) != null }
+            shot("$mode/polish-settings-top", activity)
+            val addressBeforeClick = DataStore.alwaysShowAddress
+            check(!DataStore.serviceState.started) { "Switch fixture requires stopped UI state" }
+            try {
+                clickPreference(activity, "alwaysShowAddress")
+                check(DataStore.alwaysShowAddress == !addressBeforeClick) { "Switch click did not persist value" }
+                clickPreference(activity, "alwaysShowAddress")
+                check(DataStore.alwaysShowAddress == addressBeforeClick) { "Switch click-back did not restore value" }
+            } finally {
+                DataStore.alwaysShowAddress = addressBeforeClick
+            }
+            checkNoStartedService()
+            val themeBeforeDialog = DataStore.nightTheme
+            val serviceModeBeforeDialog = DataStore.serviceMode
+            for (key in listOf("nightTheme", "serviceMode")) {
+                clickPreference(activity, key)
+                shot("$mode/polish-settings-dialog-$key", activity)
+                dismissFloating(activity)
+            }
+            check(DataStore.nightTheme == themeBeforeDialog && DataStore.serviceMode == serviceModeBeforeDialog) {
+                "Cancelled settings dialog changed its value"
+            }
+            expandPreferenceSections(activity)
+            verifyPolishPreferenceIcons(activity)
+            onMain { preferenceFragment(activity)!!.listView.scrollToPosition(0) }
+            shot("$mode/polish-settings-expanded-top", activity)
+            scrollPages("$mode/polish-settings-advanced", activity, 16)
+            captureListBottom("$mode/polish-settings-advanced-bottom", activity)
+        }
+        checkNoStartedService()
+    }
+
+    private fun verifyPolishPreferenceIcons(activity: Activity) {
+        lateinit var list: RecyclerView
+        lateinit var adapter: PreferenceGroupAdapter
+        onMain {
+            list = preferenceFragment(activity)!!.listView
+            adapter = list.adapter as PreferenceGroupAdapter
+        }
+        for (position in 0 until adapter.itemCount) {
+            var row = false
+            onMain {
+                val preference = adapter.getItem(position)
+                row = preference != null && preference !is androidx.preference.PreferenceGroup &&
+                    preference.javaClass.simpleName != "ExpandButton"
+                if (row) {
+                    check(preference!!.icon != null) { "Missing settings icon: ${preference.key}" }
+                    list.scrollToPosition(position)
+                }
+            }
+            if (!row) continue
+            await("polish settings row $position icon rendered") {
+                val item = list.findViewHolderForAdapterPosition(position)?.itemView
+                val icon = item?.findViewById<ImageView>(android.R.id.icon)
+                icon != null && icon.isShown && icon.drawable != null && icon.width > 0 && icon.height > 0
+            }
+            onMain {
+                val item = checkNotNull(list.findViewHolderForAdapterPosition(position)).itemView
+                val widget = item.findViewById<ViewGroup>(android.R.id.widget_frame)
+                val widgetLocation = IntArray(2)
+                val occupiedWidget = widget != null && widget.isShown && widget.width > 0 &&
+                    (0 until widget.childCount).any { widget.getChildAt(it).isShown }
+                if (occupiedWidget) widget!!.getLocationOnScreen(widgetLocation)
+                for (id in listOf(android.R.id.title, android.R.id.summary)) {
+                    val text = item.findViewById<TextView>(id) ?: continue
+                    if (!text.isShown || text.text.isEmpty()) continue
+                    val location = IntArray(2)
+                    text.getLocationOnScreen(location)
+                    if (occupiedWidget) check(location[0] + text.width <= widgetLocation[0] + 1) {
+                        "Settings text overlaps widget: ${adapter.getItem(position)?.key}"
+                    }
+                    val layout = checkNotNull(text.layout)
+                    val viewport = text.width - text.compoundPaddingLeft - text.compoundPaddingRight
+                    for (line in 0 until layout.lineCount) {
+                        // Explicit ellipsizing is an intentional bounded rendering policy.
+                        if (layout.getEllipsisCount(line) > 0) continue
+                        check(layout.getLineMax(line) <= viewport + 1f) {
+                            "Settings text exceeds viewport: ${adapter.getItem(position)?.key}, line $line"
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /** Targeted text-role regression, independent of installed-app enumeration permissions. */

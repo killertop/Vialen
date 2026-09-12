@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_network_reset_title">Reset on network change</string>
+    <string name="settings_wake_reset_title">Reset on device wake</string>
+</resources>

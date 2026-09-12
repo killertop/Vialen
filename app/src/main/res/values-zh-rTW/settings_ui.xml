@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_network_reset_title">網路變更時重設</string>
+    <string name="settings_wake_reset_title">裝置喚醒時重設</string>
+</resources>

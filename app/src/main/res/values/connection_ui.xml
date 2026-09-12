@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_traffic_upload">Upload</string>
+    <string name="ui_traffic_download">Download</string>
+    <string name="ui_traffic_upload_value">Upload: %1$s</string>
+    <string name="ui_traffic_download_value">Download: %1$s</string>
+    <string name="ui_vpn_service_connected">VPN connected</string>
+    <string name="ui_proxy_service_connected">Proxy connected</string>
+    <string name="ui_connectivity_check_hint">Tap to check connectivity</string>
+    <string name="ui_connectivity_testing">Checking connectivity…</string>
+</resources>

@@ -1,6 +1,5 @@
 package io.nekohasekai.sagernet.widget
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.text.format.Formatter
 import android.util.AttributeSet
@@ -12,6 +11,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.withStarted
 import com.google.android.material.bottomappbar.BottomAppBar
 import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ktx.*
@@ -28,6 +28,7 @@ class StatsBar @JvmOverloads constructor(
     defStyleAttr: Int = R.attr.bottomAppBarStyle,
 ) : BottomAppBar(context, attrs, defStyleAttr) {
     private lateinit var statusText: TextView
+    private lateinit var serviceStatusText: TextView
     private lateinit var txText: TextView
     private lateinit var rxText: TextView
     private lateinit var behavior: YourBehavior
@@ -93,6 +94,7 @@ class StatsBar @JvmOverloads constructor(
 
     override fun setOnClickListener(l: OnClickListener?) {
         statusText = findViewById(R.id.status)
+        serviceStatusText = findViewById(R.id.service_status)
         txText = findViewById(R.id.tx)
         rxText = findViewById(R.id.rx)
         super.setOnClickListener(l)
@@ -100,7 +102,7 @@ class StatsBar @JvmOverloads constructor(
 
     private fun setStatus(text: CharSequence) {
         statusText.text = text
-        TooltipCompat.setTooltipText(this, text)
+        TooltipCompat.setTooltipText(this, "${serviceStatusText.text}\n$text")
     }
 
     fun changeState(state: BaseService.State) {
@@ -115,12 +117,22 @@ class StatsBar @JvmOverloads constructor(
 
     private fun showConnectionState() {
         if (!::statusText.isInitialized) return
-        setStatus(context.getText(when (renderedState) {
-            BaseService.State.Connected -> R.string.vpn_connected
+        serviceStatusText.text = context.getText(when (renderedState) {
+            BaseService.State.Connected -> if (DataStore.serviceMode == Key.MODE_VPN) {
+                R.string.ui_vpn_service_connected
+            } else {
+                R.string.ui_proxy_service_connected
+            }
             BaseService.State.Connecting -> R.string.connecting
             BaseService.State.Stopping -> R.string.stopping
             else -> R.string.not_connected
-        }))
+        })
+        serviceStatusText.setCompoundDrawablesRelativeWithIntrinsicBounds(
+            if (renderedState.connected) R.drawable.ic_service_status_dot else 0, 0, 0, 0
+        )
+        setStatus(if (renderedState.connected) {
+            context.getText(R.string.ui_connectivity_check_hint)
+        } else "")
     }
 
     private fun syncVisibility() {
@@ -147,18 +159,11 @@ class StatsBar @JvmOverloads constructor(
         showConnectionState()
     }
 
-    @SuppressLint("SetTextI18n")
     fun updateSpeed(txRate: Long, rxRate: Long) {
-        txText.text = "▲  ${
-            context.getString(
-                R.string.speed, Formatter.formatFileSize(context, txRate)
-            )
-        }"
-        rxText.text = "▼  ${
-            context.getString(
-                R.string.speed, Formatter.formatFileSize(context, rxRate)
-            )
-        }"
+        txText.text = context.getString(R.string.speed, Formatter.formatFileSize(context, txRate))
+        rxText.text = context.getString(R.string.speed, Formatter.formatFileSize(context, rxRate))
+        txText.contentDescription = context.getString(R.string.ui_traffic_upload_value, txText.text)
+        rxText.contentDescription = context.getString(R.string.ui_traffic_download_value, rxText.text)
     }
 
     fun testConnection() {
@@ -174,7 +179,7 @@ class StatsBar @JvmOverloads constructor(
             DataStore.currentProfile == profile && DataStore.selectedProxy == selected &&
             DataStore.connectionTestURL == testUrl
         isEnabled = false
-        setStatus(app.getText(R.string.connection_test_testing))
+        setStatus(app.getText(R.string.ui_connectivity_testing))
         testJob = activity.lifecycleScope.launch {
             try {
                 val elapsed = withContext(Dispatchers.IO) { service.urlTest() }

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The background identifies a category row within the preferences RecyclerView. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="Overdraw"
+    android:id="@android:id/title"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:minHeight="44dp" android:gravity="center_vertical"
+    android:paddingStart="16dp" android:paddingEnd="16dp"
+    android:paddingTop="10dp" android:paddingBottom="10dp"
+    android:background="@color/vialen_selected_background"
+    android:textAppearance="@style/TextAppearance.Vialen.Section"
+    android:textColor="@color/vialen_accent" />

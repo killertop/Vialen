@@ -1439,6 +1439,16 @@ class ConfigurationFragment @JvmOverloads constructor(
             configurationListView = view.findViewById(R.id.configuration_list)
             layoutManager = FixedLinearLayoutManager(configurationListView)
             configurationListView.layoutManager = layoutManager
+            configurationListView.addItemDecoration(
+                com.google.android.material.divider.MaterialDividerItemDecoration(
+                    requireContext(), LinearLayout.VERTICAL
+                ).apply {
+                    dividerColor = requireContext().getColour(R.color.vialen_outline)
+                    dividerThickness = dp2px(1)
+                    dividerInsetStart = dp2px(4)
+                    dividerInsetEnd = dp2px(4)
+                }
+            )
             adapter = ConfigurationAdapter()
             ProfileManager.addListener(adapter!!)
             GroupManager.addListener(adapter!!)

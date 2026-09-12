@@ -30,7 +30,7 @@
 
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/group_pager"
-        android:background="@color/vialen_list_background"
+        android:background="@color/vialen_surface"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 

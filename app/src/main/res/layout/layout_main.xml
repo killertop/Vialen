@@ -70,42 +70,109 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="?android:attr/selectableItemBackground"
-                android:orientation="vertical"
-                android:padding="16dp">
+                android:baselineAligned="false"
+                android:gravity="center_vertical"
+                android:minHeight="96dp"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="20dp"
+                android:paddingBottom="16dp">
 
-                <TextView
-                    android:id="@+id/tx"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_columnWeight="1"
-                    android:layout_gravity="fill_horizontal"
-                    android:ellipsize="marquee"
-                    android:singleLine="true"
-                    android:textColor="@color/vialen_text_primary"
-                    android:textSize="14sp" />
+                    android:layout_weight="1"
+                    android:layout_marginEnd="12dp"
+                    android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/rx"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_columnWeight="1"
-                    android:layout_gravity="fill_horizontal"
-                    android:ellipsize="marquee"
-                    android:singleLine="true"
-                    android:textColor="@color/vialen_text_primary"
-                    android:textSize="14sp" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:minHeight="26dp"
+                        android:orientation="horizontal">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="8dp"
+                            android:importantForAccessibility="no"
+                            android:text="@string/ui_traffic_upload"
+                            android:textAppearance="@style/TextAppearance.Vialen.Secondary"
+                            android:textColor="@color/vialen_text_secondary" />
+                        <TextView
+                            android:id="@+id/tx"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFeatureSettings="tnum"
+                            android:maxLines="1"
+                            android:textAppearance="@style/TextAppearance.Vialen.ListTitle"
+                            android:textColor="@color/vialen_text_primary"
+                            app:autoSizeTextType="uniform"
+                            app:autoSizeMinTextSize="12sp"
+                            app:autoSizeMaxTextSize="16sp"
+                            app:autoSizeStepGranularity="1sp"
+                            tools:text="128 kB/s" />
+                    </LinearLayout>
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:minHeight="26dp"
+                        android:orientation="horizontal">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="8dp"
+                            android:importantForAccessibility="no"
+                            android:text="@string/ui_traffic_download"
+                            android:textAppearance="@style/TextAppearance.Vialen.Secondary"
+                            android:textColor="@color/vialen_text_secondary" />
+                        <TextView
+                            android:id="@+id/rx"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFeatureSettings="tnum"
+                            android:maxLines="1"
+                            android:textAppearance="@style/TextAppearance.Vialen.ListTitle"
+                            android:textColor="@color/vialen_text_primary"
+                            app:autoSizeTextType="uniform"
+                            app:autoSizeMinTextSize="12sp"
+                            app:autoSizeMaxTextSize="16sp"
+                            app:autoSizeStepGranularity="1sp"
+                            tools:text="2.4 MB/s" />
+                    </LinearLayout>
+                </LinearLayout>
 
-                <TextView
-                    android:id="@+id/status"
-                    android:accessibilityLiveRegion="polite"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="fill_horizontal"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:textColor="@color/vialen_text_primary"
-                    android:textSize="16sp"
-                    tools:text="@string/connection_test_available" />
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:id="@+id/service_status"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:accessibilityLiveRegion="polite"
+                        android:drawablePadding="6dp"
+                        android:maxLines="2"
+                        android:textAppearance="@style/TextAppearance.Vialen.ListTitle"
+                        android:textColor="@color/vialen_text_primary"
+                        tools:text="@string/ui_vpn_service_connected" />
+                    <TextView
+                        android:id="@+id/status"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:accessibilityLiveRegion="polite"
+                        android:ellipsize="end"
+                        android:maxLines="2"
+                        android:textAppearance="@style/TextAppearance.Vialen.Secondary"
+                        android:textColor="@color/vialen_text_secondary"
+                        tools:text="@string/ui_connectivity_testing" />
+                </LinearLayout>
 
             </LinearLayout>
 
