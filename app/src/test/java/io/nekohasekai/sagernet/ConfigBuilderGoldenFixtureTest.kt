@@ -69,6 +69,7 @@ class ConfigBuilderGoldenFixtureTest {
 
             val mockApp = mockk<SagerNet>(relaxed = true)
             every { mockApp.getDatabasePath(any()) } returns File("/tmp/test_mock_db")
+            every { mockApp.filesDir } returns File(System.getProperty("java.io.tmpdir"), "vialen-rules-no-downloads")
             SagerNet.application = mockApp
 
             val mockKvDao = mockk<io.nekohasekai.sagernet.database.preference.KeyValuePair.Dao>(relaxed = true)

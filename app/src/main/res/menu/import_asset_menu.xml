@@ -3,8 +3,12 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
+        android:id="@+id/action_update_rule_sets"
+        android:title="@string/route_set_update_all"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_import_file"
         android:icon="@drawable/ic_action_note_add"
         android:title="@string/action_import_file"
-        app:showAsAction="always" />
+        app:showAsAction="ifRoom" />
 </menu>

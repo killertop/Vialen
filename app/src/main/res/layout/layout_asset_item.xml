@@ -56,6 +56,17 @@
 
         </LinearLayout>
 
+        <TextView
+            android:id="@+id/asset_source"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginBottom="8dp"
+            android:maxLines="2"
+            android:ellipsize="middle"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textColor="?attr/accentOrTextSecondary" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -66,7 +77,7 @@
 
             <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
                 android:layout_weight="1"
                 android:gravity="bottom"
@@ -90,6 +101,16 @@
                 android:text="@string/group_update"
                 android:textColor="?accentOrTextSecondary" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/asset_error"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginBottom="12dp"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textColor="?attr/colorError"
+            android:visibility="gone" />
 
     </LinearLayout>
 

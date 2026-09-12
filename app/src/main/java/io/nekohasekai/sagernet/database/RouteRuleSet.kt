@@ -35,6 +35,11 @@ data class RouteRuleSet(
     // Stored imported references remain portable across device backup/restore.
     fun snapshotJson(filesDir: () -> File) = json().apply {
         if (source.startsWith("rule-sets/")) addProperty("source", File(filesDir(), source).absolutePath)
+        if (source.startsWith("https://")) {
+            RuleSetDownloads.file(filesDir(), this@RouteRuleSet).takeIf { it.isFile }?.let {
+                addProperty("initial_path", it.absolutePath)
+            }
+        }
     }
 
     companion object {

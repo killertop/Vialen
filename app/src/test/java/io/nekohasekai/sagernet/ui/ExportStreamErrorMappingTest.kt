@@ -9,6 +9,15 @@ import java.io.OutputStream
 
 class ExportStreamErrorMappingTest {
 
+    // This pure stream test must not depend on another test's logger mock or Android Go JNI.
+    @org.junit.Before fun isolateNativeLogger() {
+        io.mockk.mockkObject(io.nekohasekai.sagernet.ktx.Logs)
+        io.mockk.every { io.nekohasekai.sagernet.ktx.Logs.w(any<Throwable>()) } returns Unit
+    }
+    @org.junit.After fun restoreNativeLogger() {
+        io.mockk.unmockkObject(io.nekohasekai.sagernet.ktx.Logs)
+    }
+
     private val errorMsg = "Failed to export."
 
     @Test

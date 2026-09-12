@@ -607,6 +607,19 @@ mod tests {
         json!({"name":name,"source":format!("https://example.net/{name}.srs"),"format":"binary","match":direction})
     }
     #[test]
+    fn manual_bootstrap_preserves_remote_auto_update() {
+        let mut r = rule();
+        let mut reference = rule_set("geoip-cn", "destination");
+        reference["initial_path"] = json!("/data/user/0/com.vialen.app/files/remote-rule-sets/test.srs");
+        r["rule_sets"] = json!([reference]);
+        let c = generated_rule(r);
+        let set = &c["route"]["rule_set"][0];
+        assert_eq!(set["type"], "remote");
+        assert_eq!(set["update_interval"], "24h");
+        assert_eq!(set["url"], "https://example.net/geoip-cn.srs");
+        assert_eq!(set["initial_path"], "/data/user/0/com.vialen.app/files/remote-rule-sets/test.srs");
+    }
+    #[test]
     fn combined_destination_references_survive() {
         for kind in 0..3 {
             let mut r = rule();

@@ -19,4 +19,13 @@
     <string name="route_set_import_error">请导入有效的 .srs 二进制或 .json 源格式规则集，不支持旧数据库文件。</string>
     <string name="route_set_in_use">路由规则仍在引用此文件，请先移除引用再删除。</string>
     <string name="route_dns_not_projected">部分路由条件无法安全应用于 DNS，该规则及后续规则仅作用于连接，DNS 使用已配置的默认策略。</string>
+    <string name="route_set_update_all">更新全部远程规则集</string>
+    <string name="route_set_update_hint">包含已停用规则引用的远程资源。下拉可全部下载；手动下载成功后，下次连接使用，VPN 正在运行时需重连。内核运行期间仍每 24 小时检查远程更新。下方时间仅记录手动下载，不代表内核实时更新状态。</string>
+    <string name="route_set_manager_empty">暂无路由资源。请在路由规则中添加远程规则集，或使用右上角按钮导入本地 SRS/JSON 文件。</string>
+    <string name="route_set_no_remote">没有可更新的远程规则集</string>
+    <string name="route_set_never_updated">尚未手动下载</string>
+    <string name="route_set_last_checked">上次更新（手动）：\n%1$s</string>
+    <string name="route_set_update_failed">更新失败（原文件保留）：%1$s</string>
+    <string name="route_set_update_result">下载成功 %1$d 项，失败 %2$d 项。新文件将在下次连接使用。</string>
+    <string name="route_set_update_named">更新 %1$s</string>
 </resources>

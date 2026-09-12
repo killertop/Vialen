@@ -19,4 +19,13 @@
     <string name="route_set_import_error">Import a valid .srs binary or .json source rule set. Database files are not supported.</string>
     <string name="route_set_in_use">This file is referenced by a routing rule. Remove that reference before deleting the file.</string>
     <string name="route_dns_not_projected">Some routing rules cannot be safely applied to DNS. They and subsequent rules remain connection-only; DNS uses its configured default.</string>
+    <string name="route_set_update_all">Update all remote rule sets</string>
+    <string name="route_set_update_hint">Remote rules include disabled rules. Pull down to download all. Successful manual downloads are used on the next connection; reconnect an active VPN to use them. The core still checks remote rules every 24 hours while running. Times below refer to manual downloads, not live core updates.</string>
+    <string name="route_set_manager_empty">No rule resources. Add a remote rule set in a routing rule, or import a local SRS/JSON file with the toolbar button.</string>
+    <string name="route_set_no_remote">No remote rule sets to update</string>
+    <string name="route_set_never_updated">Not downloaded manually</string>
+    <string name="route_set_last_checked">Last update (manual):\n%1$s</string>
+    <string name="route_set_update_failed">Update failed (previous file retained): %1$s</string>
+    <string name="route_set_update_result">Downloaded: %1$d; failed: %2$d. New files are used on the next connection.</string>
+    <string name="route_set_update_named">Update %1$s</string>
 </resources>

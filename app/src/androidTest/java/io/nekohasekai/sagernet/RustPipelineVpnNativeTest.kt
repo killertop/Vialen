@@ -30,7 +30,9 @@ class RustPipelineVpnNativeTest {
 
     @Test fun nativeBinaryRuleSetCarriesTunTrafficAcrossReconnectAndSwitch() = runPipeline(true)
 
-    private fun runPipeline(nativeRuleSet: Boolean) = runBlocking {
+    @Test fun manualRemoteBootstrapCarriesTunTrafficWithoutInitialNetworkDownload() = runPipeline(true, true)
+
+    private fun runPipeline(nativeRuleSet: Boolean, bootstrap: Boolean = false) = runBlocking {
         val app = ApplicationProvider.getApplicationContext<SagerNet>()
         assertNull("Grant VPN consent before this explicit lifecycle test", VpnService.prepare(app))
         check(!DataStore.serviceState.started) { "An existing VPN is running; refusing to interrupt it" }
@@ -58,7 +60,8 @@ class RustPipelineVpnNativeTest {
             error("VPN state did not reach $expected; binder=${connection.service?.state}")
         }
         val nonce = "rust-${System.nanoTime()}"
-        val nativeFile = java.io.File(app.filesDir, "rule-sets/$nonce.srs")
+        val remoteRef = RouteRuleSet(nonce, "https://127.0.0.1:1/$nonce.srs")
+        val nativeFile = if (bootstrap) RuleSetDownloads.file(app.filesDir, remoteRef) else java.io.File(app.filesDir, "rule-sets/$nonce.srs")
         profileState.preservingFailure({
             DataStore.serviceMode = Key.MODE_VPN
             DataStore.directDns = "local"; DataStore.remoteDns = "local"
@@ -84,7 +87,7 @@ class RustPipelineVpnNativeTest {
                     // sing-box SRS v5: one destination predicate, 198.18.0.254/32.
                     nativeFile.writeBytes(android.util.Base64.decode("U1JTBXjaYmRgY2SAAEaWY0IM/8DEfwZAAAAA//8cPgS9", android.util.Base64.DEFAULT))
                     libcore.Libcore.validateRuleSet(nativeFile.absolutePath, "binary")
-                    route.ruleSets = RouteRuleSet.encode(listOf(RouteRuleSet(nonce, "rule-sets/${nativeFile.name}")))
+                    route.ruleSets = RouteRuleSet.encode(listOf(if (bootstrap) remoteRef else RouteRuleSet(nonce, "rule-sets/${nativeFile.name}")))
                     // An unrelated native destination must be ORed with the SRS, not ANDed.
                     route.ip = "192.0.2.1/32"
                 } else route.ip = "198.18.0.254/32"

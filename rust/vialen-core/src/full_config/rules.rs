@@ -11,6 +11,8 @@ pub(super) struct RuleSet {
     format: String,
     #[serde(rename = "match")]
     direction: String,
+    #[serde(default)]
+    initial_path: Option<String>,
 }
 
 pub(super) struct BuiltRule {
@@ -226,6 +228,10 @@ fn build_inner(
             json!({"tag":id,"type":if remote {"remote"} else {"local"},"format":set.format});
         declared[if remote { "url" } else { "path" }] = json!(set.source);
         if remote {
+            if let Some(path) = &set.initial_path {
+                if !path.starts_with('/') { return Err("rule-set initial path must be absolute".into()); }
+                declared["initial_path"] = json!(path);
+            }
             declared["http_client"] = json!("default-http-client");
             declared["update_interval"] = json!("24h");
         }
