@@ -13,6 +13,7 @@ import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.aidl.ISagerNetService
 import io.nekohasekai.sagernet.aidl.ISagerNetServiceCallback
 import io.nekohasekai.sagernet.bg.proto.ProxyInstance
+import io.nekohasekai.sagernet.bg.proto.runCancellableUrlTest
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.ktx.*
@@ -44,6 +45,7 @@ class BaseService {
         var state = State.Stopped
         var proxy: ProxyInstance? = null
         var notification: ServiceNotification? = null
+        internal var recovery: ConnectionRecovery? = null
 
         val receiver = broadcastReceiver { ctx, intent ->
             when (intent.action) {
@@ -52,14 +54,15 @@ class BaseService {
                 // Action.SWITCH_WAKE_LOCK -> runOnDefaultDispatcher { service.switchWakeLock() }
                 PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED -> {
                     if (SagerNet.power.isDeviceIdleMode) {
+                        recovery?.idleChanged(true)
                         proxy?.box?.sleep()
                     } else {
                         proxy?.box?.wake()
-                        if (DataStore.wakeResetConnections) {
-                            Libcore.resetAllConnections(true)
-                        }
+                        recovery?.idleChanged(false)
                     }
                 }
+                Intent.ACTION_SCREEN_OFF -> recovery?.screenChanged(false)
+                Intent.ACTION_SCREEN_ON -> recovery?.screenChanged(true)
 
                 Action.RESET_UPSTREAM_CONNECTIONS -> runOnDefaultDispatcher {
                     Libcore.resetAllConnections(true)
@@ -224,6 +227,9 @@ class BaseService {
         }
 
         suspend fun killProcesses() {
+            // Cancel native requests and join their workers before closing the running box.
+            data.recovery?.let { it.stop(); it.join() }
+            data.recovery = null
             var failure: Throwable? = null
             fun retain(error: Throwable) {
                 val previous = failure
@@ -271,6 +277,7 @@ class BaseService {
             this as Service
 
             data.changeState(State.Stopping)
+            data.recovery?.stop()
 
             runOnMainDispatcher {
                 data.connectingJob?.cancelAndJoin() // ensure stop connecting first
@@ -304,22 +311,61 @@ class BaseService {
         var upstreamInterfaceName: String?
 
         suspend fun preInit() {
+            val recovery = ConnectionRecovery(
+                context = Dispatchers.Main.immediate,
+                now = { SystemClock.elapsedRealtime() },
+                probe = {
+                    val box = data.proxy?.box
+                    val target = ConnectionRecovery.probeTarget(DataStore.connectionTestURL)
+                    if (data.state != State.Connected || box == null || target == null) {
+                        ConnectionRecovery.Health.Unavailable
+                    } else {
+                        val session = Libcore.newUrlTestSession()
+                        try {
+                            runCancellableUrlTest(
+                                cancel = { session.cancel() }, initialize = {}, start = {},
+                                test = { session.run(box, target, ConnectionRecovery.PROBE_TIMEOUT_MS) },
+                                close = {}, // The service owns this box; never close it from a probe.
+                            )
+                            ConnectionRecovery.Health.Healthy
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            ConnectionRecovery.Health.Failed
+                        }
+                    }
+                },
+                reset = { withContext(Dispatchers.IO) { Libcore.resetAllConnections(true) } },
+                networkEnabled = { DataStore.networkChangeResetConnections },
+                wakeEnabled = { DataStore.wakeResetConnections },
+                report = { event ->
+                    Logs.d("ConnectionRecovery ${event.kind} reason=${event.reason} " +
+                        "health=${event.health} resetCount=${event.resetCount}")
+                },
+            )
+            data.recovery = recovery
+            recovery.screenChanged(SagerNet.power.isInteractive)
+            recovery.idleChanged(SagerNet.power.isDeviceIdleMode)
             DefaultNetworkListener.start(this) {
-                SagerNet.connectivity.getLinkProperties(it)?.also { link ->
-                    SagerNet.underlyingNetwork = it
+                val network = it
+                runOnMainDispatcher {
+                    // A queued callback from an earlier service lifetime must not change the new one.
+                    if (data.recovery !== recovery || data.state == State.Stopping ||
+                        data.state == State.Stopped) return@runOnMainDispatcher
+                    val link = network?.let { SagerNet.connectivity.getLinkProperties(it) }
+                    SagerNet.underlyingNetwork = network
                     DataStore.vpnService?.updateUnderlyingNetwork()
                     //
                     val oldName = upstreamInterfaceName
-                    if (oldName != link.interfaceName) {
-                        upstreamInterfaceName = link.interfaceName
+                    if (oldName != link?.interfaceName) {
+                        upstreamInterfaceName = link?.interfaceName
                     }
                     if (oldName != null && upstreamInterfaceName != null && oldName != upstreamInterfaceName) {
                         Logs.d("Network changed: $oldName -> $upstreamInterfaceName")
-                        val resetConnections = DataStore.networkChangeResetConnections
-                        if (resetConnections) {
-                            Libcore.resetAllConnections(true)
-                        }
                     }
+                    recovery.networkChanged(network?.let {
+                        ConnectionRecovery.NetworkIdentity(it.networkHandle, link?.interfaceName)
+                    })
                 }
             }
         }
@@ -364,6 +410,8 @@ class BaseService {
                     addAction(Action.CLOSE)
                     // addAction(Action.SWITCH_WAKE_LOCK)
                     addAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED)
+                    addAction(Intent.ACTION_SCREEN_OFF)
+                    addAction(Intent.ACTION_SCREEN_ON)
                     addAction(Action.RESET_UPSTREAM_CONNECTIONS)
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -398,6 +446,7 @@ class BaseService {
                     startProcesses()
                     currentCoroutineContext().ensureActive()
                     data.changeState(State.Connected)
+                    data.recovery?.connected()
 
                     lateInit()
                 } catch (_: CancellationException) { // if the job was cancelled, it is canceller's responsibility to call stopRunner

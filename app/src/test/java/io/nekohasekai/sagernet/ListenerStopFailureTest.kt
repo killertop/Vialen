@@ -1,6 +1,7 @@
 package io.nekohasekai.sagernet
 
 import android.net.ConnectivityManager
+import android.net.Network
 import android.net.NetworkRequest
 import android.os.Handler
 import android.os.PowerManager
@@ -19,6 +20,8 @@ import io.nekohasekai.sagernet.bg.ServiceNotification
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.utils.DefaultNetworkListener
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
@@ -44,6 +47,8 @@ class ListenerStopFailureTest {
         override val data = mockk<BaseService.Data>().also { state ->
             every { state.proxy } returns null
             every { state.proxy = null } just Runs
+            every { state.recovery } returns null
+            every { state.recovery = null } just Runs
         }
         override val tag = "ListenerStopFailureFake"
         override var wakeLock: PowerManager.WakeLock? = null
@@ -147,6 +152,38 @@ class ListenerStopFailureTest {
             verify(exactly = 1) { connectivity.unregisterNetworkCallback(any<ConnectivityManager.NetworkCallback>()) }
             assertFalse(DefaultNetworkListener.stop(second))
             verify(exactly = 1) { connectivity.unregisterNetworkCallback(any<ConnectivityManager.NetworkCallback>()) }
+        }
+    }
+
+    @Test
+    fun lastStopCancelsPendingGetAndOldCallbackCannotPopulateNewRegistration() = runBlocking {
+        withTimeout(5_000) {
+            val callbacks = mutableListOf<ConnectivityManager.NetworkCallback>()
+            every {
+                connectivity.registerBestMatchingNetworkCallback(
+                    any<NetworkRequest>(), any<ConnectivityManager.NetworkCallback>(), any<Handler>()
+                )
+            } answers { callbacks += secondArg<ConnectivityManager.NetworkCallback>(); Unit }
+            val first = key()
+            val second = key()
+            DefaultNetworkListener.start(first) {}
+            DefaultNetworkListener.start(second) {}
+            val pending = async(start = CoroutineStart.UNDISPATCHED) { DefaultNetworkListener.get() }
+            DefaultNetworkListener.stop(first)
+            assertFalse("One remaining listener still owns the pending request", pending.isCompleted)
+            DefaultNetworkListener.stop(second)
+            pending.join()
+            assertTrue("Last stop cancels pending get", pending.isCancelled)
+
+            val next = key()
+            DefaultNetworkListener.start(next) {}
+            val nextPending = async(start = CoroutineStart.UNDISPATCHED) { DefaultNetworkListener.get() }
+            callbacks.first().onAvailable(mockk<Network>())
+            assertFalse("Old callback cannot complete a new lifetime's request", nextPending.isCompleted)
+            val currentNetwork = mockk<Network>()
+            callbacks.last().onAvailable(currentNetwork)
+            assertSame(currentNetwork, nextPending.await())
+            assertTrue(pending.isCancelled)
         }
     }
 
