@@ -17,7 +17,7 @@ import androidx.appcompat.widget.SwitchCompat
 import androidx.test.core.app.ApplicationProvider
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.R
-import io.nekohasekai.sagernet.RustBridgeRobolectricTestRunner
+import io.nekohasekai.sagernet.CoreBridgeRobolectricTestRunner
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -25,7 +25,7 @@ import org.robolectric.Robolectric
 import org.robolectric.annotation.Config
 import kotlin.math.roundToInt
 
-@RunWith(RustBridgeRobolectricTestRunner::class)
+@RunWith(CoreBridgeRobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "mdpi")
 class ComponentVisualContractTest {
     private fun newSwitch(): SwitchCompat = SwitchCompat(

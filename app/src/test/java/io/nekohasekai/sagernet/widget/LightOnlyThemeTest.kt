@@ -8,7 +8,7 @@ import androidx.appcompat.view.ContextThemeWrapper
 import androidx.core.view.WindowCompat
 import androidx.test.core.app.ApplicationProvider
 import io.nekohasekai.sagernet.R
-import io.nekohasekai.sagernet.RustBridgeRobolectricTestRunner
+import io.nekohasekai.sagernet.CoreBridgeRobolectricTestRunner
 import io.nekohasekai.sagernet.ui.ThemedActivity
 import io.nekohasekai.sagernet.utils.Theme
 import org.junit.Assert.*
@@ -18,7 +18,7 @@ import org.robolectric.Robolectric
 import org.robolectric.annotation.Config
 
 /** Local contexts only: no phone settings, production preferences, or VPN operations. */
-@RunWith(RustBridgeRobolectricTestRunner::class)
+@RunWith(CoreBridgeRobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "night-mdpi")
 class LightOnlyThemeTest {
     class LightActivity : ThemedActivity()

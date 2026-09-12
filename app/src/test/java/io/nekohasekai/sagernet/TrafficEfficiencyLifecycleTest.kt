@@ -34,7 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 /** Production loop and updater, destructive-read native counter fake, actual coroutine scheduling. */
-@RunWith(RustBridgeRobolectricTestRunner::class)
+@RunWith(CoreBridgeRobolectricTestRunner::class)
 @Config(sdk=[34],application=android.app.Application::class)
 class TrafficEfficiencyLifecycleTest {
     private lateinit var database: SagerDatabase
@@ -101,14 +101,14 @@ class TrafficEfficiencyLifecycleTest {
             unmockkAll()
         }
     }
-    private fun start(selector:Boolean=false):TrafficLooper {
+    private fun start(selector:Boolean=false, supplied:ConfigBuildResult?=null):TrafficLooper {
         val rows=(1L..2L).map { id -> ProxyEntity(id=id,rx=id*100,tx=id*10).apply {
             putBean(SOCKSBean().applyDefaultValues())
         } }
-        database.proxyDao().insert(rows)
-        val config=ConfigBuildResult("{}",emptyList(),1,
+        val config=supplied ?: ConfigBuildResult("{}",emptyList(),1,
             linkedMapOf("one" to listOf(rows[0]),"two" to listOf(rows[1])),
             mapOf(1L to "one",2L to "two"),if(selector) 1 else -1)
+        database.proxyDao().insert(config.trafficMap.values.flatten().distinctBy { it.id })
         val proxy=mockk<ProxyInstance>(relaxed=true)
         every { proxy.config } returns config
         // changeState reads its backing field directly; populate it for the real Data spy too.
@@ -357,6 +357,57 @@ class TrafficEfficiencyLifecycleTest {
         } finally {
             ProfileManager.removeListener(broken)
         }
+    }
+
+    private fun counterRow(id: Long) = ProxyEntity(id = id).apply { putBean(SOCKSBean().applyDefaultValues()) }
+
+    @Test fun sharedNodeAggregatesTwoReferenceTagsWithoutDuplicateOwnership() = runBlocking {
+        val shared = counterRow(1)
+        val first = counterRow(10)
+        val second = counterRow(20)
+        val reads = ConcurrentHashMap<String, AtomicInteger>()
+        val nativeRead = readStats
+        readStats = { tag, direction -> reads.computeIfAbsent("$tag/$direction") { AtomicInteger() }.incrementAndGet(); nativeRead(tag, direction) }
+        start(supplied = ConfigBuildResult("{}", emptyList(), 10,
+            linkedMapOf("chain-a" to listOf(shared, shared, first), "chain-b" to listOf(shared, second)),
+            mapOf(10L to "chain-a", 20L to "chain-b"), 1))
+        awaitCondition { queries.get() >= 8 }
+        delay(30)
+        val before = reads.mapValues { it.value.get() }
+        add("chain-a", 7, 11)
+        add("chain-b", 13, 17)
+        stop()
+        assertEquals(20L, database.proxyDao().getById(1)!!.tx)
+        assertEquals(28L, database.proxyDao().getById(1)!!.rx)
+        assertEquals(7L, database.proxyDao().getById(10)!!.tx)
+        assertEquals(13L, database.proxyDao().getById(20)!!.tx)
+        for (tag in listOf("chain-a", "chain-b")) for (direction in listOf("uplink", "downlink")) {
+            val key = "$tag/$direction"
+            assertEquals("Native resetting counter must be read once", 1, reads.getValue(key).get() - before.getValue(key))
+        }
+    }
+
+    @Test fun selectorChainMembersAndUnselectedRuleExitAllAccumulate() = runBlocking {
+        val shared = counterRow(1)
+        val first = counterRow(10)
+        val second = counterRow(20)
+        val rule = counterRow(30)
+        val loop = start(supplied = ConfigBuildResult("{}", emptyList(), 10,
+            linkedMapOf("chain-a" to listOf(shared, first), "chain-b" to listOf(shared, second), "rule-exit" to listOf(rule)),
+            mapOf(10L to "chain-a", 20L to "chain-b"), 1))
+        add(TAG_PROXY, 7, 11)
+        add("rule-exit", 5, 9)
+        loop.selectMain(20)
+        awaitCondition { database.proxyDao().getById(10)!!.tx == 7L }
+        add(TAG_PROXY, 13, 17)
+        add("chain-a", 2, 3) // A route still explicitly targets the former candidate.
+        stop()
+        assertEquals(22L, database.proxyDao().getById(1)!!.tx)
+        assertEquals(31L, database.proxyDao().getById(1)!!.rx)
+        assertEquals(9L, database.proxyDao().getById(10)!!.tx)
+        assertEquals(13L, database.proxyDao().getById(20)!!.tx)
+        assertEquals(5L, database.proxyDao().getById(30)!!.tx)
+        assertEquals(9L, database.proxyDao().getById(30)!!.rx)
     }
 
 }

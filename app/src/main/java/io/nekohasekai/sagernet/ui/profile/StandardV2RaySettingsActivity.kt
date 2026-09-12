@@ -100,6 +100,8 @@ abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV
 
         uuid.preference.summaryProvider = PasswordSummaryProvider
 
+        listOf(enableMux, muxPadding, muxType, muxConcurrency).forEach { it.preference.isVisible = !isHttp }
+        if (isHttp) tmpBean?.enableMux = false
         type.preference.isVisible = !isHttp
         uuid.preference.isVisible = !isHttp
         packetEncoding.preference.isVisible = isVmess || isVless

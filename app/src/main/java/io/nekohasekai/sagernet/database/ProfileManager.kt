@@ -4,6 +4,10 @@ import android.database.sqlite.SQLiteCantOpenDatabaseException
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.aidl.TrafficData
 import io.nekohasekai.sagernet.fmt.AbstractBean
+import io.nekohasekai.sagernet.core.Profile
+import io.nekohasekai.sagernet.core.CoreClient
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
@@ -81,29 +85,37 @@ object ProfileManager {
             putBean(bean)
             userOrder = SagerDatabase.proxyDao.nextOrder(groupId) ?: 1
         }
+        if (profile.type != ProxyEntity.TYPE_CHAIN && profile.type != ProxyEntity.TYPE_CONFIG) CoreClient.validate(profile.requireProfile())
+        currentCoroutineContext().ensureActive()
         profile.id = SagerDatabase.proxyDao.addProxy(profile)
         selectFirstIfNeeded(groupId)
         iterator { onAdd(profile) }
         return profile
     }
 
+    suspend fun createProfile(groupId: Long, profile: Profile): ProxyEntity =
+        createProfilesForImport(groupId, listOf(profile)).single()
+
     /**
      * Imports must not leave profiles behind if the destination group is deleted while a
      * multi-profile document is being parsed. Keep the existence check and every row write in
      * one database transaction; listener callbacks deliberately run after commit.
      */
-    suspend fun createProfilesForImport(groupId: Long, beans: List<AbstractBean>): List<ProxyEntity> {
-        if (beans.isEmpty()) return emptyList()
+    suspend fun createProfilesForImport(groupId: Long, nodes: List<Profile>): List<ProxyEntity> {
+        if (nodes.isEmpty()) return emptyList()
+        CoreClient.validateProfiles(nodes)
+        val context = currentCoroutineContext()
+        context.ensureActive()
         val profiles = SagerDatabase.instance.runInTransaction<List<ProxyEntity>> {
             checkNotNull(SagerDatabase.groupDao.getById(groupId)) {
                 app.getString(R.string.profile_import_target_missing)
             }
             var nextOrder = SagerDatabase.proxyDao.nextOrder(groupId) ?: 1L
-            beans.map { bean ->
-                bean.applyDefaultValues()
+            nodes.map { node ->
+                context.ensureActive()
                 ProxyEntity(groupId = groupId).apply {
                     id = 0
-                    putBean(bean)
+                    putProfile(node.copy(id = ""))
                     userOrder = nextOrder++
                     id = SagerDatabase.proxyDao.addProxy(this)
                 }
@@ -147,6 +159,8 @@ object ProfileManager {
     }
 
     suspend fun updateProfile(profile: ProxyEntity) {
+        if (profile.type != ProxyEntity.TYPE_CHAIN && profile.type != ProxyEntity.TYPE_CONFIG) CoreClient.validate(profile.requireProfile())
+        currentCoroutineContext().ensureActive()
         SagerDatabase.proxyDao.updateProxy(profile)
         iterator { onUpdated(profile, false) }
     }

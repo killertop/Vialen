@@ -1,0 +1,40 @@
+name: Go Core Contracts
+
+on:
+  pull_request:
+    paths:
+      - 'core/**'
+      - '.github/workflows/core.yml'
+  push:
+    paths:
+      - 'core/**'
+      - '.github/workflows/core.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GOTOOLCHAIN: local
+  GOWORK: "off"
+
+jobs:
+  test:
+    name: Go tests and race detector
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.1'
+          cache: false
+      - name: Verify Go version
+        shell: bash
+        run: '[[ "$(go env GOVERSION)" == go1.27.1 ]]'
+      - name: Test all business contracts
+        run: go -C core test -mod=readonly -count=1 ./...
+      - name: Check concurrent execution
+        run: go -C core test -mod=readonly -race -count=1 ./...

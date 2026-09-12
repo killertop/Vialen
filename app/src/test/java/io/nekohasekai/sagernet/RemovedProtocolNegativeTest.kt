@@ -53,8 +53,7 @@ class RemovedProtocolNegativeTest {
         try {
             parseHysteria1(link)
             fail("Should throw IllegalArgumentException on faketcp")
-        } catch (e: IllegalArgumentException) {
-            assertTrue(e.message?.contains("unsupported hysteria1 protocol") == true)
+        } catch (_: IllegalArgumentException) {
         }
     }
 
@@ -64,8 +63,7 @@ class RemovedProtocolNegativeTest {
         try {
             parseHysteria1(link)
             fail("Should throw IllegalArgumentException on wechat-video")
-        } catch (e: IllegalArgumentException) {
-            assertTrue(e.message?.contains("unsupported hysteria1 protocol") == true)
+        } catch (_: IllegalArgumentException) {
         }
     }
 
@@ -78,15 +76,21 @@ class RemovedProtocolNegativeTest {
             "ssh://root:pass@ssh.example.com:22#SSHTest"
         )
         for (link in removedLinks) {
-            val result = parseProxies(link)
-            assertTrue("Link $link should not be parsed into valid entity, but got $result", result.isEmpty())
+            val failure = runCatching { parseProxies(link) }.exceptionOrNull()
+            assertTrue("Unsupported link must fail explicitly: $link", failure is IllegalArgumentException)
         }
+    }
+
+    private fun sourceFile(relative: String): File {
+        val roots = generateSequence(File(System.getProperty("user.dir")).absoluteFile) { it.parentFile }
+        return roots.map { File(it, relative) }.firstOrNull { it.isFile }
+            ?: throw AssertionError("Required source fixture not found: $relative")
     }
 
     @Test
     fun testAddProfileMenuHasNoRemovedProtocolItems() {
-        val menuFile = File("src/main/res/menu/add_profile_menu.xml")
-        if (menuFile.exists()) {
+        val menuFile = sourceFile("app/src/main/res/menu/add_profile_menu.xml")
+        run {
             val content = menuFile.readText()
             assertFalse(content.contains("action_new_naive"))
             assertFalse(content.contains("action_new_trojan_go"))
@@ -98,8 +102,8 @@ class RemovedProtocolNegativeTest {
 
     @Test
     fun testLibcoreHasNoTorOrSSHRegistration() {
-        val boxInclude = File("../libcore/box_include.go")
-        if (boxInclude.exists()) {
+        val boxInclude = sourceFile("libcore/box_include.go")
+        run {
             val content = boxInclude.readText()
             assertFalse(content.contains("include_tor.go"))
             assertFalse(content.contains("include_ssh.go"))

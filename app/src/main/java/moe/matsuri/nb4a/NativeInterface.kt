@@ -78,7 +78,7 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
     // nb4a interface
 
     override fun selector_OnProxySelected(selectorTag: String, tag: String) {
-        if (selectorTag != "proxy") {
+        if (selectorTag != io.nekohasekai.sagernet.fmt.TAG_PROXY) {
             Logs.d("other selector: $selectorTag")
             return
         }

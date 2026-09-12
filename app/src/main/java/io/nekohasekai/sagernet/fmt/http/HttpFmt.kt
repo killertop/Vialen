@@ -1,46 +1,9 @@
 package io.nekohasekai.sagernet.fmt.http
 
-import io.nekohasekai.sagernet.fmt.v2ray.isTLS
-import io.nekohasekai.sagernet.fmt.v2ray.setTLS
-import io.nekohasekai.sagernet.ktx.urlSafe
-import okhttp3.HttpUrl
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import io.nekohasekai.sagernet.core.CoreClient
+import io.nekohasekai.sagernet.fmt.CoreProxyParser
+import io.nekohasekai.sagernet.fmt.ProfileAdapter
 
-fun parseHttp(link: String): HttpBean {
-    val httpUrl = link.toHttpUrlOrNull() ?: error("Invalid http(s) link: $link")
+fun parseHttp(link: String): HttpBean = CoreProxyParser.parse(link) as HttpBean
 
-    if (httpUrl.encodedPath != "/") error("Not http proxy")
-
-    return HttpBean().apply {
-        serverAddress = httpUrl.host
-        serverPort = httpUrl.port
-        username = httpUrl.username
-        password = httpUrl.password
-        sni = httpUrl.queryParameter("sni")
-        name = httpUrl.fragment
-        setTLS(httpUrl.scheme == "https")
-    }
-}
-
-fun HttpBean.toUri(): String {
-    val builder = HttpUrl.Builder().scheme(if (isTLS()) "https" else "http").host(serverAddress)
-
-    if (serverPort in 1..65535) {
-        builder.port(serverPort)
-    }
-
-    if (username.isNotBlank()) {
-        builder.username(username)
-    }
-    if (password.isNotBlank()) {
-        builder.password(password)
-    }
-    if (sni.isNotBlank()) {
-        builder.addQueryParameter("sni", sni)
-    }
-    if (name.isNotBlank()) {
-        builder.encodedFragment(name.urlSafe())
-    }
-
-    return builder.toString()
-}
+fun HttpBean.toUri(): String = CoreClient.exportURI(ProfileAdapter.fromBean(this))

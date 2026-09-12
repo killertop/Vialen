@@ -189,8 +189,7 @@ class FocusedUiVisualNativeTest {
                     serverAddress = "127.0.0.1"
                     serverPort = 10000 + index
                 }
-                val id = SagerDatabase.proxyDao.addProxy(ProxyEntity(groupId = fixtureGroup, userOrder = index.toLong(),
-                    socksBean = bean, status = if (index == 2) 1 else 0, ping = if (index == 2) 86 else 0))
+                val id = SagerDatabase.proxyDao.addProxy(ProxyEntity(groupId = fixtureGroup, userOrder = index.toLong(),status = if (index == 2) 1 else 0, ping = if (index == 2) 86 else 0).putBean(bean))
                 if (index == 1) fixtureProfile = id
             }
             (1..6).forEach { index ->

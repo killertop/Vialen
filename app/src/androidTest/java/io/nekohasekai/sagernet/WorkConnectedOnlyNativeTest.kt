@@ -21,7 +21,7 @@ import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.database.preference.KeyValuePair
 import io.nekohasekai.sagernet.database.preference.PublicDatabase
 import io.nekohasekai.sagernet.fmt.KryoConverters
-import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
+import io.nekohasekai.sagernet.core.Profile
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -197,9 +197,7 @@ class WorkConnectedOnlyNativeTest {
             val vpnGroup = db.groupDao().createGroup(ProxyGroup(name = "$nonce-vpn")).also {
                 groups.add(it); checkpoint()
             }
-            DataStore.selectedProxy = db.proxyDao().addProxy(ProxyEntity(groupId = vpnGroup, socksBean = SOCKSBean().apply {
-                initializeDefaultValues(); name = nonce; serverAddress = "127.0.0.1"; serverPort = checkNotNull(socks).port
-            }))
+            DataStore.selectedProxy = db.proxyDao().addProxy(ProxyEntity(groupId = vpnGroup).putProfile(Profile(name = nonce, type = "socks", server = "127.0.0.1", port = checkNotNull(socks).port, socks = Profile.Socks())))
             rules.add(db.rulesDao().createRule(RuleEntity(name = nonce, userOrder = Long.MIN_VALUE,
                 enabled = true, ip = "198.18.0.254/32", outbound = 0)))
             checkpoint()
@@ -213,11 +211,9 @@ class WorkConnectedOnlyNativeTest {
                     link = "http://127.0.0.1:${http.localPort}/$nonce"
                 })
             group.id = db.groupDao().createGroup(group).also { groups.add(it); checkpoint() }
-            val seed = ProxyEntity(groupId = group.id, socksBean = SOCKSBean().apply {
-                initializeDefaultValues(); name = "unchanged-$nonce"; serverAddress = "127.0.0.1"; serverPort = 1081
-            })
+            val seed = ProxyEntity(groupId = group.id).putProfile(Profile(name = "unchanged-$nonce", type = "socks", server = "127.0.0.1", port = 1081, socks = Profile.Socks()))
             seed.id = db.proxyDao().addProxy(seed)
-            val seedBytes = KryoConverters.serialize(seed.requireBean())
+            val seedBytes = seed.requireProfile()
             bound = true
             connection.connect(app, object : SagerConnection.Callback {
                 override fun stateChanged(state: BaseService.State, profileName: String?, msg: String?) = Unit
@@ -235,7 +231,7 @@ class WorkConnectedOnlyNativeTest {
             assertEquals(0, db.groupDao().getById(group.id)!!.subscription!!.lastUpdated)
             val unchanged = db.proxyDao().getByGroup(group.id).single()
             assertEquals(seed.id, unchanged.id)
-            assertArrayEquals(seedBytes, KryoConverters.serialize(unchanged.requireBean()))
+            assertEquals(seedBytes, unchanged.requireProfile())
             SagerNet.startService()
             await("real VPN Connected") { connection.service?.state == BaseService.State.Connected.ordinal }
             assertEquals(pid, shell("pidof ${app.packageName}:bg").trim())
@@ -257,8 +253,8 @@ class WorkConnectedOnlyNativeTest {
             runWorker(requests, completedRequests, pid, ::checkpoint)
             serverError.get()?.let { throw AssertionError("HTTP fixture failed", it) }
             assertEquals(1, hits.get())
-            val updated = db.proxyDao().getByGroup(group.id).single().requireBean()
-            assertEquals(nonce, updated.name); assertEquals("127.0.0.1", updated.serverAddress); assertEquals(1080, updated.serverPort)
+            val updated = db.proxyDao().getByGroup(group.id).single().requireProfile()
+            assertEquals(nonce, updated.name); assertEquals("127.0.0.1", updated.server); assertEquals(1080, updated.port)
             assertTrue(db.groupDao().getById(group.id)!!.subscription!!.lastUpdated > 0)
             assertEquals(BaseService.State.Connected.ordinal, connection.service!!.state)
             assertEquals(pid, shell("pidof ${app.packageName}:bg").trim())

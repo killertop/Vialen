@@ -33,7 +33,7 @@ import moe.matsuri.nb4a.proxy.shadowtls.ShadowTLSSettingsActivity
 @Entity(
     tableName = "proxy_entities", indices = [Index("groupId", name = "groupId")]
 )
-data class ProxyEntity(
+class ProxyEntity(
     @PrimaryKey(autoGenerate = true) var id: Long = 0L,
     var groupId: Long = 0L,
     var type: Int = 0,
@@ -42,21 +42,58 @@ data class ProxyEntity(
     var rx: Long = 0L,
     var status: Int = 0,
     var ping: Int = 0,
-    var uuid: String = "",
+    var sourceKey: String = "",
     var error: String? = null,
-    var socksBean: SOCKSBean? = null,
-    var httpBean: HttpBean? = null,
-    var ssBean: ShadowsocksBean? = null,
-    var vmessBean: VMessBean? = null,
-    var trojanBean: TrojanBean? = null,
-    var hysteriaBean: HysteriaBean? = null,
-    var tuicBean: TuicBean? = null,
-    var wgBean: WireGuardBean? = null,
-    var shadowTLSBean: ShadowTLSBean? = null,
-    var anyTLSBean: AnyTLSBean? = null,
-    var chainBean: ChainBean? = null,
-    var configBean: ConfigBean? = null,
+    document: String = "",
 ) : Serializable() {
+
+    @Ignore private var projection: AbstractBean? = null
+
+    /** Room reads this getter at every write, including edits to requireBean(). */
+    var document: String = document
+        get() {
+            projection?.let { field = ProfileDocument.encode(documentFromBean(it, field)) }
+            return field
+        }
+        set(value) { field = value; projection = null }
+
+    @get:Ignore val socksBean get() = requireBean() as? SOCKSBean
+    @get:Ignore val httpBean get() = requireBean() as? HttpBean
+    @get:Ignore val ssBean get() = requireBean() as? ShadowsocksBean
+    @get:Ignore val vmessBean get() = requireBean() as? VMessBean
+    @get:Ignore val trojanBean get() = requireBean() as? TrojanBean
+    @get:Ignore val hysteriaBean get() = requireBean() as? HysteriaBean
+    @get:Ignore val tuicBean get() = requireBean() as? TuicBean
+    @get:Ignore val wgBean get() = requireBean() as? WireGuardBean
+    @get:Ignore val anyTLSBean get() = requireBean() as? AnyTLSBean
+    @get:Ignore val chainBean get() = requireBean() as? ChainBean
+    @get:Ignore val configBean get() = requireBean() as? ConfigBean
+
+    fun putProfile(profile: io.nekohasekai.sagernet.core.Profile): ProxyEntity {
+        val identified = if (profile.id.isBlank()) profile.copy(id = java.util.UUID.randomUUID().toString()) else profile
+        type = ProfileDocument.profileType(identified)
+        document = ProfileDocument.encode(ProfileDocument(kind = "node", profile = identified))
+        return this
+    }
+
+    fun requireProfile(): io.nekohasekai.sagernet.core.Profile =
+        requireNotNull(ProfileDocument.decode(document).profile) { "Document is not a node" }
+
+    private fun documentFromBean(bean: AbstractBean, originalJson: String): ProfileDocument = when (bean) {
+        is ChainBean -> ProfileDocument(kind = "chain", name = bean.name.orEmpty(), hops = bean.proxies.toList())
+        is ConfigBean -> ProfileDocument(kind = "raw_config", name = bean.name.orEmpty(), content = bean.config.orEmpty(), scope = if (bean.type == 1) "outbound" else "config")
+        else -> {
+            val original = originalJson.takeIf { it.isNotEmpty() }?.let(ProfileDocument::decode)?.profile
+            val profile = if (original != null) ProfileAdapter.fromBean(bean, original) else ProfileAdapter.fromBean(bean, java.util.UUID.randomUUID().toString())
+            ProfileDocument(kind = "node", profile = profile)
+        }
+    }
+
+    fun copy(id: Long = this.id, groupId: Long = this.groupId, type: Int = this.type,
+             userOrder: Long = this.userOrder, tx: Long = this.tx, rx: Long = this.rx,
+             status: Int = this.status, ping: Int = this.ping, sourceKey: String = this.sourceKey,
+             error: String? = this.error, document: String = this.document): ProxyEntity =
+        ProxyEntity(id, groupId, type, userOrder, tx, rx, status, ping, sourceKey, error, document).also { it.dirty = dirty }
 
     companion object {
         const val TYPE_SOCKS = 0
@@ -109,10 +146,10 @@ data class ProxyEntity(
         output.writeLong(rx)
         output.writeInt(status)
         output.writeInt(ping)
-        output.writeString(uuid)
+        output.writeString(sourceKey)
         output.writeString(error)
 
-        val data = KryoConverters.serialize(requireBean())
+        val data = document.toByteArray(Charsets.UTF_8)
         output.writeVarInt(data.size, true)
         output.writeBytes(data)
 
@@ -120,7 +157,7 @@ data class ProxyEntity(
     }
 
     override fun deserializeFromBuffer(input: ByteBufferInput) {
-        val version = input.readInt()
+        require(input.readInt() == 0) { "Unsupported parcel version" }
 
         id = input.readLong()
         groupId = input.readLong()
@@ -130,7 +167,7 @@ data class ProxyEntity(
         rx = input.readLong()
         status = input.readInt()
         ping = input.readInt()
-        uuid = input.readString()
+        sourceKey = input.readString()
         error = input.readString()
         putByteArray(input.readBytes(input.readVarInt(true)))
 
@@ -139,20 +176,9 @@ data class ProxyEntity(
 
 
     fun putByteArray(byteArray: ByteArray) {
-        when (type) {
-            TYPE_SOCKS -> socksBean = KryoConverters.socksDeserialize(byteArray)
-            TYPE_HTTP -> httpBean = KryoConverters.httpDeserialize(byteArray)
-            TYPE_SS -> ssBean = KryoConverters.shadowsocksDeserialize(byteArray)
-            TYPE_VMESS -> vmessBean = KryoConverters.vmessDeserialize(byteArray)
-            TYPE_TROJAN -> trojanBean = KryoConverters.trojanDeserialize(byteArray)
-            TYPE_HYSTERIA -> hysteriaBean = KryoConverters.hysteriaDeserialize(byteArray)
-            TYPE_WG -> wgBean = KryoConverters.wireguardDeserialize(byteArray)
-            TYPE_TUIC -> tuicBean = KryoConverters.tuicDeserialize(byteArray)
-            TYPE_SHADOWTLS -> shadowTLSBean = KryoConverters.shadowTLSDeserialize(byteArray)
-            TYPE_ANYTLS -> anyTLSBean = KryoConverters.anyTLSDeserialize(byteArray)
-            TYPE_CHAIN -> chainBean = KryoConverters.chainDeserialize(byteArray)
-            TYPE_CONFIG -> configBean = KryoConverters.configDeserialize(byteArray)
-        }
+        val decoded = ProfileDocument.decode(byteArray.toString(Charsets.UTF_8))
+        type = decoded.entityType()
+        document = ProfileDocument.encode(decoded)
     }
 
     fun displayType(): String = when (type) {
@@ -175,21 +201,9 @@ data class ProxyEntity(
     fun displayAddress() = requireBean().displayAddress()
 
     fun requireBean(): AbstractBean {
-        return when (type) {
-            TYPE_SOCKS -> socksBean
-            TYPE_HTTP -> httpBean
-            TYPE_SS -> ssBean
-            TYPE_VMESS -> vmessBean
-            TYPE_TROJAN -> trojanBean
-            TYPE_HYSTERIA -> hysteriaBean
-            TYPE_WG -> wgBean
-            TYPE_TUIC -> tuicBean
-            TYPE_SHADOWTLS -> shadowTLSBean
-            TYPE_ANYTLS -> anyTLSBean
-            TYPE_CHAIN -> chainBean
-            TYPE_CONFIG -> configBean
-            else -> error("Undefined type $type")
-        } ?: error("Null ${displayType()} profile")
+        projection?.let { return it }
+        val decoded = ProfileDocument.decode(document)
+        return decoded.toBean().also { projection = it }
     }
 
     fun haveLink(): Boolean {
@@ -208,18 +222,12 @@ data class ProxyEntity(
         }
     }
 
-    fun toStdLink(compact: Boolean = false): String = with(requireBean()) {
-        when (this) {
-            is SOCKSBean -> toUri()
-            is HttpBean -> toUri()
-            is ShadowsocksBean -> toUri()
-            is VMessBean -> toUriVMessVLESSTrojan(false)
-            is TrojanBean -> toUriVMessVLESSTrojan(true)
-            is HysteriaBean -> toUri()
-            is TuicBean -> toUri()
-            is AnyTLSBean -> toUri()
-            else -> toUniversalLink()
-        }
+    fun toStdLink(compact: Boolean = false): String =
+        io.nekohasekai.sagernet.core.CoreClient.exportURI(requireProfile())
+
+    fun toProfileJson(): String = when (type) {
+        TYPE_CONFIG -> configBean!!.config
+        else -> io.nekohasekai.sagernet.core.CoreClient.exportProfiles(listOf(requireProfile()))
     }
 
     fun exportConfig(): Pair<String, String> {
@@ -257,82 +265,10 @@ data class ProxyEntity(
     }
 
     fun putBean(bean: AbstractBean): ProxyEntity {
-        socksBean = null
-        httpBean = null
-        ssBean = null
-        vmessBean = null
-        trojanBean = null
-        hysteriaBean = null
-        wgBean = null
-        tuicBean = null
-        shadowTLSBean = null
-        anyTLSBean = null
-        chainBean = null
-        configBean = null
-
-        when (bean) {
-            is SOCKSBean -> {
-                type = TYPE_SOCKS
-                socksBean = bean
-            }
-
-            is HttpBean -> {
-                type = TYPE_HTTP
-                httpBean = bean
-            }
-
-            is ShadowsocksBean -> {
-                type = TYPE_SS
-                ssBean = bean
-            }
-
-            is VMessBean -> {
-                type = TYPE_VMESS
-                vmessBean = bean
-            }
-
-            is TrojanBean -> {
-                type = TYPE_TROJAN
-                trojanBean = bean
-            }
-
-            is HysteriaBean -> {
-                type = TYPE_HYSTERIA
-                hysteriaBean = bean
-            }
-
-            is WireGuardBean -> {
-                type = TYPE_WG
-                wgBean = bean
-            }
-
-            is TuicBean -> {
-                type = TYPE_TUIC
-                tuicBean = bean
-            }
-
-            is ShadowTLSBean -> {
-                type = TYPE_SHADOWTLS
-                shadowTLSBean = bean
-            }
-
-            is AnyTLSBean -> {
-                type = TYPE_ANYTLS
-                anyTLSBean = bean
-            }
-
-            is ChainBean -> {
-                type = TYPE_CHAIN
-                chainBean = bean
-            }
-
-            is ConfigBean -> {
-                type = TYPE_CONFIG
-                configBean = bean
-            }
-
-            else -> error("Undefined type $type")
-        }
+        val updated = documentFromBean(bean, document)
+        type = updated.entityType()
+        document = ProfileDocument.encode(updated)
+        projection = bean
         return this
     }
 

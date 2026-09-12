@@ -161,7 +161,7 @@ func NewSingBoxInstance(config string, localTransport LocalDNSTransport) (b *Box
 	}
 
 	// selector
-	if proxy, ok := b.Outbound().Outbound("proxy"); ok {
+	if proxy, ok := b.Outbound().Outbound("selected"); ok {
 		if selector, ok := proxy.(*group.Selector); ok {
 			b.selector = selector
 		}

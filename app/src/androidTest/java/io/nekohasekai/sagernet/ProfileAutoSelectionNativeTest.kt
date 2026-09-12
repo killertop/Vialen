@@ -3,7 +3,7 @@ package io.nekohasekai.sagernet
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.database.*
-import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
+import io.nekohasekai.sagernet.core.Profile
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -38,9 +38,8 @@ class ProfileAutoSelectionNativeTest {
         ProxyGroup(name = "auto-selection-regression")
     ).also { groups.add(it) }
 
-    private fun bean() = TrojanBean().apply {
-        initializeDefaultValues(); serverAddress = "example.test"; serverPort = 443
-    }
+    private fun bean() = Profile(type = "trojan", server = "example.test", port = 443,
+        tls = Profile.Tls(), trojan = Profile.Password("synthetic"))
 
     @Test fun firstAddSelectsBeforeListenerAndSecondAddPreservesChoice() = runBlocking {
         val group = group()
@@ -64,10 +63,10 @@ class ProfileAutoSelectionNativeTest {
         } finally { ProfileManager.removeListener(listener) }
     }
 
-    @Test fun subscriptionPersistenceThenSelectionKeepsFirstAcrossRefresh() {
+    @Test fun subscriptionPersistenceThenSelectionKeepsFirstAcrossRefresh() = runBlocking {
         val target = group()
         val group = SagerDatabase.groupDao.getById(target)!!
-        fun named(name: String) = bean().apply { this.name = name }
+        fun named(name: String) = bean().copy(name = name)
         io.nekohasekai.sagernet.group.SubscriptionPersistence.apply(
             SagerDatabase.instance, group, listOf(named("first"), named("second"))
         )

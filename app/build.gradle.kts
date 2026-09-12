@@ -57,15 +57,12 @@ android {
 
 tasks.withType<Test>().configureEach {
     maxHeapSize = "2048m"
-    dependsOn("buildRustHost")
-    // Native implementation changes must invalidate JVM test results too.
-    inputs.file(rootProject.file("rust/vialen-core/target/release/libvialen_core.dylib"))
-        .withPropertyName("rustHostLibrary")
+    dependsOn("buildGoHost")
+    inputs.file(rootProject.file("core/build/core-host"))
+        .withPropertyName("goHostExecutable")
         .withPathSensitivity(PathSensitivity.NONE)
-    systemProperty(
-        "java.library.path",
-        "${rootProject.file("rust/vialen-core/target/release")}:${rootProject.file("rust/vialen-core/target/debug")}"
-    )
+    systemProperty("vialen.core.host", rootProject.file("core/build/core-host").absolutePath)
+    systemProperty("vialen.core.testBackend", "io.nekohasekai.sagernet.core.HostCoreBackend")
 }
 
 // Robolectric's binary AssetManager reads the local-test resource APK. Copying
@@ -86,43 +83,16 @@ tasks.configureEach {
     }
 }
 
-val buildRustHost = tasks.register<Exec>("buildRustHost") {
+val buildGoHost = tasks.register<Exec>("buildGoHost") {
     group = "build"
-    description = "Build libvialen_core.dylib for the macOS host JVM (used by unit tests via java.library.path)"
-    val rustRoot = rootProject.file("rust/vialen-core")
-    val buildScript = rootProject.file("scripts/build-rust-host.sh")
-    inputs.file(rootProject.file("rust-toolchain.toml"))
-    inputs.file(rustRoot.resolve("Cargo.toml"))
-    inputs.file(rustRoot.resolve("Cargo.lock"))
-    inputs.dir(rustRoot.resolve("src"))
-    inputs.file(buildScript)
-    outputs.file(rustRoot.resolve("target/release/libvialen_core.dylib"))
-    commandLine("bash", buildScript.absolutePath)
-}
-
-
-val rustJniLibsDir = layout.buildDirectory.dir("generated/rustJniLibs")
-
-val buildRustAndroid = tasks.register<RustAndroidTask>("buildRustAndroid") {
-    group = "build"
-    description = "Build the Rust JNI library for arm64-v8a"
-    val rustRoot = rootProject.file("rust/vialen-core")
-    val buildScript = rootProject.file("scripts/build-rust-android.sh")
-    inputs.file(rootProject.file("rust-toolchain.toml"))
-    inputs.file(rustRoot.resolve("Cargo.toml"))
-    inputs.file(rustRoot.resolve("Cargo.lock"))
-    inputs.dir(rustRoot.resolve("src"))
-    inputs.file(buildScript)
-    outputDirectory.set(rustJniLibsDir)
-    commandLine("bash", buildScript.absolutePath, rustJniLibsDir.get().asFile.absolutePath)
-}
-
-androidComponents {
-    onVariants(selector().all()) { variant ->
-        variant.sources.jniLibs?.addGeneratedSourceDirectory(
-            buildRustAndroid, RustAndroidTask::outputDirectory
-        )
-    }
+    description = "Build the pure Go executable used by JVM contract tests"
+    val coreRoot = rootProject.file("core")
+    val script = rootProject.file("scripts/build-go-host.sh")
+    inputs.files(fileTree(coreRoot) { include("**/*.go", "go.mod", "go.sum") })
+    inputs.file(rootProject.file("scripts/go-toolchain.sh"))
+    inputs.file(script)
+    outputs.file(coreRoot.resolve("build/core-host"))
+    commandLine("bash", script.absolutePath)
 }
 
 dependencies {
@@ -165,8 +135,6 @@ dependencies {
     implementation(libs.room.runtime)
     ksp(libs.room.compiler)
     implementation(libs.room.ktx)
-    implementation(libs.roomigrant.lib)
-    ksp(libs.roomigrant.compiler)
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 

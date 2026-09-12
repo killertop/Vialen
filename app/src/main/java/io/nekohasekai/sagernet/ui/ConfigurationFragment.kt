@@ -58,11 +58,15 @@ import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
 import io.nekohasekai.sagernet.databinding.LayoutProfileListBinding
 import io.nekohasekai.sagernet.databinding.LayoutProgressListBinding
-import io.nekohasekai.sagernet.fmt.AbstractBean
+import io.nekohasekai.sagernet.core.Profile
 import io.nekohasekai.sagernet.fmt.toUniversalLink
 import io.nekohasekai.sagernet.group.GroupUpdater
 import io.nekohasekai.sagernet.group.RawUpdater
 import io.nekohasekai.sagernet.ktx.FixedLinearLayoutManager
+import io.nekohasekai.sagernet.ktx.MAX_PROFILE_INPUT_BYTES
+import io.nekohasekai.sagernet.ktx.MAX_IMPORTED_PROFILES
+import io.nekohasekai.sagernet.ktx.readProfileBytes
+import io.nekohasekai.sagernet.ktx.readProfileText
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.SubscriptionFoundException
 import io.nekohasekai.sagernet.ktx.alert
@@ -316,26 +320,29 @@ class ConfigurationFragment @JvmOverloads constructor(
                         cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                             .takeIf { it >= 0 }?.let(cursor::getString)
                     }
-                    val proxies = mutableListOf<AbstractBean>()
+                    val proxies = mutableListOf<Profile>()
                     if (fileName?.endsWith(".zip", ignoreCase = true) == true) {
                         // A broken entry must close the archive as well as the underlying provider stream.
                         checkNotNull(resolver.openInputStream(file)).use { input ->
                             ZipInputStream(input).use { zip ->
+                                var bytesLeft = MAX_PROFILE_INPUT_BYTES
+                                var entryCount = 0
                                 while (true) {
                                     val entry = zip.nextEntry ?: break
+                                    require(++entryCount <= MAX_IMPORTED_PROFILES) { "Too many archive entries" }
                                     if (!entry.isDirectory) {
-                                        RawUpdater.parseRaw(zip.readBytes().toString(Charsets.UTF_8), entry.name)
-                                            ?.let { proxies.addAll(it) }
+                                        val bytes = zip.readProfileBytes(bytesLeft)
+                                        bytesLeft -= bytes.size
+                                        proxies.addAll(RawUpdater.parseRaw(bytes.decodeToString(throwOnInvalidSequence = true), entry.name))
+                                        require(proxies.size <= MAX_IMPORTED_PROFILES) { "Import exceeds 10000 profiles" }
                                     }
                                     zip.closeEntry()
                                 }
                             }
                         }
                     } else {
-                        val fileText = checkNotNull(resolver.openInputStream(file)).bufferedReader().use {
-                            it.readText()
-                        }
-                        RawUpdater.parseRaw(fileText, fileName ?: "")?.let { proxies.addAll(it) }
+                        val fileText = checkNotNull(resolver.openInputStream(file)).use { it.readProfileText() }
+                        proxies.addAll(RawUpdater.parseRaw(fileText, fileName ?: ""))
                     }
                     if (proxies.isEmpty()) {
                         showMessage(app.getString(R.string.no_proxies_found_in_file))
@@ -353,7 +360,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
         }
 
-    suspend fun import(proxies: List<AbstractBean>, targetId: Long, originGroupId: Long? = null) {
+    suspend fun import(proxies: List<Profile>, targetId: Long, originGroupId: Long? = null) {
         ProfileManager.createProfilesForImport(targetId, proxies)
         onMainDispatcher {
             val owner = activity as? MainActivity
@@ -2030,9 +2037,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                     when (item.itemId) {
                         R.id.action_standard_qr -> showCode(entity.toStdLink())
                         R.id.action_standard_clipboard -> export(entity.toStdLink())
-                        R.id.action_universal_qr -> showCode(entity.requireBean().toUniversalLink())
+                        R.id.action_universal_qr -> showCode(entity.toProfileJson())
                         R.id.action_universal_clipboard -> export(
-                            entity.requireBean().toUniversalLink()
+                            entity.toProfileJson()
                         )
 
                         R.id.action_config_export_clipboard -> export(entity.exportConfig().first)

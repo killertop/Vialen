@@ -74,8 +74,7 @@ class ProfileExportNativeTest {
         }, null, true)
         try {
             group.id = SagerDatabase.groupDao.createGroup(group)
-            val profiles = (1..2).map { number -> ProxyEntity(groupId = group.id, userOrder = number.toLong(),
-                socksBean = SOCKSBean().apply {
+            val profiles = (1..2).map { number -> ProxyEntity(groupId = group.id, userOrder = number.toLong()).putBean(SOCKSBean().apply {
                     initializeDefaultValues(); name = "Export fixture $number"
                     serverAddress = "127.0.0.1"; serverPort = 10080 + number
                 }).also { it.id = SagerDatabase.proxyDao.addProxy(it) } }

@@ -13,11 +13,12 @@ import org.junit.Assert.*
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
-@RunWith(RustBridgeRobolectricTestRunner::class)
+@RunWith(CoreBridgeRobolectricTestRunner::class)
 @Config(sdk = [34], application = android.app.Application::class)
 class VpnAuthorizationBoundaryTest {
     @Before fun setup() {
-        ConfigBuilderGoldenFixtureTest.setupDir()
+        SagerNet.application = mockk<SagerNet>(relaxed = true)
+        mockkObject(DataStore)
         mockkStatic(VpnService::class)
         mockkStatic(ContextCompat::class)
         every { ContextCompat.startForegroundService(any(), any()) } just Runs

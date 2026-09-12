@@ -38,7 +38,7 @@ import io.nekohasekai.sagernet.database.ProxyGroup
 import io.nekohasekai.sagernet.database.SubscriptionBean
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
 import io.nekohasekai.sagernet.databinding.LayoutMainBinding
-import io.nekohasekai.sagernet.fmt.AbstractBean
+import io.nekohasekai.sagernet.core.Profile
 import io.nekohasekai.sagernet.fmt.KryoConverters
 import io.nekohasekai.sagernet.group.GroupInterfaceAdapter
 import io.nekohasekai.sagernet.group.GroupUpdater
@@ -183,19 +183,8 @@ class MainActivity : ThemedActivity(),
             subscription.link = url
             group.name = uri.getQueryParameter("name")
         } else {
-            val data = uri.encodedQuery.takeIf { !it.isNullOrBlank() } ?: return
-            try {
-                group = KryoConverters.deserialize(
-                    ProxyGroup().apply { export = true }, Util.zlibDecompress(Util.b64Decode(data))
-                ).apply {
-                    export = false
-                }
-            } catch (e: Exception) {
-                onMainDispatcher {
-                    alert(e.readableMessage).show()
-                }
-                return
-            }
+            onMainDispatcher { alert("A subscription URL is required").show() }
+            return
         }
 
         val name = group.name.takeIf { !it.isNullOrBlank() } ?: group.subscription?.link
@@ -252,7 +241,7 @@ class MainActivity : ThemedActivity(),
 
     }
 
-    private suspend fun finishImportProfile(profile: AbstractBean) {
+    private suspend fun finishImportProfile(profile: Profile) {
         val targetId = DataStore.selectedGroupForImport()
 
         ProfileManager.createProfile(targetId, profile)

@@ -6,17 +6,13 @@ report="${1:?toolchain report path required}"
 : "${GITHUB_ENV:?GitHub Actions environment file required}"
 : "${GITHUB_PATH:?GitHub Actions path file required}"
 command -v sdkmanager >/dev/null
-command -v rustup >/dev/null
 
 sdkmanager --install "platforms;android-37.0" "build-tools;36.0.0" "ndk;28.1.13356709"
-rustup toolchain install 1.97.1 --profile minimal --target aarch64-linux-android
 export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.1.13356709"
 export NDK="$ANDROID_NDK_HOME"
 export PATH="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$ANDROID_HOME/build-tools/36.0.0:$PATH"
-[[ "$(go env GOVERSION)" == go1.26.5 ]]
+[[ "$(go env GOVERSION)" == go1.27.1 ]]
 java -version 2>&1 | head -n 1 | grep -F '"25.0.2"' >/dev/null
-rustup run 1.97.1 rustc --version | grep -E '^rustc 1\.97\.1 ' >/dev/null
-rustup target list --toolchain 1.97.1 --installed | grep -Fx aarch64-linux-android >/dev/null
 grep -Eq '^Pkg.Revision *= *28\.1\.13356709' "$ANDROID_NDK_HOME/source.properties"
 grep -Eq '^Pkg.Revision *= *36\.0\.0' "$ANDROID_HOME/build-tools/36.0.0/source.properties"
 test -f "$ANDROID_HOME/platforms/android-37.0/android.jar"
@@ -27,9 +23,6 @@ command -v aapt2 >/dev/null
 {
   go version
   java -version 2>&1
-  rustup run 1.97.1 rustc --version --verbose
-  rustup run 1.97.1 cargo --version
-  rustup target list --toolchain 1.97.1 --installed
   cat "$ANDROID_NDK_HOME/source.properties"
   cat "$ANDROID_HOME/build-tools/36.0.0/source.properties"
   cat "$ANDROID_HOME/platforms/android-37.0/source.properties"

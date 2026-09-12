@@ -14,15 +14,13 @@ env:
   GOTOOLCHAIN: local
   GOWORK: "off"
   VIALEN_NDK_VERSION: 28.1.13356709
-  RUSTFLAGS: ""
 
 jobs:
-  libcore:
-    name: Build traceable ARM64 core
+  core-tests:
+    name: Verify pure Go business core
     runs-on: ubuntu-24.04
     outputs:
       source_sha: ${{ steps.source.outputs.sha }}
-      manifest_sha: ${{ steps.manifest.outputs.sha }}
     defaults:
       run:
         shell: bash
@@ -40,17 +38,52 @@ jobs:
           source_sha=$(git rev-parse --verify HEAD)
           [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]]
           printf 'sha=%s\n' "$source_sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.1'
+          cache: false
+      - name: Test Go contracts and concurrency
+        run: |
+          set -euo pipefail
+          [[ "$(go env GOVERSION)" == go1.27.1 ]]
+          go -C core test -mod=readonly -count=1 ./...
+          go -C core test -mod=readonly -race -count=1 ./...
+
+  libcore:
+    name: Build traceable ARM64 core
+    needs: core-tests
+    runs-on: ubuntu-24.04
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
+      manifest_sha: ${{ steps.manifest.outputs.sha }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: Vialen
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.core-tests.outputs.source_sha }}
+          path: Vialen
+          persist-credentials: false
+      - name: Resolve immutable source
+        id: source
+        run: |
+          set -euo pipefail
+          source_sha=$(git rev-parse --verify HEAD)
+          [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]]
+          printf 'sha=%s\n' "$source_sha" >> "$GITHUB_OUTPUT"
           mkdir -p ci-artifacts/core
           python3 scripts/ci/artifacts.py source ci-artifacts/core/source-manifest.json
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26.5'
+          go-version: '1.27.1'
           cache: false
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '25.0.2'
-      - name: Install and verify Android/Rust tools
+      - name: Install and verify Android/Go tools
         run: bash scripts/ci/prepare-toolchain.sh ci-artifacts/core/toolchain.txt
       - name: Build pinned core sources
         env:
@@ -67,7 +100,6 @@ jobs:
             -run '^TestLinkEndpointFilter(DetachPassesNil|AttachKeepsFiltering|DetachStopsFDBasedReceiver)$' \
             -count=1 -timeout=30s github.com/sagernet/sing-tun)
           (cd libcore && bash init.sh)
-          mkdir -p libcore/.build
           bash buildScript/lib/core/build.sh
           cp app/libs/libcore.aar ci-artifacts/core/libcore.aar
           bash scripts/check_16kb_alignment.sh ci-artifacts/core/libcore.aar
@@ -113,13 +145,13 @@ jobs:
           cp ci-artifacts/core/libcore.aar app/libs/libcore.aar
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26.5'
+          go-version: '1.27.1'
           cache: false
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '25.0.2'
-      - name: Install and verify Android/Rust tools
+      - name: Install and verify Android/Go tools
         run: |
           mkdir -p ci-artifacts/apk
           bash scripts/ci/prepare-toolchain.sh ci-artifacts/apk/toolchain.txt

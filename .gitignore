@@ -16,10 +16,11 @@ jniLibs/
 /library/libcore_build/
 .idea/deploymentTargetDropDown.xml
 /nkmr
-/rust/vialen-core/target/
 
 # submodules
 /external
 
 # Keep local signing material outside source control.
 /release.keystore
+
+__pycache__/

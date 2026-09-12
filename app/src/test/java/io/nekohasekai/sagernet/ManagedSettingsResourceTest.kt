@@ -10,7 +10,7 @@ import org.robolectric.annotation.Config
 import org.xmlpull.v1.XmlPullParser
 
 /** Resource contract only; does not substitute for physical interaction/layout acceptance. */
-@RunWith(RustBridgeRobolectricTestRunner::class)
+@RunWith(CoreBridgeRobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class ManagedSettingsResourceTest {
     private fun keys(): Set<String> {

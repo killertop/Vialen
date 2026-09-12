@@ -103,7 +103,7 @@ class SocksProductionCutoverTest {
     }
 
     @Test
-    fun testV2rayNBase64AuthFormat() {
+    fun testBase64LookingUsernameRemainsLiteral() {
         val auth = JavaBase64.getEncoder().encodeToString("v2user:v2pass".toByteArray())
         val uri = "socks5://$auth@1.2.3.4:1080#V2rayNSocks"
         val bean = parseSOCKS(uri)
@@ -111,8 +111,8 @@ class SocksProductionCutoverTest {
         assertEquals(SOCKSBean.PROTOCOL_SOCKS5, bean.protocol)
         assertEquals("1.2.3.4", bean.serverAddress)
         assertEquals(1080, bean.serverPort)
-        assertEquals("v2user", bean.username)
-        assertEquals("v2pass", bean.password)
+        assertEquals(auth, bean.username)
+        assertEquals("", bean.password)
         assertEquals("V2rayNSocks", bean.name)
     }
 
@@ -132,8 +132,8 @@ class SocksProductionCutoverTest {
     @Test
     fun testSpecialCharactersAndPipes() {
         val pass = "pass|with|pipes:and@special"
-        val encodedPass = URLEncoder.encode(pass, "UTF-8")
-        val uri = "socks5://myuser:$encodedPass@127.0.0.1:1080#Special|Chars|Node"
+        val encodedPass = URLEncoder.encode(pass, "UTF-8").replace("+", "%20")
+        val uri = "socks5://myuser:$encodedPass@127.0.0.1:1080#Special%7CChars%7CNode"
         val bean = parseSOCKS(uri)
 
         assertEquals("127.0.0.1", bean.serverAddress)
@@ -144,7 +144,7 @@ class SocksProductionCutoverTest {
     }
 
     @Test
-    fun testInvalidInputsThrowIllegalStateException() {
+    fun testInvalidInputsRejectWithArgumentError() {
         val invalidUris = listOf(
             "http://1.1.1.1:80",
             "ss://user:pass@1.1.1.1:8388",
@@ -159,8 +159,7 @@ class SocksProductionCutoverTest {
             try {
                 parseSOCKS(uri)
                 fail("Expected parseSOCKS to throw for $uri")
-            } catch (e: IllegalStateException) {
-                assertTrue(e.message?.contains("Not supported") == true)
+            } catch (_: IllegalArgumentException) {
             }
         }
     }

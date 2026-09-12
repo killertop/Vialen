@@ -1,0 +1,72 @@
+{
+  "profiles": [
+    {
+      "id": "socks",
+      "type": "socks",
+      "server": "127.0.0.1",
+      "port": 1080,
+      "socks": {
+        "version": "5"
+      }
+    }
+  ],
+  "raw_outbounds": [
+    {
+      "id": "raw",
+      "json": {
+        "type": "http",
+        "server": "127.0.0.1",
+        "server_port": 8080,
+        "headers": {
+          "X-Test": "value"
+        }
+      }
+    }
+  ],
+  "chains": [
+    {
+      "id": "chain",
+      "hops": [
+        "socks",
+        "raw"
+      ]
+    }
+  ],
+  "selected_id": "chain",
+  "purpose": "export",
+  "platform": {
+    "vpn": false,
+    "mixed_port": 18080
+  },
+  "policy": {
+    "ipv6": "prefer_ipv4",
+    "server_strategy": "ipv6_only",
+    "dns": {
+      "direct": {
+        "type": "udp",
+        "server": "1.1.1.1",
+        "strategy": "ipv4_only"
+      },
+      "remote": {
+        "type": "https",
+        "server": "dns.google",
+        "strategy": "prefer_ipv6"
+      },
+      "route_domains": true
+    },
+    "rules": [
+      {
+        "id": "direct",
+        "match": {
+          "domains": [
+            "example.com"
+          ]
+        },
+        "action": "route",
+        "target": {
+          "kind": "direct"
+        }
+      }
+    ]
+  }
+}

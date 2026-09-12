@@ -31,6 +31,9 @@ class TuicSettingsActivity : ProfileSettingsActivity<TuicBean>() {
     }
 
     override fun TuicBean.serialize() {
+        protocolVersion = 5
+        fastConnect = false
+        customJSON = ""
         name = DataStore.profileName
         serverAddress = DataStore.serverAddress
         serverPort = DataStore.serverPort

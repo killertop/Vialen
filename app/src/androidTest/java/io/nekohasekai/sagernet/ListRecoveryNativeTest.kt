@@ -239,8 +239,7 @@ class ListRecoveryNativeTest {
         val groupId = SagerDatabase.groupDao.createGroup(ProxyGroup(name = "List scroll fixture"))
         try {
             val ids = (1..30).map { index ->
-                SagerDatabase.proxyDao.addProxy(ProxyEntity(groupId = groupId, userOrder = index.toLong(),
-                    socksBean = SOCKSBean().apply { initializeDefaultValues(); name = "Node $index"; serverAddress = "127.0.0.1"; serverPort = 1080 }))
+                SagerDatabase.proxyDao.addProxy(ProxyEntity(groupId = groupId, userOrder = index.toLong()).putBean(SOCKSBean().apply { initializeDefaultValues(); name = "Node $index"; serverAddress = "127.0.0.1"; serverPort = 1080 }))
             }
             DataStore.selectedGroup = groupId
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->

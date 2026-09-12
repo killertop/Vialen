@@ -11,7 +11,6 @@ import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.fmt.buildConfig
 import io.nekohasekai.sagernet.fmt.v2ray.VMessBean
-import io.nekohasekai.sagernet.fmt.v2ray.buildSingBoxOutboundStandardV2RayBean
 import io.nekohasekai.sagernet.fmt.v2ray.parseV2Ray
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
@@ -30,6 +29,20 @@ import java.net.URL
 
 @RunWith(AndroidJUnit4::class)
 class RealDeviceVlessRealityLiveTest {
+    private fun compileTypedOutbound(bean: io.nekohasekai.sagernet.fmt.v2ray.StandardV2RayBean): Outbound_VLESSOptions {
+        val gson = com.google.gson.Gson()
+        val profile = io.nekohasekai.sagernet.fmt.ProfileAdapter.fromBean(bean, "live-test")
+        val request = gson.toJsonTree(mapOf(
+            "profiles" to listOf(profile), "selected_id" to profile.id, "purpose" to "export",
+            "platform" to emptyMap<String, Any>(),
+            "policy" to mapOf("dns" to mapOf("direct" to mapOf("type" to "local"), "remote" to mapOf("type" to "local")))
+        )).asJsonObject
+        val plan = io.nekohasekai.sagernet.core.CoreClient.compile(request)
+        val config = com.google.gson.JsonParser.parseString(plan["config"].asString).asJsonObject
+        val outbound = config.getAsJsonArray("outbounds").first { it.asJsonObject["type"].asString == profile.type }
+        return gson.fromJson(outbound, Outbound_VLESSOptions::class.java)
+    }
+
     @get:org.junit.Rule
     val profileState = ProfileSelectionStateRule()
 
@@ -143,7 +156,7 @@ class RealDeviceVlessRealityLiveTest {
             println("[VLESS-TEST] Ephemeral parse success: server=${bean.serverAddress}:${bean.serverPort}, sni=${bean.sni}, flow=${bean.encryption}")
 
             // 2. Build and assert outbound
-            val outbound = buildSingBoxOutboundStandardV2RayBean(bean)
+            val outbound = compileTypedOutbound(bean)
             assertTrue("Expected outbound is Outbound_VLESSOptions", outbound is Outbound_VLESSOptions)
             val vlessOutbound = outbound as Outbound_VLESSOptions
             assertEquals("Expected type == vless", "vless", vlessOutbound.type)

@@ -396,7 +396,7 @@ func TestMainInstanceCloseDrainsDetachedHTTPDial(t *testing.T) {
 }
 
 func TestSelectorOutboundNotifiesOnlySuccessfulChanges(t *testing.T) {
-	instance, err := NewSingBoxInstance(`{"outbounds":[{"type":"selector","tag":"proxy","outbounds":["first","second"],"default":"first"},{"type":"direct","tag":"first"},{"type":"direct","tag":"second"}],"experimental":{"cache_file":{"enabled":false}}}`, nil)
+	instance, err := NewSingBoxInstance(`{"outbounds":[{"type":"selector","tag":"selected","outbounds":["first","second"],"default":"first"},{"type":"direct","tag":"first"},{"type":"direct","tag":"second"}],"experimental":{"cache_file":{"enabled":false}}}`, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -428,7 +428,7 @@ func TestSelectorOutboundNotifiesOnlySuccessfulChanges(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("selector callback deadlocked while resetting connections")
 	}
-	if len(selected) != 1 || selected[0] != "proxy/second" || instance.selector.Now() != "second" {
+	if len(selected) != 1 || selected[0] != "selected/second" || instance.selector.Now() != "second" {
 		t.Fatalf("notification did not match actual selector: %v", selected)
 	}
 	if !instance.SelectOutbound("second") || len(selected) != 1 {

@@ -11,7 +11,6 @@ import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.fmt.buildConfig
 import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
-import io.nekohasekai.sagernet.fmt.hysteria.buildSingBoxOutboundHysteriaBean
 import io.nekohasekai.sagernet.fmt.hysteria.parseHysteria2
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
@@ -29,6 +28,20 @@ import java.net.URL
 @RunWith(AndroidJUnit4::class)
 /** Explicit no-obfuscation HY2 contract; run separately from the salamander suite. */
 class RealDeviceHysteria2PlainLiveTest {
+    private fun compileTypedOutbound(bean: io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean): Outbound_Hysteria2Options {
+        val gson = com.google.gson.Gson()
+        val profile = io.nekohasekai.sagernet.fmt.ProfileAdapter.fromBean(bean, "live-test")
+        val request = gson.toJsonTree(mapOf(
+            "profiles" to listOf(profile), "selected_id" to profile.id, "purpose" to "export",
+            "platform" to emptyMap<String, Any>(),
+            "policy" to mapOf("dns" to mapOf("direct" to mapOf("type" to "local"), "remote" to mapOf("type" to "local")))
+        )).asJsonObject
+        val plan = io.nekohasekai.sagernet.core.CoreClient.compile(request)
+        val config = com.google.gson.JsonParser.parseString(plan["config"].asString).asJsonObject
+        val outbound = config.getAsJsonArray("outbounds").first { it.asJsonObject["type"].asString == profile.type }
+        return gson.fromJson(outbound, Outbound_Hysteria2Options::class.java)
+    }
+
     @get:org.junit.Rule
     val profileState = ProfileSelectionStateRule()
 
@@ -142,7 +155,7 @@ class RealDeviceHysteria2PlainLiveTest {
             println("[HY2-PLAIN-TEST] Ephemeral parse success: server=${bean.serverAddress}:${bean.serverPorts}, obfsType=${bean.obfsType}")
 
             // 2. Build and assert outbound (Default mode: disable_chrome_parrot omitted)
-            val outbound = buildSingBoxOutboundHysteriaBean(bean)
+            val outbound = compileTypedOutbound(bean)
             assertTrue("Expected outbound is Outbound_Hysteria2Options", outbound is Outbound_Hysteria2Options)
             val hy2Outbound = outbound as Outbound_Hysteria2Options
             assertEquals("Expected type == hysteria2", "hysteria2", hy2Outbound.type)
@@ -365,7 +378,7 @@ class RealDeviceHysteria2PlainLiveTest {
             }
 
             assertEquals("Plain HY2 compatibility bean must have no obfuscation password", "", compatBean.obfuscation)
-            val compatOutbound = buildSingBoxOutboundHysteriaBean(compatBean)
+            val compatOutbound = compileTypedOutbound(compatBean)
             assertTrue("Expected compatibility outbound is Outbound_Hysteria2Options", compatOutbound is Outbound_Hysteria2Options)
             val compatHy2Outbound = compatOutbound as Outbound_Hysteria2Options
             assertNull("Plain HY2 compatibility outbound must omit obfs", compatHy2Outbound.obfs)

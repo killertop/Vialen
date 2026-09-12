@@ -165,9 +165,3 @@ fun Project.setupApp() {
         }
     }
 }
-
-/** Public generated-source wiring preserves producer dependencies for native packaging. */
-abstract class RustAndroidTask : org.gradle.api.tasks.Exec() {
-    @get:org.gradle.api.tasks.OutputDirectory
-    abstract val outputDirectory: org.gradle.api.file.DirectoryProperty
-}

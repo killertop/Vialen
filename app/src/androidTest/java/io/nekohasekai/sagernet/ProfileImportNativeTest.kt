@@ -553,13 +553,11 @@ class ProfileImportNativeTest {
 
             val addedProfile = ProxyEntity(
                 groupId = hiddenGroup.id,
-                userOrder = 1L,
-                socksBean = SOCKSBean().apply {
+                userOrder = 1L).putBean(SOCKSBean().apply {
                     initializeDefaultValues()
                     serverAddress = "127.0.0.1"
                     serverPort = 10800
-                }
-            ).also { it.id = SagerDatabase.proxyDao.addProxy(it) }
+                }).also { it.id = SagerDatabase.proxyDao.addProxy(it) }
 
             var addReloadGen = 0L
             active.onActivity { activity ->

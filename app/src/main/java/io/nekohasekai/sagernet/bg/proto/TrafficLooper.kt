@@ -29,7 +29,8 @@ class TrafficLooper internal constructor(
     private val tagMap = mutableMapOf<String, TrafficUpdater.TrafficLooperData>()
     private val persisted = mutableMapOf<Long, TrafficData>()
     private var selectedId = Long.MIN_VALUE // -1 is the bypass counter, never a selection sentinel.
-    private var selectedTag = ""
+    private val owners = linkedMapOf<String, Set<Long>>()
+    private val sampled = mutableMapOf<String, TrafficData>()
     private val statistics = DataStore.profileTrafficStatistics
     private val showDirect = DataStore.showDirectSpeed
 
@@ -38,22 +39,23 @@ class TrafficLooper internal constructor(
         synchronized(lock) {
             check(job == null && !stopped)
             proxy = checkNotNull(data.proxy)
-            idMap[-1] = TrafficUpdater.TrafficLooperData(tag = TAG_BYPASS)
-            val tags = hashSetOf(TAG_PROXY, TAG_BYPASS)
+            tagMap[TAG_BYPASS] = TrafficUpdater.TrafficLooperData(tag = TAG_BYPASS)
+            tagMap[TAG_PROXY] = TrafficUpdater.TrafficLooperData(tag = TAG_PROXY)
             proxy.config.trafficMap.forEach { (tag, entities) ->
-                tags.add(tag)
+                require(tag != TAG_PROXY && tag != TAG_BYPASS) { "Profile counter must have its own reference tag" }
+                tagMap.getOrPut(tag) { TrafficUpdater.TrafficLooperData(tag = tag) }
+                owners[tag] = entities.map { it.id }.toSet()
                 entities.forEach { entity ->
                     persisted.putIfAbsent(entity.id, TrafficData(entity.id, entity.tx, entity.rx))
-                    val item = TrafficUpdater.TrafficLooperData(tag = tag, rx = entity.rx,
-                        tx = entity.tx, rxBase = entity.rx, txBase = entity.tx,
-                        ignore = proxy.config.selectorGroupId >= 0L)
-                    idMap[entity.id] = item
-                    tagMap[tag] = item
+                    idMap.getOrPut(entity.id) {
+                        TrafficUpdater.TrafficLooperData(tag = "", rx = entity.rx, tx = entity.tx,
+                            rxBase = entity.rx, txBase = entity.tx)
+                    }
                 }
             }
-            if (proxy.config.selectorGroupId >= 0L) selectLocked(proxy.config.mainEntId)
-            (installStats ?: proxy.box::setV2rayStats)(tags.joinToString("\n"))
-            updater = TrafficUpdater(readStats ?: proxy.box::queryStats, idMap.values.toList())
+            selectedId = proxy.config.mainEntId
+            (installStats ?: proxy.box::setV2rayStats)(tagMap.keys.joinToString("\n"))
+            updater = TrafficUpdater(readStats ?: proxy.box::queryStats, tagMap.values.toList())
             writer = scope.launch {
                 for (id in writes) {
                     persistTraffic(id)
@@ -69,22 +71,38 @@ class TrafficLooper internal constructor(
 
     /** Flush the old selection before assigning its shared counter to the new one. */
     fun selectMain(id: Long) = synchronized(lock) {
-        if (stopped || id == selectedId || id !in idMap) return@synchronized
-        updater?.updateAll()
-        val previous = selectedId
-        selectLocked(id)
-        if (statistics && previous >= 0) writes.trySend(previous)
+        if (stopped || id == selectedId || id !in proxy.config.profileTagMap) return@synchronized
+        sampleLocked()
+        val previousOwners = selectedOwners()
+        selectedId = id
+        updater?.resetRate(checkNotNull(tagMap[TAG_PROXY]))
+        if (statistics) previousOwners.forEach { writes.trySend(it) }
         wake.trySend(Unit)
     }
 
-    private fun selectLocked(id: Long) {
-        val next = idMap[id] ?: return
-        idMap[selectedId]?.apply { tag = selectedTag; ignore = true }
-        selectedId = id
-        selectedTag = next.tag
-        next.tag = TAG_PROXY
-        next.ignore = false
-        updater?.resetRate(next)
+    private fun selectedOwners(): Set<Long> {
+        val tag = proxy.config.profileTagMap[selectedId]
+        // Run plans also have a single selector candidate even without a selector group.
+        return tag?.let { owners[it] } ?: emptySet()
+    }
+
+    /** Native counters reset on read. Sample each tag once, then distribute only
+     * its new bytes to every distinct owning row. Shared rows aggregate tags. */
+    private fun sampleLocked() {
+        updater?.updateAll()
+        idMap.values.forEach { it.txRate = 0; it.rxRate = 0 }
+        tagMap.forEach { (tag, counter) ->
+            val previous = sampled[tag]
+            val deltaTx = counter.tx - (previous?.tx ?: 0L)
+            val deltaRx = counter.rx - (previous?.rx ?: 0L)
+            sampled[tag] = TrafficData(0, counter.tx, counter.rx)
+            val targets = if (tag == TAG_PROXY) selectedOwners() else owners[tag].orEmpty()
+            targets.forEach { id ->
+                val row = checkNotNull(idMap[id])
+                row.tx += deltaTx; row.rx += deltaRx
+                row.txRate += counter.txRate; row.rxRate += counter.rxRate
+            }
+        }
     }
 
     private suspend fun persistTraffic(id: Long): TrafficData? {
@@ -112,7 +130,7 @@ class TrafficLooper internal constructor(
             writer?.join() // Older selection writes cannot overwrite the final totals.
             val final = synchronized(lock) {
                 if (!statistics || updater == null) emptyList() else {
-                    updater!!.updateAll()
+                    sampleLocked()
                     persisted.keys.toList()
                 }
             }
@@ -134,7 +152,7 @@ class TrafficLooper internal constructor(
             val foreground = hasConsumer()
             val display = synchronized(lock) {
                 if (stopped) return
-                if (foreground || statistics) updater?.updateAll()
+                if (foreground || statistics) sampleLocked()
                 if (foreground) displaySnapshot() else null
             }
             if (display != null) data.binder.broadcast { callback ->
@@ -151,11 +169,13 @@ class TrafficLooper internal constructor(
 
     private fun displaySnapshot(): Pair<SpeedDisplayData, List<TrafficData>> {
         var txRate = 0L; var rxRate = 0L; var tx = 0L; var rx = 0L
-        tagMap.values.forEach {
-            if (!it.ignore) { txRate += it.txRate; rxRate += it.rxRate }
-            tx += it.tx - it.txBase; rx += it.rx - it.rxBase
+        tagMap.forEach { (tag, counter) ->
+            if (tag != TAG_BYPASS) {
+                txRate += counter.txRate; rxRate += counter.rxRate
+                tx += counter.tx; rx += counter.rx
+            }
         }
-        val bypass = checkNotNull(idMap[-1])
+        val bypass = checkNotNull(tagMap[TAG_BYPASS])
         val speed = SpeedDisplayData(txRate, rxRate, if (showDirect) bypass.txRate else 0,
             if (showDirect) bypass.rxRate else 0, tx, rx)
         return speed to if (statistics) idMap.map { (id, item) -> TrafficData(id = id, rx = item.rx, tx = item.tx) } else emptyList()

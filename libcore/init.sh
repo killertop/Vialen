@@ -1,43 +1,42 @@
-#!/bin/bash
-
-source ../buildScript/lib/core/get_source_env.sh || exit 1
-
-chmod -R 777 .build 2>/dev/null
-rm -rf .build 2>/dev/null
-
-if [ -z "$GOPATH" ]; then
-    GOPATH=$(go env GOPATH)
+#!/usr/bin/env bash
+# Install official binding tools into the normal Go tool directory, retaining backups.
+set -euo pipefail
+INIT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$INIT_DIR/../scripts/go-toolchain.sh"
+source "$INIT_DIR/../buildScript/lib/core/get_source_env.sh"
+export GOPATH="${GOPATH:-$(go env GOPATH)}"
+TOOL_BIN="${GOPATH%%:*}/bin"
+mkdir -p "$TOOL_BIN" "$INIT_DIR/build"
+verified_tool() {
+    local info
+    [[ -x "$1" ]] || return 1
+    info="$(go version -m "$1")" || return 1
+    [[ "${info%%$'\n'*}" == *": go$REQUIRED_GO_VERSION" ]] || return 1
+    [[ "$info" == *"golang.org/x/mobile"*$'\t'"$GOMOBILE_VERSION"$'\t'"$GOMOBILE_SUM"* ]]
+}
+if ! verified_tool "$TOOL_BIN/gomobile" || ! verified_tool "$TOOL_BIN/gobind"; then
+    TOOL_STAGE="$(mktemp -d "$INIT_DIR/build/tool-init.XXXXXX")"
+    mkdir -p "$TOOL_STAGE/bin"
+    # Exact module version and checksum avoid a private fork and a separate old compiler.
+    (
+        cd "$TOOL_STAGE"
+        GOWORK=off GOFLAGS= GOBIN="$TOOL_STAGE/bin" \
+            go install "golang.org/x/mobile/cmd/gomobile@$GOMOBILE_VERSION" \
+                       "golang.org/x/mobile/cmd/gobind@$GOMOBILE_VERSION"
+    )
+    verified_tool "$TOOL_STAGE/bin/gomobile"
+    verified_tool "$TOOL_STAGE/bin/gobind"
+    mkdir -p "$INIT_DIR/build/tool-backups"
+    TOOL_BACKUP="$(mktemp -d "$INIT_DIR/build/tool-backups/tools.XXXXXX")"
+    for tool in gomobile gobind; do
+        if [[ -e "$TOOL_BIN/$tool" || -L "$TOOL_BIN/$tool" ]]; then
+            mv "$TOOL_BIN/$tool" "$TOOL_BACKUP/$tool"
+        fi
+        cp -p "$TOOL_STAGE/bin/$tool" "$TOOL_BIN/$tool"
+    done
+    echo "Previous tools and staging retained at $TOOL_BACKUP and $TOOL_STAGE"
 fi
-
-# Install gomobile
-if [ ! -f "$GOPATH/bin/gomobile-matsuri" ]; then
-    git clone https://github.com/MatsuriDayo/gomobile.git
-    pushd gomobile
-	git checkout --detach "$COMMIT_GOMOBILE" || exit 1
-    pushd cmd
-    pushd gomobile
-    go install -v
-    popd
-    pushd gobind
-    go install -v
-    popd
-    popd
-    rm -rf gomobile
-    mv "$GOPATH/bin/gomobile" "$GOPATH/bin/gomobile-matsuri"
-    mv "$GOPATH/bin/gobind" "$GOPATH/bin/gobind-matsuri"
-fi
-
-# Existing tool binaries must also match the pinned source revision.
-for tool in gomobile-matsuri gobind-matsuri; do
-    tool_info=$(go version -m "$GOPATH/bin/$tool") || exit 1
-    case "$tool_info" in
-        *"vcs.revision=$COMMIT_GOMOBILE"*) ;;
-        *) echo "$tool source revision does not match COMMIT_GOMOBILE" >&2; exit 1 ;;
-    esac
-    case "$tool_info" in
-        *"vcs.modified=false"*) ;;
-        *) echo "$tool was built from modified or unverified sources" >&2; exit 1 ;;
-    esac
-done
-
-GOBIND=gobind-matsuri gomobile-matsuri init
+verified_tool "$TOOL_BIN/gomobile"
+verified_tool "$TOOL_BIN/gobind"
+echo "Official gomobile/gobind ready: $GOMOBILE_VERSION, Go $REQUIRED_GO_VERSION"
+# No OpenAL is used; gomobile bind works directly without destructive init/clean.

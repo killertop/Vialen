@@ -7,9 +7,9 @@ import io.nekohasekai.sagernet.database.ProxyEntity
 
 const val TAG_MIXED = "mixed-in"
 
-const val TAG_PROXY = "proxy"
+const val TAG_PROXY = "selected"
 const val TAG_DIRECT = "direct"
-const val TAG_BYPASS = "bypass"
+const val TAG_BYPASS = "direct"
 const val TAG_BLOCK = "block"
 
 const val LOCALHOST = "127.0.0.1"

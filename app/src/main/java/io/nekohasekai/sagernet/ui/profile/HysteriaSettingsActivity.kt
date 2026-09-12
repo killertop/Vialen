@@ -14,11 +14,11 @@ import moe.matsuri.nb4a.ui.SimpleMenuPreference
 
 class HysteriaSettingsActivity : ProfileSettingsActivity<HysteriaBean>() {
 
-    override fun createEntity() = HysteriaBean().applyDefaultValues()
+    override fun createEntity() = HysteriaBean().applyDefaultValues().apply { protocolVersion = 2 }
 
     override fun HysteriaBean.init() {
         DataStore.profileName = name
-        DataStore.protocolVersion = protocolVersion
+        DataStore.protocolVersion = 2
         DataStore.serverAddress = serverAddress
         DataStore.serverPorts = serverPorts
         DataStore.serverObfs = obfuscation
@@ -45,7 +45,7 @@ class HysteriaSettingsActivity : ProfileSettingsActivity<HysteriaBean>() {
 
     override fun HysteriaBean.serialize() {
         name = DataStore.profileName
-        protocolVersion = DataStore.protocolVersion
+        protocolVersion = 2
         serverAddress = DataStore.serverAddress
         serverPorts = DataStore.serverPorts
         obfuscation = DataStore.serverObfs
@@ -107,43 +107,16 @@ class HysteriaSettingsActivity : ProfileSettingsActivity<HysteriaBean>() {
         }
         updateObfsType(DataStore.serverObfsType)
 
-        fun updateVersion(v: Int) {
-            if (v == 2) {
-                authPayload.isVisible = true
-                //
-                authType.isVisible = false
-                alpn.isVisible = false
-                //
-                findPreference<EditTextPreference>(Key.SERVER_STREAM_RECEIVE_WINDOW)!!.isVisible =
-                    false
-                findPreference<EditTextPreference>(Key.SERVER_CONNECTION_RECEIVE_WINDOW)!!.isVisible =
-                    false
-                findPreference<SwitchPreference>(Key.SERVER_DISABLE_MTU_DISCOVERY)!!.isVisible =
-                    false
-                advancedCategory?.isVisible = true
-                //
-                authPayload.title = resources.getString(R.string.password)
-            } else {
-                authType.isVisible = true
-                authPayload.isVisible = true
-                alpn.isVisible = true
-                //
-                findPreference<EditTextPreference>(Key.SERVER_STREAM_RECEIVE_WINDOW)!!.isVisible =
-                    true
-                findPreference<EditTextPreference>(Key.SERVER_CONNECTION_RECEIVE_WINDOW)!!.isVisible =
-                    true
-                findPreference<SwitchPreference>(Key.SERVER_DISABLE_MTU_DISCOVERY)!!.isVisible =
-                    true
-                advancedCategory?.isVisible = false
-                //
-                authPayload.title = resources.getString(R.string.hysteria_auth_payload)
-            }
-        }
-        findPreference<SimpleMenuPreference>(Key.PROTOCOL_VERSION)!!.setOnPreferenceChangeListener { _, newValue ->
-            updateVersion(newValue.toString().toIntOrNull() ?: 1)
-            true
-        }
-        updateVersion(DataStore.protocolVersion)
+        // The new profile model exposes Hysteria 2 only.
+        findPreference<SimpleMenuPreference>(Key.PROTOCOL_VERSION)?.isVisible = false
+        authPayload.isVisible = true
+        authType.isVisible = false
+        alpn.isVisible = false
+        findPreference<EditTextPreference>(Key.SERVER_STREAM_RECEIVE_WINDOW)!!.isVisible = false
+        findPreference<EditTextPreference>(Key.SERVER_CONNECTION_RECEIVE_WINDOW)!!.isVisible = false
+        findPreference<SwitchPreference>(Key.SERVER_DISABLE_MTU_DISCOVERY)!!.isVisible = false
+        advancedCategory?.isVisible = true
+        authPayload.title = resources.getString(R.string.password)
 
         findPreference<EditTextPreference>(Key.SERVER_UPLOAD_SPEED)!!.apply {
             setOnBindEditTextListener(EditTextPreferenceModifiers.Number)

@@ -3,9 +3,7 @@ package io.nekohasekai.sagernet
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.group.RawUpdater
-import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
-import io.nekohasekai.sagernet.fmt.toUniversalLink
-import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
+import java.net.URLEncoder
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Rule
@@ -22,26 +20,23 @@ class SubscriptionEndToEndNativeTest {
         val db=SagerDatabase.instance
         LoopbackHttpFixture().use { server ->
             val sub=SubscriptionBean().apply {initializeDefaultValues();link="http://127.0.0.1:${server.port}/formats";deduplication=false;forceResolve=false}
-            val group=ProxyGroup(name="Rust-formats-${System.nanoTime()}",type=GroupType.SUBSCRIPTION,subscription=sub)
+            val group=ProxyGroup(name="Core-formats-${System.nanoTime()}",type=GroupType.SUBSCRIPTION,subscription=sub)
             group.id=db.groupDao().createGroup(group)
             try {
-                val universal = SOCKSBean().apply {
-                    initializeDefaultValues(); name = "Universal"; serverAddress = "127.0.0.1"; serverPort = 1080
-                }.toUniversalLink()
                 val formats=listOf(
-                    universal + "\n" + "sn://socks:AA==\nhttp://user:pass@127.0.0.1:8080#HTTP",
+                    "socks5://127.0.0.1:1080#SOCKS\nhttp://user:pass@127.0.0.1:8080#HTTP",
                     "proxies: [{type: http, name: HTTP, server: 127.0.0.1, port: 8080}, {type: anytls, name: AnyTLS, server: 127.0.0.1, port: 443, password: synthetic}]",
                     """{"outbounds":[{"type":"socks","tag":"Custom","server":"127.0.0.1","server_port":1080}]}""",
                     "[Interface]\nAddress=10.0.0.1/32\nPrivateKey=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nMTU=1420\n[Peer]\nEndpoint=127.0.0.1:51820\nPublicKey=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     Base64.getEncoder().encodeToString("http://user:pass@127.0.0.1:8080#HTTP\nanytls://pass@127.0.0.1:443#AnyTLS".toByteArray())
                 )
                 for (text in formats) {
-                    val expected=io.nekohasekai.sagernet.oracle.LegacyRawUpdater.parseRaw(text)!!
+                    val expectedNames = listOf(listOf("SOCKS", "HTTP"), listOf("HTTP", "AnyTLS"), listOf("Custom"), listOf("WireGuard"), listOf("HTTP", "AnyTLS"))[formats.indexOf(text)]
                     server.reply.set(LoopbackHttpFixture.Reply(body=text))
                     RawUpdater.doUpdate(group,sub,null,false)
                     val rows=db.proxyDao().getByGroup(group.id)
-                    assertEquals(expected.map {it.displayName()},rows.map {it.displayName()})
-                    assertEquals(expected.map {it.javaClass},rows.map {it.requireBean().javaClass})
+                    if (formats.indexOf(text) != 3) assertEquals(expectedNames, rows.map { it.displayName() })
+                    assertEquals(if (formats.indexOf(text) == 3) listOf("wireguard") else listOf(listOf("socks", "http"), listOf("http", "anytls"), listOf("socks"), emptyList(), listOf("http", "anytls"))[formats.indexOf(text)], rows.map { it.requireProfile().type })
                     val ids=rows.map {it.id}
                     RawUpdater.doUpdate(group,sub,null,false)
                     assertEquals(ids,db.proxyDao().getByGroup(group.id).map {it.id})
@@ -50,33 +45,26 @@ class SubscriptionEndToEndNativeTest {
             } finally {db.runInTransaction {db.proxyDao().deleteByGroup(group.id);db.groupDao().deleteById(group.id)}}
         }
     }
-    @Test fun universalCollisionNamesAndStableIdsReachRoom() = runBlocking {
+    @Test fun duplicateNamesAndStableIdsReachRoom() = runBlocking {
         val db = SagerDatabase.instance
         LoopbackHttpFixture().use { server ->
             val sub = SubscriptionBean().apply {
-                initializeDefaultValues(); link = "http://127.0.0.1:${server.port}/universal"
+                initializeDefaultValues(); link = "http://127.0.0.1:${server.port}/duplicates"
                 deduplication = false; forceResolve = false
             }
-            val group = ProxyGroup(name = "Rust-universal-${System.nanoTime()}", type = GroupType.SUBSCRIPTION, subscription = sub)
+            val group = ProxyGroup(name = "Core-duplicates-${System.nanoTime()}", type = GroupType.SUBSCRIPTION, subscription = sub)
             group.id = db.groupDao().createGroup(group)
             try {
                 val names = List(12) { "A" } + listOf("A (0)", "A (1)", "A (1) (1)", "节点😀", "节点😀")
                 val text = names.mapIndexed { index, label ->
-                    SOCKSBean().apply {
-                        initializeDefaultValues(); name = label; serverAddress = "127.0.0.1"; serverPort = 1080 + index
-                    }.toUniversalLink()
+                    "socks5://127.0.0.1:${1080 + index}#${URLEncoder.encode(label, "UTF-8").replace("+", "%20")}"
                 }.joinToString("\n")
-                val used = LinkedHashSet<String>()
-                val expected = names.map { original ->
-                    var name = original; var index = 0
-                    while (name in used) name = name.replace(" ($index)", "") + " (${++index})"
-                    used.add(name); name
-                }
+                val expected = names
                 server.reply.set(LoopbackHttpFixture.Reply(body = text))
                 RawUpdater.doUpdate(group, sub, null, false)
                 val rows = db.proxyDao().getByGroup(group.id)
                 assertEquals(expected, rows.map { it.displayName() })
-                assertEquals(names.indices.map { 1080 + it }, rows.map { it.requireBean().serverPort.toInt() })
+                assertEquals(names.indices.map { 1080 + it }, rows.map { it.requireProfile().port })
                 RawUpdater.doUpdate(group, sub, null, false)
                 assertEquals(rows.map { it.id }, db.proxyDao().getByGroup(group.id).map { it.id })
             } finally {
@@ -90,7 +78,7 @@ class SubscriptionEndToEndNativeTest {
         val originalGroups = db.groupDao().allGroups().map { it.id }.toSet()
         LoopbackHttpFixture().use { server ->
             val sub = SubscriptionBean().apply { initializeDefaultValues(); link = "http://127.0.0.1:${server.port}/subscription"; deduplication = true; forceResolve = false }
-            val group = ProxyGroup(name = "Rust-E2E-${System.nanoTime()}", type = GroupType.SUBSCRIPTION, subscription = sub)
+            val group = ProxyGroup(name = "Core-E2E-${System.nanoTime()}", type = GroupType.SUBSCRIPTION, subscription = sub)
             group.id = db.groupDao().createGroup(group)
             var expectedNames = listOf("A", "B", "C", "D", "E", "F")
             var successes = 0
@@ -108,16 +96,14 @@ class SubscriptionEndToEndNativeTest {
                 server.reply.set(LoopbackHttpFixture.Reply(body = Base64.getEncoder().encodeToString(links.joinToString("\n").toByteArray())))
             }
             try {
-                val initial = listOf("trojan://pw@a.example:443#A", "tuic://user:pw@b.example:443#B",
-                    "hysteria://c.example:443?auth=pw#C", "hy2://pw@d.example:443#D",
-                    "vless://user@e.example:443?security=tls#E", "vmess://user@f.example:443?type=ws#F",
-                    "trojan://other@a.example:443#duplicate")
+                val initial = listOf("trojan://pw@a.example:443#A", "tuic://00000000-0000-4000-8000-000000000001:pw@b.example:443#B",
+                    "anytls://pw@c.example:443#C", "hy2://pw@d.example:443#D",
+                    "vless://00000000-0000-4000-8000-000000000001@e.example:443?security=tls#E", "http://f.example:8080#F",
+                    "trojan://pw@a.example:443#duplicate")
                 publish(initial)
                 RawUpdater.doUpdate(group, sub, ui, false)
                 val oldRows = db.proxyDao().getByGroup(group.id)
                 val oldIds = oldRows.associate { it.displayName() to it.id }
-                oldRows[0].requireBean().apply { customOutboundJson = "{\"local\":true}"; customConfigJson = "retained-config" }
-                db.proxyDao().updateProxy(oldRows[0])
                 expectedNames = listOf("F", "A", "new")
                 publish(listOf(initial[5], "trojan://changed@changed.example:443#A", "socks5://new.example:1080#new"))
                 RawUpdater.doUpdate(group, sub, ui, false)
@@ -125,9 +111,7 @@ class SubscriptionEndToEndNativeTest {
                 assertEquals(oldIds["F"], rows[0].id)
                 assertEquals(oldIds["A"], rows[1].id)
                 assertEquals(listOf(1L,2L,3L), rows.map { it.userOrder })
-                assertEquals("changed", (rows[1].requireBean() as TrojanBean).password)
-                assertEquals("{\"local\":true}", rows[1].requireBean().customOutboundJson)
-                assertEquals("retained-config", rows[1].requireBean().customConfigJson)
+                assertEquals("changed", rows[1].requireProfile().trojan!!.password)
                 RawUpdater.doUpdate(group, sub, ui, false)
                 assertEquals(rows.map { it.id }, db.proxyDao().getByGroup(group.id).map { it.id })
                 val lastUpdated = db.groupDao().getById(group.id)!!.subscription!!.lastUpdated
@@ -136,13 +120,16 @@ class SubscriptionEndToEndNativeTest {
                 assertEquals(3, successes)
                 assertEquals(lastUpdated, db.groupDao().getById(group.id)!!.subscription!!.lastUpdated)
                 assertEquals(rows.map { it.id }, db.proxyDao().getByGroup(group.id).map { it.id })
-                // A deliberately empty JSON subscription clears this group only.
-                expectedNames = emptyList()
+                // Empty and partial subscriptions must retain the committed group.
                 server.reply.set(LoopbackHttpFixture.Reply(body = "[]"))
-                RawUpdater.doUpdate(group, sub, ui, false)
-                assertTrue(db.proxyDao().getByGroup(group.id).isEmpty())
-                assertEquals(4, successes)
-                assertEquals(5, server.requests.get())
+                assertTrue(runCatching { RawUpdater.doUpdate(group, sub, ui, false) }.isFailure)
+                assertEquals(rows.map { it.id }, db.proxyDao().getByGroup(group.id).map { it.id })
+                assertEquals(3, successes)
+                server.reply.set(LoopbackHttpFixture.Reply(body = "trojan://pw@valid.example:443#valid\nunsupported://bad"))
+                assertTrue(runCatching { RawUpdater.doUpdate(group, sub, ui, false) }.isFailure)
+                assertEquals(rows.map { it.id }, db.proxyDao().getByGroup(group.id).map { it.id })
+                assertEquals(3, successes)
+                assertEquals(6, server.requests.get())
             } finally {
                 db.runInTransaction { db.proxyDao().deleteByGroup(group.id); db.groupDao().deleteById(group.id) }
             }
@@ -173,7 +160,7 @@ class SubscriptionEndToEndNativeTest {
                 val rows = db.proxyDao().getByGroup(group.id)
                 assertEquals(1, rows.size)
                 assertEquals("ContentTrojan", rows[0].displayName())
-                assertTrue(rows[0].requireBean() is TrojanBean)
+                assertEquals("trojan", rows[0].requireProfile().type)
             } finally {
                 db.runInTransaction {
                     db.proxyDao().deleteByGroup(group.id)

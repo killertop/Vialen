@@ -11,10 +11,10 @@ import io.nekohasekai.sagernet.databinding.LayoutAssetItemBinding
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
-import io.nekohasekai.sagernet.RustBridgeRobolectricTestRunner
+import io.nekohasekai.sagernet.CoreBridgeRobolectricTestRunner
 import org.robolectric.annotation.Config
 
-@RunWith(RustBridgeRobolectricTestRunner::class)
+@RunWith(CoreBridgeRobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "zh-rCN-520dpi")
 class RuleResourceCardTest {
     @Test fun longSourceCannotClipTheSeparateUpdateTimestampOrFailure() {

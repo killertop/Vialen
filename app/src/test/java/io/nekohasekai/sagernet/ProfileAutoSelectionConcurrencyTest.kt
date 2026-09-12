@@ -26,7 +26,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-@RunWith(RustBridgeRobolectricTestRunner::class)
+@RunWith(ProfileSelectionRobolectricTestRunner::class)
 @Config(sdk = [34], application = android.app.Application::class)
 class ProfileAutoSelectionConcurrencyTest {
     companion object {
@@ -65,6 +65,14 @@ class ProfileAutoSelectionConcurrencyTest {
         // Robolectric has installed the Application by @Before, but not @BeforeClass.
         ensureDatabase()
         preferences.keyValuePairDao().reset()
+        // Prove both directions use the actual Room DAO, not a stale mocked delegate.
+        DataStore.selectedProxy = MANUAL
+        assertEquals(MANUAL, preferences.keyValuePairDao()[Key.PROFILE_ID]?.long)
+        preferences.keyValuePairDao().put(
+            io.nekohasekai.sagernet.database.preference.KeyValuePair(Key.PROFILE_ID).put(FIRST)
+        )
+        assertEquals(FIRST, DataStore.selectedProxy)
+        DataStore.selectedProxy = 0L
         clearMocks(profiles)
         DataStore.serviceState = BaseService.State.Stopped
         every { profiles.getIdsByGroup(TARGET) } returns listOf(FIRST)

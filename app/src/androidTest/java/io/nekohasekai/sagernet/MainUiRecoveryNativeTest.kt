@@ -160,10 +160,9 @@ class MainUiRecoveryNativeTest {
         // Connection controls intentionally stay hidden on an empty installation.
         // Own a fixture instead of depending on the user's saved profiles.
         val group = SagerDatabase.groupDao.createGroup(ProxyGroup(name = "Bottom bar fixture"))
-        val bean = io.nekohasekai.sagernet.fmt.socks.SOCKSBean().apply {
-            initializeDefaultValues(); serverAddress = "127.0.0.1"; serverPort = 9
-        }
-        val proxy = SagerDatabase.proxyDao.addProxy(ProxyEntity(groupId = group, socksBean = bean))
+        val bean = io.nekohasekai.sagernet.core.Profile(name = "", type = "socks", server = "127.0.0.1",
+            port = 9, socks = io.nekohasekai.sagernet.core.Profile.Socks())
+        val proxy = SagerDatabase.proxyDao.addProxy(ProxyEntity(groupId = group).putProfile(bean))
         DataStore.selectedGroup = group
         DataStore.selectedProxy = proxy
         try { withMain { scenario ->

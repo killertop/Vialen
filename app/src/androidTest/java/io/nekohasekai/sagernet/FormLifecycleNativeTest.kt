@@ -296,10 +296,9 @@ class FormLifecycleNativeTest {
     @Test fun lastNodeDeleteUndoAndCommitRefreshConnectionControls() {
         Assume.assumeTrue("This empty-home scenario requires no saved nodes", SagerDatabase.proxyDao.getAll().isEmpty())
         val groupId = SagerDatabase.groupDao.createGroup(ProxyGroup(name = "UI availability fixture", userOrder = 99999))
-        val bean = io.nekohasekai.sagernet.fmt.socks.SOCKSBean().apply {
-            initializeDefaultValues(); name = "UI availability node"; serverAddress = "127.0.0.1"; serverPort = 9
-        }
-        val entity = ProxyEntity(groupId = groupId, socksBean = bean)
+        val bean = io.nekohasekai.sagernet.core.Profile(name = "UI availability node", type = "socks", server = "127.0.0.1",
+            port = 9, socks = io.nekohasekai.sagernet.core.Profile.Socks())
+        val entity = ProxyEntity(groupId = groupId).putProfile(bean)
         val id = SagerDatabase.proxyDao.addProxy(entity)
         DataStore.selectedGroup = groupId
         DataStore.selectedProxy = id

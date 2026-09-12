@@ -92,7 +92,7 @@ class RemoteSubscriptionVpnNativeTest {
                 check(index in imported.indices)
                 imported[index]
             } else {
-                ProxyEntity().apply { this.groupId = groupId; putBean(beans!![index]) }.also {
+                ProxyEntity().apply { this.groupId = groupId; putProfile(beans!![index]) }.also {
                     it.id = db.proxyDao().addProxy(it)
                 }
             }

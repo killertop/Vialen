@@ -20,7 +20,7 @@ class FullConfigSnapshotNativeTest {
         val oldRemote=DataStore.remoteDns;val oldDirect=DataStore.directDns
         val oldMode=DataStore.serviceMode;val oldRouting=DataStore.enableDnsRouting
         val oldCustom=DataStore.globalCustomConfig
-        val group=ProxyGroup(name="Rust-full-config-${System.nanoTime()}")
+        val group=ProxyGroup(name="Core-full-config-${System.nanoTime()}")
         group.id=db.groupDao().createGroup(group)
         val rules=mutableListOf<Long>()
         val originalRules=db.rulesDao().enabledRules().map { it.copy(packages=it.packages.toSet()) }
@@ -34,7 +34,7 @@ class FullConfigSnapshotNativeTest {
             val a=node("first",1080);val b=node("second",1081)
             val chain=ProxyEntity(groupId=group.id).apply {putBean(ChainBean().applyDefaultValues().apply {name="chain";proxies=mutableListOf(a.id,b.id)})}
             chain.id=db.proxyDao().addProxy(chain)
-            val route=RuleEntity(name="Rust DNS response test",enabled=true,domains="full:snapshot.example",ip="192.0.2.0/24",outbound=-1)
+            val route=RuleEntity(name="Core DNS response test",enabled=true,domains="full:snapshot.example",ip="192.0.2.0/24",outbound=-1)
             rules.add(db.rulesDao().createRule(route))
             for (selector in listOf(false,true)) {
                 group.isSelector=selector;db.groupDao().updateGroup(group)

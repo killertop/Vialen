@@ -1,7 +1,8 @@
 package io.nekohasekai.sagernet.ktx
 
 import com.google.gson.JsonParser
-import io.nekohasekai.sagernet.fmt.AbstractBean
+import io.nekohasekai.sagernet.core.Profile
+import io.nekohasekai.sagernet.core.CoreClient
 import io.nekohasekai.sagernet.fmt.Serializable
 import moe.matsuri.nb4a.utils.JavaUtil.gson
 import moe.matsuri.nb4a.utils.Util
@@ -90,8 +91,8 @@ fun String.decodeBase64UrlSafe(): String {
 
 class SubscriptionFoundException(val link: String) : RuntimeException()
 
-suspend fun parseProxies(text: String): List<AbstractBean> =
-    checkNotNull(io.nekohasekai.sagernet.group.RustRawSubscription.parse(text, mode = "links"))
+suspend fun parseProxies(text: String): List<Profile> =
+    CoreClient.importProfiles(text).requireComplete()
 
 fun <T : Serializable> T.applyDefaultValues(): T {
     initializeDefaultValues()

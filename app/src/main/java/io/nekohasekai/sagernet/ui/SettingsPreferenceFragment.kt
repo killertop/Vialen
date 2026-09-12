@@ -37,7 +37,6 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
 
     private lateinit var isProxyApps: SwitchPreference
 
-    private lateinit var globalCustomConfig: EditConfigPreference
 
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -78,8 +77,6 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
         val enableFakeDns = findPreference<SwitchPreference>(Key.ENABLE_FAKEDNS)!!
 
         val mtu = findPreference<MTUPreference>(Key.MTU)!!
-        globalCustomConfig = findPreference(Key.GLOBAL_CUSTOM_CONFIG)!!
-        globalCustomConfig.useConfigStore(Key.GLOBAL_CUSTOM_CONFIG)
 
         findPreference<Preference>("uiDetailedDiagnostics")!!.setOnPreferenceClickListener {
             val enabled = RuntimeDiagnostics.remainingMillis(diagnosticService()) > 0
@@ -150,7 +147,6 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
         resolveDestination.onPreferenceChangeListener = reloadListener
         tunImplementation.onPreferenceChangeListener = reloadListener
         acquireWakeLock.onPreferenceChangeListener = reloadListener
-        globalCustomConfig.onPreferenceChangeListener = reloadListener
     }
 
     override fun onResume() {
@@ -164,9 +160,6 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
 
         if (::isProxyApps.isInitialized) {
             isProxyApps.isChecked = DataStore.proxyApps
-        }
-        if (::globalCustomConfig.isInitialized) {
-            globalCustomConfig.notifyChanged()
         }
     }
 

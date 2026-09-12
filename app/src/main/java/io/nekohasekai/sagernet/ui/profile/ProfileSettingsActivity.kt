@@ -176,8 +176,6 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
             val editingId = DataStore.editingId
             fun T.serializeDraft() {
                 serialize()
-                customConfigJson = DataStore.serverCustom
-                customOutboundJson = DataStore.serverCustomOutbound
             }
             if (editingId == 0L) {
                 ProfileManager.createProfile(DataStore.editingGroup, createEntity().apply { serializeDraft() })
@@ -216,8 +214,8 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
             }
         }
         // shared menu item
-        menu.findItem(R.id.action_custom_outbound_json)?.isVisible = true
-        menu.findItem(R.id.action_custom_config_json)?.isVisible = true
+        menu.findItem(R.id.action_custom_outbound_json)?.isVisible = false
+        menu.findItem(R.id.action_custom_config_json)?.isVisible = false
         return true
     }
 

@@ -1,55 +1,81 @@
 package io.nekohasekai.sagernet.group
 
+import androidx.room.withTransaction
+import io.nekohasekai.sagernet.core.Profile
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.ProxyGroup
 import io.nekohasekai.sagernet.database.SagerDatabase
-import io.nekohasekai.sagernet.fmt.AbstractBean
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import java.util.ArrayDeque
 
-/** Kotlin matching and atomic Room updates; existing Bean equality preserves local overrides. */
 internal object SubscriptionPersistence {
     data class Result(val changed: Int, val added: List<String>, val updated: Map<String, String>, val deleted: List<String>)
+    data class Existing(val sourceKey: String, val profile: Profile)
 
-    fun apply(db: SagerDatabase, group: ProxyGroup, proxies: List<AbstractBean>): Result {
-        val names = proxies.map { it.displayName() }
-        require(names.toSet().size == names.size) { "Subscription names must be disambiguated before persistence" }
-        var result: Result? = null
-        db.runInTransaction {
+    fun sourceKey(profile: Profile): String = if (profile.id.isNotBlank()) "id:${profile.id}" else
+        "name:${profile.type.length}:${profile.type}${profile.name.length}:${profile.name}"
+
+    /** Reserve exact matches first so reordering duplicate names cannot exchange local IDs. */
+    fun match(old: List<Existing>, incoming: List<Profile>): List<Int?> {
+        val exact = HashMap<Pair<String, Profile>, ArrayDeque<Int>>()
+        old.forEachIndexed { index, entry ->
+            exact.getOrPut(entry.sourceKey to SubscriptionDedup.semanticKey(entry.profile)) { ArrayDeque() }.add(index)
+        }
+        val used = BooleanArray(old.size)
+        val result = incoming.map { profile ->
+            exact[sourceKey(profile) to SubscriptionDedup.semanticKey(profile)]?.pollFirst()?.also { used[it] = true }
+        }.toMutableList()
+        val remaining = HashMap<String, ArrayDeque<Int>>()
+        old.forEachIndexed { index, entry ->
+            if (!used[index]) remaining.getOrPut(entry.sourceKey) { ArrayDeque() }.add(index)
+        }
+        incoming.forEachIndexed { index, profile ->
+            if (result[index] == null) result[index] = remaining[sourceKey(profile)]?.pollFirst()
+        }
+        return result
+    }
+
+    suspend fun apply(db: SagerDatabase, group: ProxyGroup, proxies: List<Profile>): Result {
+        require(proxies.isNotEmpty()) { "Empty subscription cannot replace saved profiles" }
+        currentCoroutineContext().ensureActive()
+        return db.withTransaction {
+            currentCoroutineContext().ensureActive()
             check(db.groupDao().getById(group.id) != null) { "Subscription group was deleted during refresh" }
             val dao = db.proxyDao()
             val old = dao.getByGroup(group.id)
-            // Preserve the legacy last-entity match, but remove orphaned duplicate-name rows.
-            val byName = old.associateBy { it.displayName() }
-            val retainedIds = names.mapNotNull { byName[it]?.id }.toSet()
-            val removed = old.filter { it.id !in retainedIds }
+            val previous = old.map { Existing(it.sourceKey, it.requireProfile()) }
+            val matches = match(previous, proxies)
+            val retained = matches.filterNotNull().toSet()
+            val removed = old.filterIndexed { index, _ -> index !in retained }
+            val names = SubscriptionNames.unique(proxies.map(SubscriptionNames::display))
+            val oldNames = SubscriptionNames.unique(previous.map { SubscriptionNames.display(it.profile) })
             val added = ArrayList<String>()
             val updated = LinkedHashMap<String, String>()
-            val replacements = ArrayList<ProxyEntity>()
-            proxies.forEachIndexed { index, bean ->
-                val name = names[index]
-                val order = index + 1L
-                val entity = byName[name]
-                if (entity == null) {
-                    dao.addProxy(ProxyEntity(groupId = group.id, userOrder = order).apply { putBean(bean) })
-                    added.add(name)
+            proxies.forEachIndexed { index, profile ->
+                currentCoroutineContext().ensureActive()
+                val oldIndex = matches[index]
+                if (oldIndex == null) {
+                    dao.addProxy(ProxyEntity(groupId = group.id, userOrder = index + 1L,
+                        sourceKey = sourceKey(profile)).putProfile(profile.copy(id = "")))
+                    added.add(names[index])
                 } else {
-                    val previous = entity.requireBean()
-                    bean.customOutboundJson = previous.customOutboundJson
-                    bean.customConfigJson = previous.customConfigJson
-                    val contentChanged = previous != bean
-                    if (contentChanged || entity.userOrder != order) {
-                        entity.putBean(bean)
-                        entity.userOrder = order // Content changes must not suppress reorder.
-                        replacements.add(entity)
-                        if (contentChanged) updated[name] = name
+                    val saved = previous[oldIndex].profile
+                    val replacement = profile.copy(id = saved.id)
+                    val entity = old[oldIndex]
+                    if (saved != replacement) updated[oldNames[oldIndex]] = names[index]
+                    if (saved != replacement || entity.userOrder != index + 1L) {
+                        dao.updateProxy(entity.copy(userOrder = index + 1L, sourceKey = sourceKey(profile)).putProfile(replacement))
                     }
                 }
             }
-            dao.updateProxy(replacements)
+            currentCoroutineContext().ensureActive()
             dao.deleteProxy(removed)
             check(dao.countByGroup(group.id) == proxies.size.toLong()) { "Subscription row count mismatch" }
             db.groupDao().updateGroup(group)
-            result = Result(removed.size + added.size + updated.size, added, updated, removed.map { it.displayName() })
+            currentCoroutineContext().ensureActive()
+            Result(removed.size + added.size + updated.size, added, updated,
+                previous.indices.filter { it !in retained }.map { oldNames[it] })
         }
-        return checkNotNull(result)
     }
 }

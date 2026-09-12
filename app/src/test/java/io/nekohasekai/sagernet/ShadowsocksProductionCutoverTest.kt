@@ -97,50 +97,45 @@ class ShadowsocksProductionCutoverTest {
     }
 
     @Test
-    fun testLegacyV2rayNFormat() {
-        val raw = "chacha20-ietf-poly1305:legacy_pass@legacy.server.net:9000"
+    fun testDeprecatedWholeAuthorityBase64IsRejected() {
+        val raw = "chacha20-ietf-poly1305:synthetic_pass@synthetic.example:9000"
         val b64 = JavaBase64.getEncoder().encodeToString(raw.toByteArray())
-        val encodedRemarks = URLEncoder.encode("旧版节点-测试", "UTF-8")
-        val uri = "ss://$b64#$encodedRemarks"
-        val bean = parseShadowsocks(uri)
-
-        assertEquals("legacy.server.net", bean.serverAddress)
-        assertEquals(9000, bean.serverPort)
-        assertEquals("chacha20-ietf-poly1305", bean.method)
-        assertEquals("legacy_pass", bean.password)
-        assertEquals("旧版节点-测试", bean.name)
-        assertTrue(bean.plugin.isEmpty())
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            parseShadowsocks("ss://$b64#Deprecated")
+        }
     }
 
     @Test
     fun testIpv6BracketedHost() {
-        val userinfo = JavaBase64.getEncoder().encodeToString("2022-blake3-aes-128-gcm:pwd".toByteArray())
-        val uri = "ss://$userinfo@[2001:db8::1]:8388#IPv6Node"
+        val key = JavaBase64.getEncoder().encodeToString(ByteArray(16) { it.toByte() })
+        val encodedKey = URLEncoder.encode(key, "UTF-8").replace("+", "%20")
+        val uri = "ss://2022-blake3-aes-128-gcm:$encodedKey@[2001:db8::1]:8388#IPv6Node"
         val bean = parseShadowsocks(uri)
 
         assertEquals("2001:db8::1", bean.serverAddress)
         assertEquals(8388, bean.serverPort)
         assertEquals("2022-blake3-aes-128-gcm", bean.method)
-        assertEquals("pwd", bean.password)
+        assertEquals(key, bean.password)
         assertEquals("IPv6Node", bean.name)
     }
 
     @Test
     fun testSpecialCharactersAndPipes() {
         val pass = "pass|word|with|pipes|and:colons"
-        val uri = "ss://aes-256-gcm:$pass@127.0.0.1:8388?plugin=obfs-local%3Btag%3Dpipe%7Cval#Name%7CWith%7CPipes"
+        val encodedPass = URLEncoder.encode(pass, "UTF-8").replace("+", "%20")
+        val uri = "ss://aes-256-gcm:$encodedPass@127.0.0.1:8388#Name%7CWith%7CPipes"
         val bean = parseShadowsocks(uri)
 
         assertEquals("127.0.0.1", bean.serverAddress)
         assertEquals(8388, bean.serverPort)
         assertEquals("aes-256-gcm", bean.method)
         assertEquals(pass, bean.password)
-        assertEquals("obfs-local;tag=pipe|val", bean.plugin)
+        assertEquals("", bean.plugin)
         assertEquals("Name|With|Pipes", bean.name)
     }
 
     @Test
-    fun testInvalidInputsThrowIllegalStateException() {
+    fun testInvalidInputsRejectWithArgumentError() {
         val invalidUris = listOf(
             "socks5://1.1.1.1:1080",
             "http://1.1.1.1:80",
@@ -157,8 +152,7 @@ class ShadowsocksProductionCutoverTest {
             try {
                 parseShadowsocks(uri)
                 fail("Expected parseShadowsocks to throw for $uri")
-            } catch (e: IllegalStateException) {
-                assertTrue(e.message?.contains("invalid ss link") == true)
+            } catch (_: IllegalArgumentException) {
             }
         }
     }

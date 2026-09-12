@@ -13,10 +13,14 @@ import zipfile
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
+CORE_FILES = {"libcore.aar", "source-manifest.json", "toolchain.txt",
+              "go-modules.json", "go-module-verification.txt",
+              "business-go-modules.json", "business-go-module-verification.txt",
+              "local-go-inputs.json"}
 
 
-def run(*args, cwd=None):
-    return subprocess.check_output(args, cwd=cwd or ROOT, text=True).strip()
+def run(*args, cwd=None, env=None):
+    return subprocess.check_output(args, cwd=cwd or ROOT, env=env, text=True).strip()
 
 
 def require(ok, message):
@@ -93,8 +97,8 @@ def verify_core(folder):
     manifest = json.loads(manifest_file.read_text())
     require(manifest["source_sha"] == os.environ["EXPECTED_SOURCE_SHA"] == source()["source_sha"],
             "Core/source SHA mismatch")
-    require(set(manifest["files"]) == {"libcore.aar", "source-manifest.json", "toolchain.txt",
-                                     "go-modules.json", "go-module-verification.txt"},
+    require(manifest["schema"] == 2, "Unsupported core manifest schema")
+    require(set(manifest["files"]) == CORE_FILES,
             "Unexpected core manifest file set")
     for name, expected in manifest["files"].items():
         require(record(folder / name) == expected, "Core handoff file mismatch: " + name)
@@ -236,6 +240,78 @@ def patched_sing_tun(repo, pin, apply=False):
     return patched_dependency(repo, pin, "sing-tun-detach", apply)
 
 
+def json_stream(raw):
+    # go list emits a sequence of JSON objects, not an array.
+    decoder, values = json.JSONDecoder(), []
+    while raw.strip():
+        value, end = decoder.raw_decode(raw.lstrip())
+        raw = raw.lstrip()[end:]
+        values.append(value)
+    return values
+
+
+def current_generated_modules(aar):
+    build_root = (ROOT / "libcore/build").resolve()
+    marker = ROOT / "libcore/build/current.txt"
+    require(marker.is_file() and not marker.is_symlink(), "Current core build marker missing or symlinked")
+    lines = marker.read_text().splitlines()
+    require(len(lines) == 1 and Path(lines[0]).is_absolute(), "Expected one absolute core build directory")
+    build_dir = Path(lines[0]).resolve(strict=True)
+    require(build_dir != build_root and build_root in build_dir.parents,
+            "Current core build directory escapes libcore/build")
+    cache = (build_dir / "cache").resolve(strict=True)
+    require(build_dir in cache.parents and cache.is_dir(), "Generated cache escapes current build directory")
+    require(record(build_dir / "libcore.aar") == record(aar),
+            "Handed-off AAR is not from the current build directory")
+    generated = {}
+    for path in cache.rglob("go.*"):
+        if path.name not in {"go.mod", "go.sum"}:
+            continue
+        require(path.is_file() and not path.is_symlink() and cache in path.resolve().parents,
+                "Invalid generated module file")
+        generated[str(path.relative_to(build_dir))] = {**record(path), "text": path.read_text()}
+    require(any(name.endswith("/go.mod") for name in generated),
+            "Current generated gomobile modules missing; provenance incomplete")
+    return build_dir, generated
+
+
+def local_go_inputs():
+    # Enumerate effective package inputs, including ignored/untracked source and
+    # go:embed data. Local replaces are not protected by go mod verify.
+    tracked = set(filter(None, run("git", "ls-files", "-z").split("\0")))
+    local_roots = [(ROOT / name).resolve() for name in ("core", "libcore")]
+    fields = ("GoFiles", "CgoFiles", "CFiles", "CXXFiles", "MFiles", "HFiles",
+              "FFiles", "SFiles", "SwigFiles", "SwigCXXFiles", "SysoFiles",
+              "EmbedFiles", "TestGoFiles", "XTestGoFiles", "TestEmbedFiles", "XTestEmbedFiles")
+    records = {}
+    def include(path):
+        require(path.is_file() and not path.is_symlink(), "Go input missing or symlinked: " + str(path))
+        require(ROOT.resolve() in path.resolve().parents, "Go input escapes checkout: " + str(path))
+        name = str(path.relative_to(ROOT))
+        require(name in tracked, "Unrecorded Go source/embed input: " + name)
+        records[name] = record(path)
+    for module in ("core", "libcore"):
+        for name in ("go.mod", "go.sum"):
+            include(ROOT / module / name)
+    for module, target in [("core", "host"), ("libcore", "android-arm64")]:
+        args = ["go", "list", "-mod=readonly", "-deps", "-json"]
+        env = dict(os.environ, GOWORK="off")
+        if target == "android-arm64":
+            env.update(GOOS="android", GOARCH="arm64", CGO_ENABLED="1")
+            args += ["-tags=with_conntrack,with_gvisor,with_quic,with_wireguard,with_utls"]
+        args.append("./...")
+        for package in json_stream(run(*args, cwd=ROOT / module, env=env)):
+            directory = Path(package["Dir"])
+            if not any(directory.resolve() == root or root in directory.resolve().parents for root in local_roots):
+                continue
+            for field in fields:
+                for name in package.get(field, []):
+                    include(directory / name)
+    require(records, "No local Go inputs recorded")
+    return {"scope": "host core tests and Android ARM64 core packages, including test and embed inputs",
+            "files": records}
+
+
 def core(folder):
     require(json.loads((folder / "source-manifest.json").read_text()) == source(),
             "Source content changed while building core")
@@ -256,40 +332,42 @@ def core(folder):
             repositories[name] = {"commit": pins[key], "uninitialized_gitlinks":
                                   {name: entry["bytes"].decode() for name, entry in tree.items() if entry["gitlink"]}}
     tools = {}
-    for name in ["gomobile-matsuri", "gobind-matsuri"]:
+    for name in ["gomobile", "gobind"]:
         path = Path(os.environ["GOPATH"]) / "bin" / name
         info = run("go", "version", "-m", str(path))
-        require("vcs.revision=" + pins["GOMOBILE"] in info and "vcs.modified=false" in info,
-                "Gomobile tool revision mismatch")
-        require("go1.26.5" in info.splitlines()[0], "Gomobile tool built with unexpected Go")
+        mobile_version = re.search(r'export GOMOBILE_VERSION="([^"]+)"', pin_file).group(1)
+        mobile_sum = re.search(r'export GOMOBILE_SUM="([^"]+)"', pin_file).group(1)
+        require("golang.org/x/mobile\t" + mobile_version + "\t" + mobile_sum in info,
+                "Gomobile official module version or checksum mismatch")
+        require(info.splitlines()[0].endswith(": go1.27.1"), "Gomobile tool built with unexpected Go")
         tools[name] = {**record(path), "build_info": info}
-    module_json = run("go", "list", "-mod=readonly", "-m", "-json", "all", cwd=ROOT / "libcore")
-    # go list emits a JSON stream, not a single JSON array.
-    decoder, modules = json.JSONDecoder(), []
-    rest = module_json
-    while rest.strip():
-        value, end = decoder.raw_decode(rest.lstrip())
-        rest = rest.lstrip()[end:]
-        modules.append(value)
-    write(folder / "go-modules.json", modules)
-    (folder / "go-module-verification.txt").write_text(
-        run("go", "mod", "verify", cwd=ROOT / "libcore") + "\n")
-    generated = {}
-    for path in (ROOT / "libcore/.build").rglob("go.*"):
-        if path.name in {"go.mod", "go.sum"}:
-            generated[str(path.relative_to(ROOT))] = {**record(path), "text": path.read_text()}
-    require(generated, "Generated gomobile module files missing; provenance incomplete")
+    for module, graph_name, verification_name in [
+            ("libcore", "go-modules.json", "go-module-verification.txt"),
+            ("core", "business-go-modules.json", "business-go-module-verification.txt")]:
+        modules = json_stream(run("go", "list", "-mod=readonly", "-m", "-json", "all",
+                                  cwd=ROOT / module))
+        allowed = {ROOT / "core", ROOT / "libcore"} | {ROOT.parent / name for name in repositories}
+        for entry in modules:
+            replacement = entry.get("Replace", {})
+            if replacement and not replacement.get("Version"):
+                require(Path(replacement["Dir"]).resolve() in {p.resolve() for p in allowed},
+                        "Unverified local module replacement: " + entry["Path"])
+        write(folder / graph_name, modules)
+        (folder / verification_name).write_text(run("go", "mod", "verify", cwd=ROOT / module) + "\n")
+    write(folder / "local-go-inputs.json", local_go_inputs())
+    build_dir, generated = current_generated_modules(folder / "libcore.aar")
     require(json.loads((folder / "source-manifest.json").read_text()) == source(),
             "Module verification changed tracked inputs")
-    names = ["libcore.aar", "source-manifest.json", "toolchain.txt", "go-modules.json", "go-module-verification.txt"]
+    names = sorted(CORE_FILES)
     write(folder / "core-manifest.json", {
-        "schema": 1, "source_sha": source()["source_sha"],
+        "schema": 2, "source_sha": source()["source_sha"],
         "kind": "traceable CI build; not bit-for-bit reproducibility",
         "files": {name: record(folder / name) for name in names},
         "replace_repositories": repositories, "gomobile_tools": tools,
+        "build_directory": str(build_dir.relative_to(ROOT)),
         "generated_module_files": generated,
         "generated_module_verify": "not run; source-module verify is separate from generated local-replace limitations",
-        "bind": {"target": "android/arm64", "api": 21, "flags_source": "libcore/build.sh"}})
+        "bind": {"target": "android/arm64", "api": 24, "flags_source": "libcore/build.sh"}})
 
 
 

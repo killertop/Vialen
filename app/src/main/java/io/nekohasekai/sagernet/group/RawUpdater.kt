@@ -3,10 +3,13 @@ package io.nekohasekai.sagernet.group
 import androidx.core.net.toUri
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.*
-import io.nekohasekai.sagernet.fmt.AbstractBean
-import io.nekohasekai.sagernet.fmt.wireguard.WireGuardBean
+import io.nekohasekai.sagernet.core.Profile
+import io.nekohasekai.sagernet.core.CoreClient
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import io.nekohasekai.sagernet.ktx.*
-import libcore.Libcore
 import moe.matsuri.nb4a.utils.Util
 
 @Suppress("EXPERIMENTAL_API_USAGE")
@@ -20,56 +23,35 @@ object RawUpdater : GroupUpdater() {
     ) {
 
         val link = subscription.link
-        var proxies: List<AbstractBean>
+        var proxies: List<Profile>
+        var remoteUserinfo: String? = null
+        var remoteGroupName: String? = null
         if (link.startsWith("content://")) {
             val contentText = app.contentResolver.openInputStream(link.toUri())
-                ?.bufferedReader()
-                ?.use { it.readText() }
+                ?.use { it.readProfileText() }
 
-            proxies = contentText?.let { parseRaw(contentText) }
+            proxies = contentText?.let { parseRaw(contentText, showWarnings = byUser) }
                 ?: error(app.getString(R.string.no_proxies_found_in_subscription))
         } else {
 
-            val response = Libcore.newHttpClient().apply {
-                trySocks5(DataStore.mixedPort)
-                tryH3Direct()
-                // Subscription transport policy: Go TLS, minimum 1.2, allowing 1.3.
-                modernTLS()
-            }.newRequest().apply {
-                if (DataStore.allowInsecureOnRequest) {
-                    allowInsecure()
-                }
-                setURL(subscription.link)
-                setUserAgent(subscription.customUserAgent.takeIf { it.isNotBlank() } ?: USER_AGENT)
-            }.execute()
-            proxies = parseRaw(Util.getStringBox(response.contentString))
-                ?: error(app.getString(R.string.no_proxies_found))
-
-            subscription.subscriptionUserinfo =
-                Util.getStringBox(response.getHeader("Subscription-Userinfo"))
+            val response = SubscriptionFetch.fetch(subscription.link, subscription.customUserAgent)
+            proxies = parseRaw(response.text, showWarnings = byUser)
+            remoteUserinfo = response.userinfo
 
             // 修改默认名字
             if (proxyGroup.name?.startsWith("Subscription #") == true) {
-                var remoteName = Util.getStringBox(response.getHeader("content-disposition"))
+                var remoteName = response.disposition
                 if (remoteName.isNotBlank()) {
                     remoteName = Util.decodeFilename(remoteName)
                     if (remoteName.isNotBlank()) {
-                        proxyGroup.name = remoteName
+                        remoteGroupName = remoteName
                     }
                 }
             }
         }
 
-        val proxiesMap = LinkedHashMap<String, AbstractBean>()
-        val originalNames = proxies.map { it.displayName() }
-        val uniqueNames = SubscriptionNames.unique(originalNames)
-        for ((index, proxy) in proxies.withIndex()) {
-            if (uniqueNames[index] != originalNames[index]) proxy.name = uniqueNames[index]
-            proxiesMap[proxy.displayName()] = proxy
-        }
-        proxies = proxiesMap.values.toList()
-
-        if (subscription.forceResolve) forceResolve(proxies, proxyGroup.id)
+        currentCoroutineContext().ensureActive()
+        if (subscription.forceResolve) proxies = forceResolve(proxies, proxyGroup.id)
 
         val duplicate = if (subscription.deduplication) {
             val dedup = SubscriptionDedup.apply(proxies)
@@ -77,30 +59,42 @@ object RawUpdater : GroupUpdater() {
             dedup.duplicates
         } else emptyList()
 
+        currentCoroutineContext().ensureActive()
+        val previousName = proxyGroup.name
+        val previousUserinfo = subscription.subscriptionUserinfo
         val previousTimestamp = subscription.lastUpdated
+        remoteGroupName?.let { proxyGroup.name = it }
+        remoteUserinfo?.let { subscription.subscriptionUserinfo = it }
         subscription.lastUpdated = (System.currentTimeMillis() / 1000).toInt()
         val result = try {
             SubscriptionPersistence.apply(SagerDatabase.instance, proxyGroup, proxies)
         } catch (error: Throwable) {
+            proxyGroup.name = previousName
+            subscription.subscriptionUserinfo = previousUserinfo
             subscription.lastUpdated = previousTimestamp
             throw error
         }
+        currentCoroutineContext().ensureActive()
         io.nekohasekai.sagernet.database.ProfileManager.selectFirstIfNeeded(proxyGroup.id)
-        finishUpdate(proxyGroup)
 
         userInterface?.onUpdateSuccess(
             proxyGroup, result.changed, result.added, result.updated, result.deleted, duplicate, byUser
         )
     }
 
-    suspend fun parseRaw(text: String, fileName: String = ""): List<AbstractBean>? =
-        HybridRawSubscription.parse(text, fileName)
-
-    fun clashCipher(cipher: String): String = if (cipher == "dummy") "none" else cipher
-
-    fun parseWireGuard(conf: String): List<WireGuardBean> =
-        checkNotNull(RustRawSubscription.parse(conf, mode = "wireguard")).map { it as WireGuardBean }
-
-    fun parseJSON(json: Any): List<AbstractBean> =
-        checkNotNull(RustRawSubscription.parse("", mode = "json", json = json))
+    suspend fun parseRaw(text: String, fileName: String = "", showWarnings: Boolean = true): List<Profile> {
+        currentCoroutineContext().ensureActive()
+        val result = CoreClient.importProfiles(text, fileName = fileName)
+        val profiles = result.requireComplete()
+        val warnings = result.issues.filter { it.severity == "warning" && it.code != "NON_PROXY_ENTRY" }
+        if (warnings.isNotEmpty()) {
+            val message = warnings.take(5).joinToString("\n") { "${it.code}: ${it.message}" }
+            Logs.w(message)
+            if (showWarnings) withContext(Dispatchers.Main) {
+                android.widget.Toast.makeText(app, message, android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+        currentCoroutineContext().ensureActive()
+        return profiles
+    }
 }

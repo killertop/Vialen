@@ -23,7 +23,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /** Exercise the public stopRunner and a fresh Service, including the actual state transitions. */
-@RunWith(RustBridgeRobolectricTestRunner::class)
+@RunWith(CoreBridgeRobolectricTestRunner::class)
 @Config(sdk = [34], application = android.app.Application::class)
 class ServiceStopFailureTest {
     class TestService : Service(), BaseService.Interface {

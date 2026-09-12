@@ -15,13 +15,10 @@ import org.junit.runners.model.Statement
  */
 @RunWith(Suite::class)
 @Suite.SuiteClasses(
-    RawSubscriptionNativeTest::class,
-    HybridRawSubscriptionNativeTest::class,
     SubscriptionEndToEndNativeTest::class,
     SubscriptionPersistenceNativeTest::class,
     FullConfigSnapshotNativeTest::class,
     ChainTagIntegrityNativeTest::class,
-    OutboundConfigNativeTest::class,
     ProfileAutoSelectionNativeTest::class,
     ListenerLifecycleNativeTest::class,
     CancellableUrlTestNativeTest::class,

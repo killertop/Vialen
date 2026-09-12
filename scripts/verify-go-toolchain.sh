@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Verifies host Go vs Required Go 1.25.5 toolchain pinning
+# Verifies host Go vs Required Go 1.27.1 toolchain pinning
 set -euo pipefail
 
-REQUIRED_GO="go1.25.5"
+REQUIRED_GO="go1.27.1"
 HOST_GO=$(go env GOVERSION 2>/dev/null || go version | awk '{print $3}')
 
 # Query effective version when GOTOOLCHAIN is enforced

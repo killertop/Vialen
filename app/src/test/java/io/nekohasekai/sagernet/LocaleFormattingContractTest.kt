@@ -9,7 +9,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.util.Locale
 
-@RunWith(RustBridgeRobolectricTestRunner::class)
+@RunWith(CoreBridgeRobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class LocaleFormattingContractTest {
     @Test fun transportNormalizationIsIndependentOfTurkishLocale() {

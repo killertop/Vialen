@@ -1,24 +1,27 @@
 package io.nekohasekai.sagernet.group
 
-/** Preserves legacy replacement order while resuming long collision chains. */
+import io.nekohasekai.sagernet.core.Profile
+
 internal object SubscriptionNames {
+    fun display(profile: Profile): String = profile.name.ifBlank {
+        val host = if (':' in profile.server) "[${profile.server}]" else profile.server
+        "$host:${profile.port}"
+    }
+
+    /** Unique report labels only; subscription names remain unchanged in storage. */
     fun unique(names: List<String>): List<String> {
+        val reserved = names.toHashSet()
         val used = HashSet<String>()
-        var resume: HashMap<String, Pair<String, Int>>? = null
+        val next = HashMap<String, Int>()
         return names.map { original ->
-            val previous = resume?.get(original)
-            var name = previous?.first ?: original
-            var index = previous?.second ?: 0
-            while (name in used) {
-                name = name.replace(" ($index)", "") + " (${++index})"
+            if (used.add(original)) original else {
+                var suffix = next[original] ?: 2
+                var candidate: String
+                do { candidate = "$original (${suffix++})" } while (candidate in reserved || candidate in used)
+                next[original] = suffix
+                used.add(candidate)
+                candidate
             }
-            used.add(name)
-            // Unique and paired names do not need a second map.
-            if (index >= 4) {
-                val cache = resume ?: HashMap<String, Pair<String, Int>>().also { resume = it }
-                cache[original] = name to index
-            }
-            name
         }
     }
 }
