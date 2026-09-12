@@ -12,7 +12,7 @@
         <EditTextPreference app:defaultValue="1440" app:key="subscriptionAutoUpdateDelay" app:title="@string/auto_update_delay" app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
     <PreferenceCategory app:key="uiGroupAdvanced" app:title="@string/ui_advanced" app:initialExpandedChildrenCount="0">
-        <moe.matsuri.nb4a.ui.SimpleMenuPreference app:defaultValue="0" app:entries="@array/group_orders" app:entryValues="@array/int_array_3" app:key="groupOrder" app:title="@string/group_order" app:useSimpleSummaryProvider="true" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference app:defaultValue="2" app:entries="@array/group_orders" app:entryValues="@array/int_array_3" app:key="groupOrder" app:title="@string/group_order" app:useSimpleSummaryProvider="true" />
         <SwitchPreference app:key="groupIsSelector" app:title="@string/ui_use_selector" app:summary="@string/ui_use_selector_help" />
         <io.nekohasekai.sagernet.widget.OutboundPreference app:key="groupFrontProxy" app:title="@string/front_proxy" app:useSimpleSummaryProvider="true" />
         <io.nekohasekai.sagernet.widget.OutboundPreference app:key="groupLandingProxy" app:title="@string/landing_proxy" app:useSimpleSummaryProvider="true" />
