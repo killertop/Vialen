@@ -14,10 +14,12 @@ object Logs {
     // level int use logrus.go
 
     fun d(message: String) {
+        if (io.nekohasekai.sagernet.utils.RuntimeDiagnostics.remainingMillis() <= 0) return
         Libcore.nekoLogPrintln("[Debug] [${mkTag()}] $message")
     }
 
     fun d(message: String, exception: Throwable) {
+        if (io.nekohasekai.sagernet.utils.RuntimeDiagnostics.remainingMillis() <= 0) return
         Libcore.nekoLogPrintln("[Debug] [${mkTag()}] $message" + "\n" + exception.stackTraceToString())
     }
 

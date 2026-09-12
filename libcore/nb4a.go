@@ -12,7 +12,6 @@ import (
 	"log"
 
 	"github.com/matsuridayo/libneko/neko_common"
-	"github.com/matsuridayo/libneko/neko_log"
 	"github.com/sagernet/sing-box/option"
 	"golang.org/x/sys/unix"
 	"libcore/nekoutils"
@@ -26,7 +25,7 @@ func NekoLogPrintln(s string) {
 }
 
 func NekoLogClear() {
-	neko_log.LogWriter.Truncate()
+	coreLog.clear()
 }
 
 func ForceGc() {
@@ -56,12 +55,8 @@ func InitCore(process, cachePath, internalAssets, externalAssets string,
 	externalAssetsPath = externalAssets
 
 	// Set up log
-	if maxLogSizeKb < 50 {
-		maxLogSizeKb = 50
-	}
-	neko_log.LogWriterDisable = !logEnable
-	neko_log.TruncateOnStart = isBgProcess
-	neko_log.SetupLog(int(maxLogSizeKb)*1024, filepath.Join(cachePath, "neko.log"))
+	// Legacy size/enabled parameters remain ABI-compatible; logs are always bounded.
+	setupCoreLog(filepath.Join(cachePath, "neko.log"))
 
 	// nekoutils
 	nekoutils.Selector_OnProxySelected = intfNB4A.Selector_OnProxySelected

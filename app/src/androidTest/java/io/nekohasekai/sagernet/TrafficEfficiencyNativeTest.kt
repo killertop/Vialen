@@ -26,6 +26,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 
 /** Actual production sampler/Binder/Room and Go counters, through a real loopback SOCKS exchange.
@@ -45,9 +46,13 @@ class TrafficEfficiencyNativeTest {
     }
     private class Callback:ISagerNetServiceCallback.Stub() {
         val speeds=AtomicInteger()
+        val speedTimes=CopyOnWriteArrayList<Long>()
         val traffic=ConcurrentHashMap<Long,TrafficData>()
         override fun stateChanged(state:Int,profileName:String?,msg:String?)=Unit
-        override fun cbSpeedUpdate(stats:SpeedDisplayData?) { speeds.incrementAndGet() }
+        override fun cbSpeedUpdate(stats:SpeedDisplayData?) {
+            speedTimes.add(SystemClock.elapsedRealtime())
+            speeds.incrementAndGet()
+        }
         override fun cbTrafficUpdate(stats:TrafficData?) { if(stats!=null) traffic[stats.id]=stats.copy() }
         override fun cbSelectorUpdate(id:Long)=Unit
     }
@@ -75,7 +80,8 @@ class TrafficEfficiencyNativeTest {
         profileState.preservingFailure({
             DataStore.serviceMode=Key.MODE_PROXY
             DataStore.directDns="local";DataStore.remoteDns="local"
-            DataStore.speedInterval=40;DataStore.profileTrafficStatistics=true;DataStore.showDirectSpeed=false
+            // A legacy disabled display preference must no longer disable native accounting.
+            DataStore.speedInterval=0;DataStore.profileTrafficStatistics=true;DataStore.showDirectSpeed=false
             val nonce="traffic-${System.nanoTime()}"
             LoopbackSocksFixture(nonce).use { fixture ->
                 val row=ProxyEntity(groupId=group.id,tx=11,rx=37).apply {
@@ -101,8 +107,8 @@ class TrafficEfficiencyNativeTest {
                 delay(80)
                 val idleQueries=queries.get()
                 val idleStart=System.nanoTime();val idleCpu=Process.getElapsedCpuTime()
-                delay(240) // Six configured foreground periods.
-                assertEquals("Background must not use configured 40 ms timer",idleQueries,queries.get())
+                delay(1200) // Longer than the internal foreground period, below the 30 s statistics period.
+                assertEquals("Background must use the internal 30 s statistics timer",idleQueries,queries.get())
                 val backgroundCpu=Process.getElapsedCpuTime()-idleCpu
                 val backgroundMs=(System.nanoTime()-idleStart)/1_000_000
                 service.data.binder.registerCallback(callback,SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND)
@@ -121,6 +127,10 @@ class TrafficEfficiencyNativeTest {
                 awaitCondition { callback.speeds.get()>previousSpeeds }
                 val registrationMs=(System.nanoTime()-registrationStart)/1_000_000
                 assertTrue("Foreground registration did not wake promptly",registrationMs<1000)
+                val firstPeriodicSpeed=callback.speeds.get()
+                awaitCondition { callback.speeds.get()>firstPeriodicSpeed }
+                val periodMs=callback.speedTimes[firstPeriodicSpeed]-callback.speedTimes[firstPeriodicSpeed-1]
+                assertTrue("Foreground must use 1 s policy, not legacy fast cadence: $periodMs ms",periodMs>=800)
                 service.data.binder.unregisterCallback(callback)
                 delay(100)
                 // Register a background consumer to observe final persistence notification only.
@@ -152,7 +162,7 @@ class TrafficEfficiencyNativeTest {
                 val delivered=checkNotNull(callback.traffic[row.id])
                 assertEquals(final.tx,delivered.tx);assertEquals(final.rx,delivered.rx)
                 assertTrue("Stop must query final native counters",queries.get()>beforeRequest)
-                Log.i("TrafficEfficiency", "native=true requests=${fixture.requests.get()} configured_ms=40 background_ms=$backgroundMs idle_query_delta=0 idle_cpu_ms=$backgroundCpu wake_ms=$wakeMs registration_wake_ms=$registrationMs final_tx_delta=${final.tx-11} final_rx_delta=${final.rx-37} pid=${Process.myPid()}")
+                Log.i("TrafficEfficiency", "native=true requests=${fixture.requests.get()} legacy_ms=0 foreground_policy_ms=1000 background_policy_ms=30000 background_ms=$backgroundMs idle_query_delta=0 idle_cpu_ms=$backgroundCpu wake_ms=$wakeMs registration_wake_ms=$registrationMs final_tx_delta=${final.tx-11} final_rx_delta=${final.rx-37} pid=${Process.myPid()}")
             }
         },{
             profileState.cleanupSteps({ instance?.close();instance=null },{

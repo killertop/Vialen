@@ -104,6 +104,9 @@ class BaseService {
         override fun getState(): Int = (data?.state ?: State.Idle).ordinal
         override fun getProfileName(): String = data?.proxy?.displayProfileName ?: "Idle"
 
+        override fun setDiagnosticMode(enabled: Boolean) = Libcore.setDiagnosticMode(enabled)
+        override fun getDiagnosticRemainingMillis(): Long = Libcore.diagnosticRemainingMillis()
+
         override fun registerCallback(cb: ISagerNetServiceCallback, id: Int) {
             if (id == SagerConnection.CONNECTION_ID_RESTART_BG) {
                 Runtime.getRuntime().exit(0)

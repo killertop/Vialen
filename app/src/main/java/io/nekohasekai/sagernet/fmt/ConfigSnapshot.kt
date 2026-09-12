@@ -104,7 +104,7 @@ internal class ConfigSnapshot private constructor(
                     "remote_dns" to DataStore.remoteDns, "direct_dns" to DataStore.directDns,
                     "enable_dns_routing" to DataStore.enableDnsRouting, "fake_dns" to DataStore.enableFakeDns,
                     "sniffing" to DataStore.trafficSniffing, "ipv6" to DataStore.ipv6Mode,
-                    "log_level" to DataStore.logLevel,
+                    "log_level" to io.nekohasekai.sagernet.utils.RuntimeDiagnostics.NORMAL_LOG_LEVEL,
                     "tun" to DataStore.tunImplementation, "mtu" to DataStore.mtu, "mixed_port" to DataStore.mixedPort,
                     "resolve_destination" to DataStore.resolveDestination, "bypass_lan" to DataStore.bypassLanInCore,
                     "global_insecure" to DataStore.globalAllowInsecure,

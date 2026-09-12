@@ -110,6 +110,10 @@ func NewSingBoxInstance(config string, localTransport LocalDNSTransport) (b *Box
 	}
 
 	// create box
+	// Keep the upstream unsynchronized level immutable. Platform output is
+	// filtered by our process-wide monotonic diagnostic deadline. Empty output
+	// uses io.Discard for Android, preventing user configs bypassing the bound.
+	options.Log = &option.LogOptions{Level: "info", DisableColor: true}
 	instance, err := box.New(box.Options{
 		Options: options,
 		Context: ctx,

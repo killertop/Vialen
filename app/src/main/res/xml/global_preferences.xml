@@ -37,17 +37,15 @@
         <SwitchPreference app:key="allowAccess" app:summary="@string/allow_access_sum" app:title="@string/allow_access" />
     </PreferenceCategory>
     <PreferenceCategory app:key="uiDiagnostics" app:title="@string/ui_diagnostics" app:initialExpandedChildrenCount="0">
-        <moe.matsuri.nb4a.ui.SimpleMenuPreference app:defaultValue="1000" app:entries="@array/notification_entry" app:entryValues="@array/notification_value" app:key="speedInterval" app:title="@string/speed_interval" app:useSimpleSummaryProvider="true" />
         <SwitchPreference app:defaultValue="true" app:key="profileTrafficStatistics" app:summary="@string/profile_traffic_statistics_summary" app:title="@string/profile_traffic_statistics" />
         <SwitchPreference app:defaultValue="true" app:key="showDirectSpeed" app:summary="@string/show_direct_speed_sum" app:title="@string/show_direct_speed" app:useSimpleSummaryProvider="true" />
         <moe.matsuri.nb4a.ui.UrlTestPreference app:defaultValue="http://cp.cloudflare.com/" app:key="connectionTestURL" app:title="@string/connection_test_url" app:useSimpleSummaryProvider="true" />
-        <moe.matsuri.nb4a.ui.LongClickListPreference app:defaultValue="0" app:entries="@array/log_level" app:entryValues="@array/int_array_5" app:key="logLevel" app:title="@string/log_level" app:useSimpleSummaryProvider="true" />
-        <Preference app:key="uiLogBuffer" app:title="@string/form_log_buffer_size" />
+        <Preference app:key="uiDetailedDiagnostics" app:title="@string/runtime_diagnostics_title" app:summary="@string/runtime_diagnostics_summary" />
+        <Preference app:key="uiManagedSettings" app:title="@string/runtime_managed_title" app:summary="@string/runtime_managed_summary" />
     </PreferenceCategory>
     <PreferenceCategory app:key="uiSecurity" app:title="@string/ui_security" app:initialExpandedChildrenCount="0">
         <SwitchPreference app:key="globalAllowInsecure" app:title="@string/global_allow_insecure" />
         <SwitchPreference app:key="allowInsecureOnRequest" app:title="@string/allow_insecure_on_request_sum" />
-        <moe.matsuri.nb4a.ui.SimpleMenuPreference app:defaultValue="1.2" app:entries="@array/app_tls_version" app:entryValues="@array/app_tls_version" app:key="appTLSVersion" app:title="@string/app_tls_version" app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
     <PreferenceCategory app:key="uiAdvanced" app:title="@string/ui_advanced" app:initialExpandedChildrenCount="0">
         <moe.matsuri.nb4a.ui.SimpleMenuPreference app:defaultValue="0" app:entries="@array/tun_implementation" app:entryValues="@array/int_array_3" app:key="tunImplementation" app:title="@string/tun_implementation" app:useSimpleSummaryProvider="true" />

@@ -85,6 +85,7 @@ func NewHttpClient() HTTPClient {
 
 func (c *httpClient) ModernTLS() {
 	c.tls.MinVersion = tls.VersionTLS12
+	c.tls.MaxVersion = 0 // Permit TLS 1.3, including after a previous pinned policy.
 	// c.tls.CipherSuites = nekoutils.Map(tls.CipherSuites(), func(it *tls.CipherSuite) uint16 { return it.ID })
 }
 

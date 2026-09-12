@@ -91,6 +91,8 @@ class VisualSurfaceCaptureTest {
         try {
             // Suppress automatic connection preference; no service controls are invoked.
             DataStore.configurationStore.putBoolean("isAutoConnect", false)
+            // Covered by publicBefore's exact type/byte snapshot and finally restoration.
+            DataStore.configurationStore.putBoolean("managedRuntimeNoticeAcknowledged", true)
             createFixtures()
             for ((mode, label) in listOf(2 to "light", 1 to "dark").filter { requestedMode == "all" || it.second == requestedMode }) {
                 DataStore.nightTheme = mode
@@ -205,14 +207,19 @@ class VisualSurfaceCaptureTest {
                     await { preferenceFragment(activity) != null }
                     expandPreferenceSections(activity)
                     scrollPages("$mode/settings", activity, 12)
-                    for (key in listOf("remoteDns", "logLevel", "nightTheme", "mtu", "connectionTestURL")) {
+                    for (key in listOf("remoteDns", "nightTheme", "mtu", "connectionTestURL")) {
                         clickPreference(activity, key)
                         shot("$mode/settings-dialog-$key", activity)
                         dismissFloating(activity)
                     }
-                    clickPreference(activity, "logLevel", longClick = true)
-                    shot("$mode/settings-log-buffer-dialog", activity)
+                    val diagnosticsWereEnabled = libcore.Libcore.diagnosticRemainingMillis() > 0
+                    clickPreference(activity, "uiDetailedDiagnostics")
+                    shot("$mode/settings-diagnostics-confirmation", activity)
+                    // Back cancels; never press the enable/disable action.
                     dismissFloating(activity)
+                    if (!diagnosticsWereEnabled) check(libcore.Libcore.diagnosticRemainingMillis() == 0L) {
+                        "Cancelling diagnostics confirmation enabled diagnostics"
+                    }
                 }
             }
         }
@@ -410,7 +417,7 @@ class VisualSurfaceCaptureTest {
             await("compact settings") { preferenceFragment(activity) != null }
             shot("$mode/compact-settings-top", activity)
             captureListBottom("$mode/compact-settings-bottom", activity)
-            clickPreference(activity, "logLevel")
+            clickPreference(activity, "nightTheme")
             shot("$mode/compact-single-choice-dialog", activity)
             dismissFloating(activity)
         }

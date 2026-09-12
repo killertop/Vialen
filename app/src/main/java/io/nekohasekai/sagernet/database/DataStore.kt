@@ -107,6 +107,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
         return groups.find { it.type == GroupType.BASIC }!!.id
     }
 
+    // Legacy values deliberately retained for backup/audit, no longer runtime policy inputs.
     var appTLSVersion by configurationStore.string(Key.APP_TLS_VERSION)
     var showBottomBar by configurationStore.boolean(Key.SHOW_BOTTOM_BAR)
 
@@ -129,6 +130,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var bypassLanInCore by configurationStore.boolean(Key.BYPASS_LAN_IN_CORE)
 
     var allowAccess by configurationStore.boolean(Key.ALLOW_ACCESS)
+    // Retained for old backup provenance; TrafficSampling owns the runtime cadence.
     var speedInterval by configurationStore.stringToInt(Key.SPEED_INTERVAL)
     var showGroupInNotification by configurationStore.boolean("showGroupInNotification")
 
@@ -139,6 +141,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var enableDnsRouting by configurationStore.boolean(Key.ENABLE_DNS_ROUTING) { true }
     var enableFakeDns by configurationStore.boolean(Key.ENABLE_FAKEDNS) { true }
 
+    // Retained, not overwritten on upgrade. RuntimeDiagnostics owns normal/temporary logging.
     var logLevel by configurationStore.stringToInt(Key.LOG_LEVEL)
     var logBufSize by configurationStore.int(Key.LOG_BUF_SIZE) { 0 }
     var acquireWakeLock by configurationStore.boolean(Key.ACQUIRE_WAKE_LOCK)

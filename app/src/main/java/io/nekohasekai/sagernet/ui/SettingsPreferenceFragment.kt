@@ -1,9 +1,10 @@
 package io.nekohasekai.sagernet.ui
 
-import io.nekohasekai.sagernet.ui.form.showIntegerFormDialog
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
@@ -16,9 +17,24 @@ import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.utils.Theme
+import io.nekohasekai.sagernet.utils.RuntimeDiagnostics
 import moe.matsuri.nb4a.ui.*
 
 class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFragment() {
+
+    private val diagnosticsHandler = Handler(Looper.getMainLooper())
+    private var managedNotice: androidx.appcompat.app.AlertDialog? = null
+    private fun diagnosticService() = (activity as? MainActivity)?.connection?.service
+    private val refreshDiagnostics = object : Runnable {
+        override fun run() {
+            val remaining = RuntimeDiagnostics.remainingMillis(diagnosticService())
+            findPreference<Preference>("uiDetailedDiagnostics")?.summary =
+                if (remaining > 0) getString(R.string.runtime_diagnostics_active,
+                    (remaining + 59_999) / 60_000)
+                else getString(R.string.runtime_diagnostics_summary)
+            diagnosticsHandler.postDelayed(this, 1_000)
+        }
+    }
 
     private lateinit var isProxyApps: SwitchPreference
 
@@ -64,28 +80,29 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
         val enableDnsRouting = findPreference<SwitchPreference>(Key.ENABLE_DNS_ROUTING)!!
         val enableFakeDns = findPreference<SwitchPreference>(Key.ENABLE_FAKEDNS)!!
 
-        val logLevel = findPreference<LongClickListPreference>(Key.LOG_LEVEL)!!
         val mtu = findPreference<MTUPreference>(Key.MTU)!!
         globalCustomConfig = findPreference(Key.GLOBAL_CUSTOM_CONFIG)!!
         globalCustomConfig.useConfigStore(Key.GLOBAL_CUSTOM_CONFIG)
 
-        logLevel.dialogLayoutResource = R.layout.layout_loglevel_help
-        logLevel.setOnPreferenceChangeListener { _, _ ->
-            needRestart()
+        findPreference<Preference>("uiDetailedDiagnostics")!!.setOnPreferenceClickListener {
+            val enabled = RuntimeDiagnostics.remainingMillis(diagnosticService()) > 0
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.runtime_diagnostics_title)
+                .setMessage(if (enabled) R.string.runtime_diagnostics_stop_message else R.string.runtime_diagnostics_start_message)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(if (enabled) R.string.runtime_diagnostics_stop else R.string.runtime_diagnostics_start) { _, _ ->
+                    runCatching { RuntimeDiagnostics.setEnabled(diagnosticService(), !enabled) }
+                        .onFailure { error ->
+                            android.widget.Toast.makeText(requireContext(), error.readableMessage,
+                                android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    diagnosticsHandler.removeCallbacks(refreshDiagnostics)
+                    refreshDiagnostics.run()
+                }.show()
             true
         }
-        logLevel.setOnLongClickListener {
-            if (context == null) return@setOnLongClickListener true
-
-            requireContext().showIntegerFormDialog(
-                getString(R.string.form_log_buffer_size),
-                DataStore.logBufSize.takeIf { it > 0 }?.toString() ?: "50",
-                1..Int.MAX_VALUE,
-            ) { size ->
-                DataStore.logBufSize = size
-                needRestart()
-                true
-            }
+        findPreference<Preference>("uiManagedSettings")!!.setOnPreferenceClickListener {
+            showManagedSettingsNotice()
             true
         }
 
@@ -106,29 +123,7 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
             startActivity(Intent(activity, AppManagerActivity::class.java))
             true
         }
-        findPreference<Preference>("uiLogBuffer")!!.apply {
-            summary = DataStore.logBufSize.toString()
-            setOnPreferenceClickListener {
-                requireContext().showIntegerFormDialog(getString(R.string.form_log_buffer_size),
-                    DataStore.logBufSize.toString(), 1..Int.MAX_VALUE) { size ->
-                    DataStore.logBufSize = size
-                    summary = size.toString()
-                    needRestart()
-                    true
-                }
-                true
-            }
-        }
-
-        val profileTrafficStatistics =
-            findPreference<SwitchPreference>(Key.PROFILE_TRAFFIC_STATISTICS)!!
-        val speedInterval = findPreference<SimpleMenuPreference>(Key.SPEED_INTERVAL)!!
-        profileTrafficStatistics.isEnabled = speedInterval.value.toString() != "0"
-        speedInterval.setOnPreferenceChangeListener { _, newValue ->
-            profileTrafficStatistics.isEnabled = newValue.toString() != "0"
-            needReload()
-            true
-        }
+        findPreference<SwitchPreference>(Key.PROFILE_TRAFFIC_STATISTICS)!!.onPreferenceChangeListener = reloadListener
 
         serviceMode.setOnPreferenceChangeListener { _, _ ->
             if (DataStore.serviceState.started) SagerNet.stopService()
@@ -164,12 +159,40 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
     override fun onResume() {
         super.onResume()
 
+        diagnosticsHandler.removeCallbacks(refreshDiagnostics)
+        refreshDiagnostics.run()
+        if (!DataStore.configurationStore.getBoolean("managedRuntimeNoticeAcknowledged", false)) {
+            showManagedSettingsNotice()
+        }
+
         if (::isProxyApps.isInitialized) {
             isProxyApps.isChecked = DataStore.proxyApps
         }
         if (::globalCustomConfig.isInitialized) {
             globalCustomConfig.notifyChanged()
         }
+    }
+
+    override fun onPause() {
+        diagnosticsHandler.removeCallbacks(refreshDiagnostics)
+        super.onPause()
+    }
+
+    private fun showManagedSettingsNotice() {
+        if (managedNotice?.isShowing == true) return
+        managedNotice = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.runtime_managed_title)
+            .setMessage(R.string.runtime_managed_message)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                DataStore.configurationStore.putBoolean("managedRuntimeNoticeAcknowledged", true)
+            }.show()
+    }
+
+    override fun onDestroyView() {
+        diagnosticsHandler.removeCallbacks(refreshDiagnostics)
+        managedNotice?.dismiss()
+        managedNotice = null
+        super.onDestroyView()
     }
 
 }

@@ -31,7 +31,6 @@ class TrafficLooper internal constructor(
     private val profiles = mutableMapOf<Long, ProxyEntity>()
     private var selectedId = Long.MIN_VALUE // -1 is the bypass counter, never a selection sentinel.
     private var selectedTag = ""
-    private val interval = DataStore.speedInterval.toLong()
     private val statistics = DataStore.profileTrafficStatistics
     private val showDirect = DataStore.showDirectSpeed
 
@@ -39,7 +38,6 @@ class TrafficLooper internal constructor(
     fun start() {
         synchronized(lock) {
             check(job == null && !stopped)
-            if (interval <= 0) return
             proxy = checkNotNull(data.proxy)
             idMap[-1] = TrafficUpdater.TrafficLooperData(tag = TAG_BYPASS)
             val tags = hashSetOf(TAG_PROXY, TAG_BYPASS)
@@ -69,7 +67,7 @@ class TrafficLooper internal constructor(
 
     fun onConsumersChanged() { wake.trySend(Unit) }
 
-    fun isSelected(id: Long) = synchronized(lock) { !stopped && (interval <= 0 || selectedId == id) }
+    fun isSelected(id: Long) = synchronized(lock) { !stopped && selectedId == id }
 
     /** Flush the old selection before assigning its shared counter to the new one. */
     fun selectMain(id: Long) = synchronized(lock) {
@@ -137,7 +135,7 @@ class TrafficLooper internal constructor(
                     display.second.forEach { callback.cbTrafficUpdate(it) }
                 }
             }
-            val delay = TrafficSampling.interval(interval, foreground, statistics)
+            val delay = TrafficSampling.interval(foreground, statistics)
             if (delay == null) wake.receive()
             else withTimeoutOrNull(delay) { wake.receive() }
         }
@@ -158,10 +156,9 @@ class TrafficLooper internal constructor(
 
 internal object TrafficSampling {
     /** Null means no timer; foreground registration wakes the loop immediately. */
-    fun interval(configured: Long, foreground: Boolean, statistics: Boolean): Long? = when {
-        configured <= 0 -> null
-        foreground -> configured
-        statistics -> maxOf(configured, 30_000L)
+    fun interval(foreground: Boolean, statistics: Boolean): Long? = when {
+        foreground -> 1_000L
+        statistics -> 30_000L
         else -> null
     }
 }

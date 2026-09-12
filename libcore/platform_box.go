@@ -12,7 +12,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/matsuridayo/libneko/neko_log"
 	"github.com/sagernet/sing-box/adapter"
 	sblog "github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
@@ -239,12 +238,11 @@ var boxPlatformLogWriter sblog.PlatformWriter = &boxPlatformLogWriterWrapper{}
 func (w *boxPlatformLogWriterWrapper) DisableColors() bool { return true }
 
 func (w *boxPlatformLogWriterWrapper) WriteMessage(level uint8, message string) {
+	if level > sblog.LevelInfo && DiagnosticRemainingMillis() == 0 {
+		return
+	}
 	if !strings.HasSuffix(message, "\n") {
 		message += "\n"
 	}
-	if neko_log.LogWriter != nil {
-		neko_log.LogWriter.Write([]byte(message))
-	} else {
-		log.Print(message)
-	}
+	_, _ = coreLog.Write([]byte(message))
 }

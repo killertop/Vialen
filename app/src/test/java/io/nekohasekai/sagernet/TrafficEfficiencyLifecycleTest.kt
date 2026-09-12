@@ -105,13 +105,13 @@ class TrafficEfficiencyLifecycleTest {
     }
     private suspend fun stop() { looper!!.stop();looper=null }
 
-    @Test fun backgroundStatisticsAvoidConfiguredFrequencyAndStopDrainsFinalBytes() = runBlocking {
+    @Test fun backgroundStatisticsUseInternalPolicyAndStopDrainsFinalBytes() = runBlocking {
         start()
         awaitCondition { queries.get()>=6 }
         delay(40)
         val before=queries.get()
         add("one",7,11)
-        delay(120) // Six configured display intervals; background timer is thirty seconds.
+        delay(120) // Legacy 20 ms preference is ignored; background timer is thirty seconds.
         assertEquals(before,queries.get())
         stop()
         val row=persisted.last { it.id==1L }
@@ -171,14 +171,38 @@ class TrafficEfficiencyLifecycleTest {
         assertEquals(17L,persisted.last { it.id==1L }.tx)
     }
 
-    @Test fun zeroIntervalDoesNotInstallOrQueryCountersEvenOnSelectionAndStop() = runBlocking {
+    @Test fun legacyZeroIntervalStillInstallsSelectsAndFlushesStatistics() = runBlocking {
         every { DataStore.speedInterval } returns 0
         val loop=start(selector=true)
+        assertTrue(loop.isSelected(1))
+        add(TAG_PROXY,7,11)
+        loop.selectMain(2)
+        assertTrue(loop.isSelected(2))
+        add(TAG_PROXY,13,17)
         consumers[callback]=SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND
-        loop.onConsumersChanged();loop.selectMain(2)
-        delay(50);stop()
-        assertEquals(0,queries.get());assertTrue(persisted.isEmpty())
-        assertEquals(0,installs.get())
+        loop.onConsumersChanged()
+        awaitCondition { speeds.get()>0 }
+        stop()
+        assertEquals(1,installs.get())
+        assertEquals(17L,persisted.last { it.id==1L }.tx)
+        assertEquals(111L,persisted.last { it.id==1L }.rx)
+        assertEquals(33L,persisted.last { it.id==2L }.tx)
+        assertEquals(217L,persisted.last { it.id==2L }.rx)
+        verify(exactly=0) { DataStore.speedInterval }
+    }
+
+    @Test fun tileAndBackgroundActivityAreNotRealtimeConsumers() = runBlocking {
+        every { DataStore.profileTrafficStatistics } returns false
+        consumers[callback]=SagerConnection.CONNECTION_ID_TILE
+        val loop=start()
+        delay(80)
+        assertEquals(0,queries.get())
+        consumers[callback]=SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_BACKGROUND
+        loop.onConsumersChanged()
+        delay(80)
+        assertEquals(0,queries.get())
+        assertEquals(0,speeds.get())
+        assertEquals(1,installs.get())
     }
 
     @Test fun concurrentSelectionFinishesItsDrainBeforeStopAndCannotChangeAfterStop() = runBlocking {

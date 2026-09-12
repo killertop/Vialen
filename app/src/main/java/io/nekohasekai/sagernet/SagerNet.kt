@@ -62,8 +62,8 @@ class SagerNet : Application(),
                 cacheDir.absolutePath + "/",
                 filesDir.absolutePath + "/",
                 externalAssets.absolutePath + "/",
-                DataStore.logBufSize,
-                DataStore.logLevel > 0,
+                RuntimeDiagnostics.LOG_CAPACITY_KIB,
+                true,
                 nativeInterface, nativeInterface, LocalResolverImpl
             )
 
