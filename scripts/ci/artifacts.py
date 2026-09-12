@@ -440,11 +440,44 @@ def apk(folder):
         aar_bytes = aar_archive.read(aar_library)
     apk_library_sha = hashlib.sha256(apk_bytes).hexdigest()
     aar_library_sha = hashlib.sha256(aar_bytes).hexdigest()
-    require(apk_library_sha == aar_library_sha, "APK libgojni.so differs from core handoff AAR")
+    ndk_value = os.environ.get("ANDROID_NDK_HOME")
+    require(ndk_value, "ANDROID_NDK_HOME is required for native handoff verification")
+    ndk = Path(ndk_value).resolve(strict=True)
+    ndk_properties = ndk / "source.properties"
+    ndk_properties_text = ndk_properties.read_text()
+    revision = re.findall(r"^Pkg\.Revision\s*=\s*(\S+)\s*$", ndk_properties_text, re.M)
+    require(revision == ["28.1.13356709"], "Unexpected NDK revision for native handoff verification")
+    host_prefix = {"darwin": "darwin-", "linux": "linux-", "win32": "windows-"}.get(sys.platform)
+    require(host_prefix is not None, "Unsupported native verification host")
+    executable = "llvm-strip.exe" if sys.platform == "win32" else "llvm-strip"
+    strip_tools = [tool for tool in (ndk / "toolchains/llvm/prebuilt").glob(host_prefix + "*/bin/" + executable)
+                   if tool.is_file() and os.access(tool, os.X_OK)]
+    require(len(strip_tools) == 1, "Expected one executable host llvm-strip in pinned NDK")
+    strip_tool = strip_tools[0]
+    require(ndk in strip_tool.resolve().parents, "llvm-strip escapes pinned NDK")
+    # Retain the exact input/output for review; never alter the handoff AAR or APK.
+    verification_dir = Path(tempfile.mkdtemp(prefix="native-handoff-", dir=folder.parent))
+    original = verification_dir / "aar-libgojni.so"
+    normalized = verification_dir / "normalized-libgojni.so"
+    original.write_bytes(aar_bytes)
+    strip_command = [str(strip_tool), "--strip-unneeded", "-o", str(normalized), str(original)]
+    run(*strip_command)
+    normalized_sha = digest(normalized)
+    require(apk_library_sha == normalized_sha,
+            "APK libgojni.so differs from NDK-stripped core handoff AAR")
     native_evidence = {
         "apk_entry": apk_library, "aar_entry": aar_library,
         "apk_sha256": apk_library_sha, "aar_sha256": aar_library_sha,
-        "bytes": len(apk_bytes), "verified_equal": True,
+        "normalized_aar_sha256": normalized_sha,
+        "apk_bytes": len(apk_bytes), "aar_bytes": len(aar_bytes),
+        "normalized_aar_bytes": normalized.stat().st_size,
+        "verified_equal_after_strip": True,
+        "strip_command": strip_command,
+        "strip_tool": {"path": str(strip_tool), **record(strip_tool),
+                       "version": run(str(strip_tool), "--version")},
+        "ndk": {"revision": revision[0], "source_properties": record(ndk_properties),
+                "source_properties_text": ndk_properties_text},
+        "retained_verification_directory": str(verification_dir),
     }
     require("package: name='com.vialen.app'" in badging, "Unexpected package ID")
     require("application-debuggable" not in badging, "Debuggable APK")
