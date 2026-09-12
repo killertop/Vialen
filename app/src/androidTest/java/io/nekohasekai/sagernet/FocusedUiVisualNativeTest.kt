@@ -15,7 +15,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.Toolbar
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -50,7 +49,6 @@ import io.nekohasekai.sagernet.ui.profile.ProfileSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.SocksSettingsActivity
 import io.nekohasekai.sagernet.ui.ScannerActivity
 import io.nekohasekai.sagernet.ui.profile.ConfigEditActivity
-import io.nekohasekai.sagernet.utils.Theme
 import moe.matsuri.nb4a.TempDatabase
 import org.json.JSONArray
 import org.json.JSONObject
@@ -113,7 +111,7 @@ class FocusedUiVisualNativeTest {
         assumeTrue("Requires physical-device opt in: -e vialenFocusedVisual true",
             args.getString("vialenFocusedVisual") == "true")
         val mode = args.getString("vialenVisualMode") ?: "light"
-        require(mode in setOf("light", "dark"))
+        require(mode == "light") { "Vialen supports only light appearance" }
         label = (args.getString("vialenVisualLabel") ?: mode).replace(Regex("[^a-zA-Z0-9_-]"), "_")
         check(DataStore.serviceState == BaseService.State.Stopped || DataStore.serviceState == BaseService.State.Idle)
         main {
@@ -126,8 +124,6 @@ class FocusedUiVisualNativeTest {
         check(output.mkdirs())
         val publicBefore = snapshot(PublicDatabase.kvPairDao)
         val cacheBefore = snapshot(TempDatabase.profileCacheDao)
-        val oldTheme = Theme.currentNightMode
-        val oldDelegate = AppCompatDelegate.getDefaultNightMode()
         val application = context.applicationContext as Application
         application.registerActivityLifecycleCallbacks(callbacks)
         try {
@@ -136,9 +132,6 @@ class FocusedUiVisualNativeTest {
             TempDatabase.profileCacheDao.reset()
             installFixtures()
             DataStore.configurationStore.putBoolean("isAutoConnect", false)
-            DataStore.nightTheme = if (mode == "dark") 1 else 2
-            Theme.currentNightMode = DataStore.nightTheme
-            main { Theme.applyNightTheme() }
             surface("main-surfaces") { captureMainSurfaces() }
             surface("group-form") { captureForm("group-form", GroupSettingsActivity::class.java, GroupSettingsActivity.EXTRA_GROUP_ID, fixtureFormGroup) }
             surface("rule-form") { captureForm("rule-form", RouteSettingsActivity::class.java, RouteSettingsActivity.EXTRA_ROUTE_ID, fixtureRule) }
@@ -155,8 +148,6 @@ class FocusedUiVisualNativeTest {
             try { restoreRoom() } catch (error: Throwable) { failures.add("Room restore: ${error.javaClass.simpleName}; internal backup tables retained") }
             try { restore(PublicDatabase.kvPairDao, publicBefore) } catch (error: Throwable) { failures.add("public config restore: ${error.javaClass.simpleName}") }
             try { restore(TempDatabase.profileCacheDao, cacheBefore) } catch (error: Throwable) { failures.add("draft restore: ${error.javaClass.simpleName}") }
-            Theme.currentNightMode = oldTheme
-            try { main { AppCompatDelegate.setDefaultNightMode(oldDelegate) } } catch (error: Throwable) { failures.add("theme restore: ${error.javaClass.simpleName}") }
             writeIndex("FINISHED")
             println("VIALEN_FOCUSED_VISUAL ${output.absolutePath} screenshots=${screenshots.length()} failures=${failures.size}")
         }

@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
     <PreferenceCategory app:layout="@layout/preference_settings_category" app:key="uiAppearance" app:title="@string/ui_appearance">
-        <moe.matsuri.nb4a.ui.SimpleMenuPreference app:defaultValue="0" app:entries="@array/night_mode" app:entryValues="@array/int_array_4" app:singleLineTitle="false" app:icon="@drawable/ic_settings_dark_mode_outline" app:layout="@layout/preference_settings_value" app:key="nightTheme" app:title="@string/night_mode" app:useSimpleSummaryProvider="true" />
         <SwitchPreference app:singleLineTitle="false" app:icon="@drawable/ic_settings_bottom_navigation_outline" app:layout="@layout/preference_settings_row" app:key="showBottomBar" app:title="@string/show_bottom_bar" />
         <SwitchPreference app:singleLineTitle="false" app:icon="@drawable/ic_settings_location_on_outline" app:layout="@layout/preference_settings_row" app:key="alwaysShowAddress" app:summary="@string/always_show_address_sum" app:title="@string/always_show_address" />
         <SwitchPreference app:singleLineTitle="false" app:icon="@drawable/ic_settings_notifications_outline" app:layout="@layout/preference_settings_row" app:key="showGroupInNotification" app:title="@string/show_group_in_notification" />

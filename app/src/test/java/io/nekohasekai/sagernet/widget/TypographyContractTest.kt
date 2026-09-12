@@ -17,5 +17,5 @@ class TypographyContractTest {
         ApplicationProvider.getApplicationContext(), R.style.Theme_SagerNet))
 
     @Test fun lightTypographyRoles() = verify()
-    @Test @Config(qualifiers = "night-mdpi") fun darkTypographyRoles() = verify()
+    @Test @Config(qualifiers = "night-mdpi") fun lightTypographyIgnoresSystemAppearance() = verify()
 }

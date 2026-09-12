@@ -16,7 +16,6 @@ import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
 import io.nekohasekai.sagernet.ktx.*
-import io.nekohasekai.sagernet.utils.Theme
 import io.nekohasekai.sagernet.utils.RuntimeDiagnostics
 import moe.matsuri.nb4a.ui.*
 
@@ -61,12 +60,6 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
         DataStore.initGlobal()
         addPreferencesFromResource(R.xml.global_preferences)
 
-        val nightTheme = findPreference<SimpleMenuPreference>(Key.NIGHT_THEME)!!
-        nightTheme.setOnPreferenceChangeListener { _, newTheme ->
-            Theme.currentNightMode = (newTheme as String).toInt()
-            Theme.applyNightTheme()
-            true
-        }
         val mixedPort = findPreference<EditTextPreference>(Key.MIXED_PORT)!!
         val serviceMode = findPreference<Preference>(Key.SERVICE_MODE)!!
         val allowAccess = findPreference<Preference>(Key.ALLOW_ACCESS)!!

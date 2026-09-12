@@ -19,6 +19,6 @@
         app:titleTextColor="@color/vialen_text_primary"
         app:subtitleTextColor="@color/vialen_text_secondary"
         app:navigationIconTint="@color/vialen_toolbar_icon"
-        app:popupTheme="@style/ThemeOverlay.AppCompat.DayNight"
+        app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
         app:title="@string/app_name" />
 </com.google.android.material.appbar.AppBarLayout>

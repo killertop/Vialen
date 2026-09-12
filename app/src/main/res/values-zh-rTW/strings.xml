@@ -257,8 +257,6 @@
     <string name="need_reload">重新載入代理服務以套用修改</string>
     <string name="route_warn">請在新增客製化規則前閱讀上游參考文件，否則您可能會無法連線至網際網路。</string>
     <string name="lines">%d 行</string>
-    <string name="night_mode">夜間模式</string>
-    <string name="follow_system">跟隨系統</string>
     <string name="enable">啟用</string>
     <string name="disable">停用</string>
     <string name="auto">自動</string>

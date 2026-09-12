@@ -64,12 +64,10 @@
         android:theme="@style/Theme.Start">
 
         <activity
-            android:name="io.nekohasekai.sagernet.ui.BlankActivity"
-            android:configChanges="uiMode" />
+            android:name="io.nekohasekai.sagernet.ui.BlankActivity" />
 
         <activity
             android:name="io.nekohasekai.sagernet.ui.MainActivity"
-            android:configChanges="uiMode"
             android:exported="true"
             android:launchMode="singleTask">
             <intent-filter>
@@ -135,56 +133,39 @@
             android:excludeFromRecents="true"
             android:taskAffinity="" />
         <activity
-            android:name="io.nekohasekai.sagernet.ui.profile.ConfigEditActivity"
-            android:configChanges="uiMode" />
+            android:name="io.nekohasekai.sagernet.ui.profile.ConfigEditActivity" />
         <activity
-            android:name="io.nekohasekai.sagernet.ui.profile.SocksSettingsActivity"
-            android:configChanges="uiMode" />
+            android:name="io.nekohasekai.sagernet.ui.profile.SocksSettingsActivity" />
         <activity
-            android:name="io.nekohasekai.sagernet.ui.profile.HttpSettingsActivity"
-            android:configChanges="uiMode" />
+            android:name="io.nekohasekai.sagernet.ui.profile.HttpSettingsActivity" />
         <activity
-            android:name="io.nekohasekai.sagernet.ui.profile.ShadowsocksSettingsActivity"
-            android:configChanges="uiMode" />
+            android:name="io.nekohasekai.sagernet.ui.profile.ShadowsocksSettingsActivity" />
         <activity
-            android:name="io.nekohasekai.sagernet.ui.profile.VMessSettingsActivity"
-            android:configChanges="uiMode" />
+            android:name="io.nekohasekai.sagernet.ui.profile.VMessSettingsActivity" />
         <activity
-            android:name="io.nekohasekai.sagernet.ui.profile.TrojanSettingsActivity"
-            android:configChanges="uiMode" />
+            android:name="io.nekohasekai.sagernet.ui.profile.TrojanSettingsActivity" />
         <activity
-            android:name="io.nekohasekai.sagernet.ui.profile.HysteriaSettingsActivity"
-            android:configChanges="uiMode" />
+            android:name="io.nekohasekai.sagernet.ui.profile.HysteriaSettingsActivity" />
         <activity
-            android:name="io.nekohasekai.sagernet.ui.profile.WireGuardSettingsActivity"
-            android:configChanges="uiMode" />
+            android:name="io.nekohasekai.sagernet.ui.profile.WireGuardSettingsActivity" />
         <activity
-            android:name="io.nekohasekai.sagernet.ui.profile.TuicSettingsActivity"
-            android:configChanges="uiMode" />
+            android:name="io.nekohasekai.sagernet.ui.profile.TuicSettingsActivity" />
         <activity
-            android:name="io.nekohasekai.sagernet.ui.profile.ChainSettingsActivity"
-            android:configChanges="uiMode" />
+            android:name="io.nekohasekai.sagernet.ui.profile.ChainSettingsActivity" />
         <activity
-            android:name="moe.matsuri.nb4a.proxy.shadowtls.ShadowTLSSettingsActivity"
-            android:configChanges="uiMode" />
+            android:name="moe.matsuri.nb4a.proxy.shadowtls.ShadowTLSSettingsActivity" />
         <activity
-            android:name="moe.matsuri.nb4a.proxy.anytls.AnyTLSSettingsActivity"
-            android:configChanges="uiMode" />
+            android:name="moe.matsuri.nb4a.proxy.anytls.AnyTLSSettingsActivity" />
         <activity
-            android:name="moe.matsuri.nb4a.proxy.config.ConfigSettingActivity"
-            android:configChanges="uiMode" />
+            android:name="moe.matsuri.nb4a.proxy.config.ConfigSettingActivity" />
         <activity
-            android:name="io.nekohasekai.sagernet.ui.GroupSettingsActivity"
-            android:configChanges="uiMode" />
+            android:name="io.nekohasekai.sagernet.ui.GroupSettingsActivity" />
         <activity
-            android:name="io.nekohasekai.sagernet.ui.RouteSettingsActivity"
-            android:configChanges="uiMode" />
+            android:name="io.nekohasekai.sagernet.ui.RouteSettingsActivity" />
         <activity
-            android:name="io.nekohasekai.sagernet.ui.AssetsActivity"
-            android:configChanges="uiMode" />
+            android:name="io.nekohasekai.sagernet.ui.AssetsActivity" />
         <activity
-            android:name="io.nekohasekai.sagernet.ui.AppListActivity"
-            android:configChanges="uiMode" />
+            android:name="io.nekohasekai.sagernet.ui.AppListActivity" />
         <activity
             android:name=".QuickToggleShortcut"
             android:excludeFromRecents="true"
@@ -218,28 +199,24 @@
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
         <activity
             android:name="io.nekohasekai.sagernet.ui.AppManagerActivity"
-            android:configChanges="uiMode"
             android:excludeFromRecents="true"
             android:label="@string/proxied_apps"
             android:launchMode="singleTask"
             android:parentActivityName=".ui.MainActivity" />
         <activity
             android:name="io.nekohasekai.sagernet.ui.ScannerActivity"
-            android:configChanges="uiMode"
             android:excludeFromRecents="true"
             android:label="@string/add_profile_methods_scan_qr_code"
             android:launchMode="singleTask"
             android:parentActivityName="io.nekohasekai.sagernet.ui.MainActivity" />
         <activity
             android:name="io.nekohasekai.sagernet.ui.ProfileSelectActivity"
-            android:configChanges="uiMode"
             android:label="@string/select_profile"
             android:launchMode="singleTask"
             android:parentActivityName="io.nekohasekai.sagernet.ui.MainActivity" />
 
         <activity
             android:name="io.nekohasekai.sagernet.ui.SwitchActivity"
-            android:configChanges="uiMode"
             android:excludeFromRecents="true"
             android:launchMode="singleInstance"
             android:theme="@style/Theme.SagerNet.Dialog" />

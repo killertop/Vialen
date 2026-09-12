@@ -87,7 +87,7 @@ class ComponentVisualContractTest {
 
     @Test
     @Config(qualifiers = "night-mdpi")
-    fun darkSwitchDistinguishesCheckedAndDisabledStates() {
+    fun lightSwitchStatesIgnoreSystemAppearance() {
         assertSwitchStateColors()
     }
 

@@ -31,7 +31,7 @@ class ManagedSettingsResourceTest {
 
     @Test fun retiredKnobsAreReplacedByBoundedExplicitDiagnosticsAndNotice() {
         val keys = keys()
-        for (removed in listOf("speedInterval", "appTLSVersion", "logLevel", "uiLogBuffer")) {
+        for (removed in listOf("speedInterval", "appTLSVersion", "logLevel", "uiLogBuffer", "nightTheme")) {
             assertFalse(removed, removed in keys)
         }
         assertTrue("uiDetailedDiagnostics" in keys)
@@ -44,7 +44,7 @@ class ManagedSettingsResourceTest {
         val keys = keys()
         for (retained in listOf("isAutoConnect", "proxyApps", "uiEditApps", "remoteDns", "directDns",
             "enableDnsRouting", "enableFakeDns", "bypassLan", "bypassLanInCore", "allowAccess",
-            "nightTheme", "showGroupInNotification", "profileTrafficStatistics", "mtu", "ipv6Mode",
+            "showGroupInNotification", "profileTrafficStatistics", "mtu", "ipv6Mode",
             "tunImplementation", "acquireWakeLock", "networkChangeResetConnections", "wakeResetConnections")) {
             assertTrue("Missing retained setting: $retained", retained in keys)
         }

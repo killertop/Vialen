@@ -109,10 +109,10 @@ class RuntimePolicyNativeTest {
                     parser.next()
                 }
             }
-            for (removed in listOf("speedInterval", "appTLSVersion", "logLevel", "uiLogBuffer")) {
+            for (removed in listOf("speedInterval", "appTLSVersion", "logLevel", "uiLogBuffer", "nightTheme")) {
                 assertFalse("Legacy setting still visible: $removed", removed in keys)
             }
-            for (retained in listOf("uiDetailedDiagnostics", "uiManagedSettings", "nightTheme",
+            for (retained in listOf("uiDetailedDiagnostics", "uiManagedSettings",
                 "allowInsecureOnRequest", "profileTrafficStatistics")) {
                 assertTrue("Missing retained control: $retained", retained in keys)
             }

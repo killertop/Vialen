@@ -10,7 +10,6 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import com.google.android.material.chip.Chip
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.Toolbar
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -37,7 +36,6 @@ import io.nekohasekai.sagernet.fmt.internal.ChainBean
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
 import io.nekohasekai.sagernet.ui.*
 import io.nekohasekai.sagernet.ui.profile.ConfigEditActivity
-import io.nekohasekai.sagernet.utils.Theme
 import io.nekohasekai.sagernet.widget.QRCodeDialog
 import moe.matsuri.nb4a.TempDatabase
 import org.json.JSONArray
@@ -71,9 +69,9 @@ class VisualSurfaceCaptureTest {
         assumeTrue("Requires -e vialenVisualCapture true", InstrumentationRegistry.getArguments()
             .getString("vialenVisualCapture") == "true")
         val arguments = InstrumentationRegistry.getArguments()
-        val requestedMode = arguments.getString("vialenVisualMode") ?: "all"
+        val requestedMode = arguments.getString("vialenVisualMode") ?: "light"
         val requestedSection = arguments.getString("vialenVisualSection") ?: "all"
-        require(requestedMode in setOf("light", "dark", "all")) { "Invalid vialenVisualMode=$requestedMode" }
+        require(requestedMode == "light") { "Vialen supports only light appearance" }
         require(requestedSection in setOf("main", "forms", "standalone", "conditions", "compact", "typography", "polish", "all")) { "Invalid vialenVisualSection=$requestedSection" }
         checkNoStartedService()
         check(activities().isEmpty()) { "Close app activities before this isolated capture run" }
@@ -81,8 +79,6 @@ class VisualSurfaceCaptureTest {
         check(output.mkdirs())
         val publicBefore = snapshot(PublicDatabase.kvPairDao)
         val cacheBefore = snapshot(TempDatabase.profileCacheDao)
-        val themeBefore = Theme.currentNightMode
-        val delegateBefore = AppCompatDelegate.getDefaultNightMode()
         val stateBefore = DataStore.serviceState
         var failure: Throwable? = null
         fun attempt(block: () -> Unit) {
@@ -100,10 +96,8 @@ class VisualSurfaceCaptureTest {
                 DataStore.alwaysShowAddress = false
             }
             createFixtures()
-            for ((mode, label) in listOf(2 to "light", 1 to "dark").filter { requestedMode == "all" || it.second == requestedMode }) {
-                DataStore.nightTheme = mode
-                Theme.currentNightMode = mode
-                instrumentation.runOnMainSync { Theme.applyNightTheme() }
+            run {
+                val label = "light"
                 DataStore.selectedGroup = groupId
                 DataStore.selectedProxy = profileId
                 if (requestedSection == "all" || requestedSection == "main") {
@@ -139,9 +133,7 @@ class VisualSurfaceCaptureTest {
             attempt { restore(PublicDatabase.kvPairDao, publicBefore) }
             attempt { restore(TempDatabase.profileCacheDao, cacheBefore) }
             attempt {
-                Theme.currentNightMode = themeBefore
                 DataStore.serviceState = stateBefore
-                instrumentation.runOnMainSync { AppCompatDelegate.setDefaultNightMode(delegateBefore) }
             }
             attempt { checkNoStartedService() }
             attempt {
@@ -219,7 +211,7 @@ class VisualSurfaceCaptureTest {
                     await { preferenceFragment(activity) != null }
                     expandPreferenceSections(activity)
                     scrollPages("$mode/settings", activity, 12)
-                    for (key in listOf("remoteDns", "nightTheme", "mtu", "connectionTestURL")) {
+                    for (key in listOf("remoteDns", "serviceMode", "mtu", "connectionTestURL")) {
                         clickPreference(activity, key)
                         shot("$mode/settings-dialog-$key", activity)
                         dismissFloating(activity)
@@ -307,14 +299,13 @@ class VisualSurfaceCaptureTest {
                 DataStore.alwaysShowAddress = addressBeforeClick
             }
             checkNoStartedService()
-            val themeBeforeDialog = DataStore.nightTheme
             val serviceModeBeforeDialog = DataStore.serviceMode
-            for (key in listOf("nightTheme", "serviceMode")) {
+            for (key in listOf("serviceMode")) {
                 clickPreference(activity, key)
                 shot("$mode/polish-settings-dialog-$key", activity)
                 dismissFloating(activity)
             }
-            check(DataStore.nightTheme == themeBeforeDialog && DataStore.serviceMode == serviceModeBeforeDialog) {
+            check(DataStore.serviceMode == serviceModeBeforeDialog) {
                 "Cancelled settings dialog changed its value"
             }
             expandPreferenceSections(activity)
@@ -620,7 +611,7 @@ class VisualSurfaceCaptureTest {
             await("compact settings") { preferenceFragment(activity) != null }
             shot("$mode/compact-settings-top", activity)
             captureListBottom("$mode/compact-settings-bottom", activity)
-            clickPreference(activity, "nightTheme")
+            clickPreference(activity, "serviceMode")
             shot("$mode/compact-single-choice-dialog", activity)
             dismissFloating(activity)
         }

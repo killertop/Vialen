@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <style name="Base.Theme.Vialen" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.Vialen" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
         <item name="actionBarStyle">@style/Widget.MaterialComponents.ActionBar.Solid</item>
         <item name="actionModeCloseDrawable">@drawable/ic_navigation_close</item>
         <item name="colorButtonNormal">@color/vialen_selected_background</item>
@@ -64,7 +65,8 @@
         <item name="snackbarTextViewStyle">@style/Widget.Vialen.Snackbar.TextView</item>
         <item name="snackbarButtonStyle">@style/Widget.Vialen.Snackbar.Button</item>
     </style>
-    <style name="Base.Theme.Vialen.Dialog" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
+    <style name="Base.Theme.Vialen.Dialog" parent="Theme.MaterialComponents.Light.Dialog.Alert">
+        <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
         <item name="actionBarStyle">@style/Widget.MaterialComponents.ActionBar.Solid</item>
         <item name="actionModeCloseDrawable">@drawable/ic_navigation_close</item>
         <item name="colorButtonNormal">@color/vialen_selected_background</item>
@@ -175,18 +177,19 @@
         <item name="rippleColor">@color/chip_ripple_color</item>
     </style>
     <style name="Theme.SagerNet" parent="Base.Theme.Vialen">
-        <item name="android:windowLightStatusBar">@bool/vialen_light_system_bars</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
     <style name="Theme.SagerNet.Dialog" parent="Base.Theme.Vialen.Dialog">
-        <item name="android:windowLightStatusBar">@bool/vialen_light_system_bars</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
     <style name="ThemeOverlay.MaterialComponents.MaterialAlertDialog.SagerNet" parent="ThemeOverlay.Vialen.DialogBase">
         <item name="android:statusBarColor">@color/vialen_surface</item>
-        <item name="android:windowLightStatusBar">@bool/vialen_light_system_bars</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
-    <style name="Theme.SagerNet.Black" />
-    <style name="Theme.SagerNet.Dialog.Black" />
-    <style name="Theme.Start" parent="Theme.MaterialComponents.DayNight">
+    <style name="Theme.Start" parent="Theme.MaterialComponents.Light">
+        <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
+        <item name="android:windowBackground">@color/vialen_background</item>
+        <item name="android:windowLightStatusBar">true</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="colorPrimary">@android:color/transparent</item>
         <item name="colorPrimaryDark">@android:color/transparent</item>

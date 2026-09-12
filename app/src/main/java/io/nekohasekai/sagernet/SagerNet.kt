@@ -74,6 +74,8 @@ class SagerNet : Application(),
                         io.nekohasekai.sagernet.database.RemovedDashboardCleanup.clean(filesDir)
                         DataStore.configurationStore.remove("enableClashAPI")
                         DataStore.configurationStore.remove("yacdURL")
+                        // Retired appearance preference: never read or restore it as policy.
+                        DataStore.configurationStore.remove("nightTheme")
                     }.onFailure { Logs.w(it) }
                 }
             }
@@ -81,7 +83,6 @@ class SagerNet : Application(),
 
         if (isMainProcess) {
             Theme.apply(this)
-            Theme.applyNightTheme()
             runOnDefaultDispatcher {
                 DefaultNetworkListener.start(this) {
                     underlyingNetwork = it

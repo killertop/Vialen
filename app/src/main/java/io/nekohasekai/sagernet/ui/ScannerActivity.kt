@@ -46,7 +46,7 @@ class ScannerActivity : ThemedActivity(),
         binding = LayoutScannerBinding.inflate(layoutInflater)
         setContentView(binding.root)
         // The preview extends behind the status inset. Keep that inset on the same
-        // opaque surface as the toolbar so day/night system icons retain contrast.
+        // opaque surface as the toolbar so system icons retain contrast.
         findViewById<android.view.View>(R.id.appbar).setBackgroundResource(R.color.vialen_surface)
         setSupportActionBar(findViewById(R.id.toolbar))
         supportActionBar?.setTitle(R.string.ui_scanner_title)

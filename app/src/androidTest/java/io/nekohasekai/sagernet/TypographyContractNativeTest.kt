@@ -25,5 +25,5 @@ class TypographyContractNativeTest {
         failure?.let { throw it }
     }
     @Test fun lightTypographyRoles() = verify(Configuration.UI_MODE_NIGHT_NO)
-    @Test fun darkTypographyRoles() = verify(Configuration.UI_MODE_NIGHT_YES)
+    @Test fun lightTypographyIgnoresSystemAppearance() = verify(Configuration.UI_MODE_NIGHT_YES)
 }

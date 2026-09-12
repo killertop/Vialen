@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.SagerNet" parent="Base.Theme.Vialen">
-        <item name="android:windowLightStatusBar">@bool/vialen_light_system_bars</item>
-        <item name="android:windowLightNavigationBar">@bool/vialen_light_system_bars</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
     <style name="Theme.SagerNet.Dialog" parent="Base.Theme.Vialen.Dialog">
-        <item name="android:windowLightStatusBar">@bool/vialen_light_system_bars</item>
-        <item name="android:windowLightNavigationBar">@bool/vialen_light_system_bars</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
     <style name="ThemeOverlay.MaterialComponents.MaterialAlertDialog.SagerNet" parent="ThemeOverlay.Vialen.DialogBase">
         <item name="android:statusBarColor">@color/vialen_surface</item>
         <item name="android:navigationBarColor">@color/vialen_surface</item>
-        <item name="android:windowLightStatusBar">@bool/vialen_light_system_bars</item>
-        <item name="android:windowLightNavigationBar">@bool/vialen_light_system_bars</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 </resources>

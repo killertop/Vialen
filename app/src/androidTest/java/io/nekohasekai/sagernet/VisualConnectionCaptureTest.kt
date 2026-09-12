@@ -2,7 +2,6 @@ package io.nekohasekai.sagernet
 
 import android.graphics.Bitmap
 import android.os.ParcelFileDescriptor
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -13,7 +12,6 @@ import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.preference.KeyValuePair
 import io.nekohasekai.sagernet.database.preference.PublicDatabase
 import io.nekohasekai.sagernet.ui.MainActivity
-import io.nekohasekai.sagernet.utils.Theme
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assume.assumeTrue
@@ -40,8 +38,6 @@ class VisualConnectionCaptureTest {
         val before = dao.all().map { row -> KeyValuePair(row.key).also {
             it.valueType = row.valueType; it.value = row.value.copyOf()
         } }
-        val oldTheme = Theme.currentNightMode
-        val oldDelegate = AppCompatDelegate.getDefaultNightMode()
         val oldState = DataStore.serviceState
         val output = File(checkNotNull(context.getExternalFilesDir(null)),
             "ui-v1.6-connection/${System.currentTimeMillis()}")
@@ -56,10 +52,8 @@ class VisualConnectionCaptureTest {
         try {
             DataStore.configurationStore.putBoolean("isAutoConnect", false)
             DataStore.showBottomBar = true
-            for ((mode, label) in listOf(2 to "light", 1 to "dark")) {
-                DataStore.nightTheme = mode
-                Theme.currentNightMode = mode
-                onMain { Theme.applyNightTheme() }
+            run {
+                val label = "light"
                 val scenario = ActivityScenario.launch(MainActivity::class.java)
                 try {
                     settle(750)
@@ -117,9 +111,7 @@ class VisualConnectionCaptureTest {
                 } == true) { "Preference restore mismatch: ${row.key}" } }
             }
             cleanup {
-                Theme.currentNightMode = oldTheme
                 DataStore.serviceState = oldState
-                onMain { AppCompatDelegate.setDefaultNightMode(oldDelegate) }
             }
             cleanup { checkNoStartedService() }
             cleanup {

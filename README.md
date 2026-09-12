@@ -6,7 +6,7 @@
 
 ## 中文
 
-Vialen 提供节点与订阅管理、分组、路由和 VPN 连接，采用简洁的黑色主题与独立夜间模式设置。当前正式安装包适用于 Android ARM64（`arm64-v8a`），应用包名为 `com.vialen.app`。
+Vialen 提供节点与订阅管理、分组、路由和 VPN 连接，统一采用浅色界面，不随系统外观或省电模式切换主题。当前正式安装包适用于 Android ARM64（`arm64-v8a`），应用包名为 `com.vialen.app`。
 
 ### 功能
 
@@ -44,7 +44,7 @@ Vialen 提供节点与订阅管理、分组、路由和 VPN 连接，采用简�
 
 [Download the latest release](https://github.com/killertop/Vialen/releases/latest) · [Release history](https://github.com/killertop/Vialen/releases)
 
-Vialen provides profile, subscription, group, routing, and VPN management with a restrained black theme and separate night-mode settings. Current release packages target Android ARM64 (`arm64-v8a`) and use the application ID `com.vialen.app`.
+Vialen provides profile, subscription, group, routing, and VPN management with one light appearance that does not follow system appearance or battery saver. Current release packages target Android ARM64 (`arm64-v8a`) and use the application ID `com.vialen.app`.
 
 ### Features
 

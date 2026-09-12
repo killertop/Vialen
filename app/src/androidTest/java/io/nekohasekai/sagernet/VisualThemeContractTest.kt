@@ -44,7 +44,7 @@ class VisualThemeContractTest {
         failure?.let { throw it }
     }
 
-    @Test fun dayAndNightContrastAndConnectionStates() {
+    @Test fun lightPaletteAndConnectionStatesIgnoreSystemAppearance() {
         for (night in listOf(Configuration.UI_MODE_NIGHT_NO, Configuration.UI_MODE_NIGHT_YES)) {
             lateinit var context: ViewContext
             lateinit var button: ServiceButton
@@ -66,6 +66,7 @@ class VisualThemeContractTest {
                         assertTrue("night=$night contrast=$ratio minimum=$minimum", ratio >= minimum)
                     }
                     val surface = color(R.color.vialen_surface)
+                    assertEquals("System appearance must not change the app surface", Color.WHITE, surface)
                     val resolved = context.obtainStyledAttributes(intArrayOf(
                         android.R.attr.textColorPrimary,
                         android.R.attr.textColorSecondary,
@@ -98,7 +99,7 @@ class VisualThemeContractTest {
                     val dialogSurface = try {
                         dialogSurfaceAttributes.getColor(0, Color.TRANSPARENT)
                     } finally { dialogSurfaceAttributes.recycle() }
-                    assertEquals("Dialog surface must follow day/night", surface, dialogSurface)
+                    assertEquals("Dialog must retain the light surface", surface, dialogSurface)
                     for (checked in listOf(false, true)) {
                         choice.isChecked = checked
                         val ratio = ColorUtils.calculateContrast(choice.currentTextColor, dialogSurface)
