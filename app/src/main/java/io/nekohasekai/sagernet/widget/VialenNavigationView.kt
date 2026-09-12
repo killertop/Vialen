@@ -13,7 +13,7 @@ import com.google.android.material.button.MaterialButton
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.databinding.LayoutNavigationDrawerBinding
 
-/** A small, scrollable drawer sharing the main pages' pearl surfaces and text roles. */
+/** A flat, scrollable drawer sharing the main pages' brand colors and text roles. */
 class VialenNavigationView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
@@ -36,12 +36,10 @@ class VialenNavigationView @JvmOverloads constructor(
         private set
 
     init {
-        setBackgroundResource(R.drawable.vialen_pearl_background)
+        setBackgroundResource(R.color.vialen_surface)
         isFillViewport = true
         clipToPadding = false
         ViewCompat.setAccessibilityPaneTitle(this, context.getString(R.string.navigation_drawer_title))
-        ViewCompat.setAccessibilityHeading(binding.navigationConnectionSection, true)
-        ViewCompat.setAccessibilityHeading(binding.navigationAppSection, true)
         ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
             val safe = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
             view.updatePadding(top = safe.top, bottom = safe.bottom)

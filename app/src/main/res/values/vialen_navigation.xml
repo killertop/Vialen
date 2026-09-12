@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <dimen name="vialen_navigation_width">280dp</dimen>
+    <dimen name="vialen_navigation_width">260dp</dimen>
+    <style name="TextAppearance.Vialen.DrawerBrand" parent="TextAppearance.Vialen.PanelTitle">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="fontFamily">sans-serif-medium</item>
+    </style>
     <style name="Widget.Vialen.DrawerItem" parent="Widget.Vialen.NavigationButton">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
@@ -17,13 +21,14 @@
         <item name="android:insetBottom">4dp</item>
         <item name="android:checkable">true</item>
         <item name="android:saveEnabled">false</item>
+        <item name="android:foreground">@drawable/vialen_navigation_indicator</item>
         <item name="android:textColor">@color/navigation_icon</item>
         <item name="android:elevation">0dp</item>
         <item name="android:stateListAnimator">@null</item>
         <item name="backgroundTint">@color/vialen_navigation_item</item>
         <item name="iconTint">@color/vialen_navigation_icon</item>
         <item name="iconSize">22dp</item>
-        <item name="iconPadding">14dp</item>
+        <item name="iconPadding">24dp</item>
         <item name="iconGravity">start</item>
         <item name="cornerRadius">@dimen/vialen_pearl_node_corner</item>
         <item name="rippleColor">@color/vialen_ripple</item>
