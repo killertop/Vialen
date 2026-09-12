@@ -49,7 +49,6 @@ import io.nekohasekai.sagernet.ui.RouteSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.ProfileSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.SocksSettingsActivity
 import io.nekohasekai.sagernet.ui.ScannerActivity
-import io.nekohasekai.sagernet.ui.WebviewFragment
 import io.nekohasekai.sagernet.ui.profile.ConfigEditActivity
 import io.nekohasekai.sagernet.utils.Theme
 import moe.matsuri.nb4a.TempDatabase
@@ -145,7 +144,6 @@ class FocusedUiVisualNativeTest {
             surface("rule-form") { captureForm("rule-form", RouteSettingsActivity::class.java, RouteSettingsActivity.EXTRA_ROUTE_ID, fixtureRule) }
             surface("profile-form") { captureForm("profile-form", SocksSettingsActivity::class.java, ProfileSettingsActivity.EXTRA_PROFILE_ID, fixtureProfile) }
             surface("editor") { captureEditor() }
-            surface("web-error") { captureWebError() }
             surface("scanner") { captureScanner() }
         } finally {
             // Finish only Activities created while this test owned the lifecycle callback.
@@ -528,28 +526,6 @@ class FocusedUiVisualNativeTest {
                 }
                 shot("editor-ime", activity)
             }
-        } finally { close(activity) }
-    }
-
-    private fun captureWebError() {
-        // A rejected local URL gives deterministic error UI without contacting an external host.
-        DataStore.yacdURL = "http://"
-        DataStore.showBottomBar = false
-        val activity = launch(MainActivity::class.java)
-        try {
-            main {
-                activity.displayFragmentWithId(R.id.nav_traffic)
-                activity.supportFragmentManager.executePendingTransactions()
-            }
-            await("web error") { activity.findViewById<View>(R.id.panel_error)?.visibility == View.VISIBLE }
-            main {
-                val retry = activity.findViewById<View>(R.id.panel_retry)
-                target("web-error-retry", retry)
-                safeSides("web-error-cutout-safety", activity, listOf(retry))
-                contract("web-error-loading-hidden", activity.findViewById<View>(R.id.panel_progress).visibility != View.VISIBLE)
-                contract("web-error-is-current-page", activity.supportFragmentManager.findFragmentById(R.id.fragment_holder) is WebviewFragment)
-            }
-            shot("web-error", activity)
         } finally { close(activity) }
     }
 

@@ -49,7 +49,6 @@ struct Settings {
     fake_dns: bool,
     sniffing: i32,
     ipv6: i32,
-    clash_api: bool,
     log_level: i32,
     tun: i32,
     mtu: i32,
@@ -548,9 +547,6 @@ fn build(req: Request) -> Result<Value, String> {
         config["http_clients"] = json!([{"tag":"default-http-client"}]);
     }
     config["route"] = route;
-    if !req.for_test && s.clash_api {
-        config["experimental"] = json!({"clash_api":{"external_controller":"127.0.0.1:9090","external_ui":"../files/yacd"}});
-    }
     if !req.for_test {
         merge(&mut config, &s.custom);
     }
@@ -585,7 +581,7 @@ mod tests {
     use super::*;
     fn request() -> Value {
         json!({"mode":"snapshot","version":1,"selected":1,"for_test":false,"for_export":false,
-            "settings":{"service_mode":"vpn","allow_access":false,"remote_dns":"https://dns.example/dns-query","direct_dns":"1.1.1.1","enable_dns_routing":true,"fake_dns":false,"sniffing":0,"ipv6":1,"clash_api":false,"log_level":2,"tun":2,"mtu":9000,"mixed_port":2080,"resolve_destination":false,"bypass_lan":false,"global_insecure":false,"server_strategy":"","custom":null,"tun_v4":"172.19.0.1","tun_v6":"fdfe:dcba:9876::1"},
+            "settings":{"service_mode":"vpn","allow_access":false,"remote_dns":"https://dns.example/dns-query","direct_dns":"1.1.1.1","enable_dns_routing":true,"fake_dns":false,"sniffing":0,"ipv6":1,"log_level":2,"tun":2,"mtu":9000,"mixed_port":2080,"resolve_destination":false,"bypass_lan":false,"global_insecure":false,"server_strategy":"","custom":null,"tun_v4":"172.19.0.1","tun_v6":"fdfe:dcba:9876::1"},
             "profiles":[{"id":1,"group_id":1,"name":"one","server":"example.com","outbound":{"kind":"Socks","server":"example.com","port":1080,"protocol":2,"username":"","password":""},"chain":null,"full_config":null,"custom_outbound":null,"custom_config":null,"mux":null,"uot":false}],
             "groups":[],"rules":[],"selector_ids":[],"selector_order":[],"extra_ids":[]})
     }

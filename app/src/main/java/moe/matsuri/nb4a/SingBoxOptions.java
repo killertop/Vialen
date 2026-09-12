@@ -130,23 +130,6 @@ public class SingBoxOptions {
 
     // paste generate output here
 
-    public static class ClashAPIOptions extends SingBoxOption {
-
-        public String external_controller;
-
-        public String external_ui;
-
-        public String external_ui_download_url;
-
-        public String external_ui_download_detour;
-
-        public String secret;
-
-        public String default_mode;
-
-        // Generate note: option type:  public List<String> ModeList;
-
-    }
 
     public static class SelectorOutboundOptions extends SingBoxOption {
 
@@ -400,7 +383,6 @@ public class SingBoxOptions {
 
     public static class ExperimentalOptions extends SingBoxOption {
 
-        public ClashAPIOptions clash_api;
 
         public V2RayAPIOptions v2ray_api;
 

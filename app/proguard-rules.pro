@@ -1,8 +1,33 @@
 -repackageclasses ''
 -allowaccessmodification
 
--keep class io.nekohasekai.sagernet.** { *;}
--keep class moe.matsuri.nb4a.** { *;}
+# Native entry points are looked up by class and method name, not Java call sites.
+-keepclasseswithmembers,includedescriptorclasses class * {
+    native <methods>;
+}
+
+# Imported/exported profile field names form a persistent JSON wire schema.
+# Constructors are also called reflectively by the subscription parser.
+-keep class * extends io.nekohasekai.sagernet.fmt.AbstractBean {
+    <fields>;
+    public <init>();
+}
+-keep class io.nekohasekai.sagernet.fmt.AbstractBean {
+    <fields>;
+    public <init>();
+}
+-keep class moe.matsuri.nb4a.SingBoxOptions$* {
+    <fields>;
+    public <init>();
+}
+-keep class io.nekohasekai.sagernet.fmt.v2ray.VmessQRCode {
+    <fields>;
+    public <init>();
+}
+
+# Workers persisted by previous releases must retain their binary class names.
+# Constructor and framework reflection rules are supplied by WorkManager/Room.
+-keepnames class * extends androidx.work.ListenableWorker
 
 # Clean Kotlin
 -assumenosideeffects class kotlin.jvm.internal.Intrinsics {
@@ -19,7 +44,6 @@
     static void throwUninitializedPropertyAccessException(java.lang.String);
 }
 
--dontobfuscate
 -keepattributes SourceFile
 
 -dontwarn java.beans.BeanInfo

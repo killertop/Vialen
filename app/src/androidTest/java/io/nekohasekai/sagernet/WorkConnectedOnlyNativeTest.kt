@@ -191,7 +191,7 @@ class WorkConnectedOnlyNativeTest {
             DataStore.serviceMode = Key.MODE_VPN
             DataStore.directDns = "local"; DataStore.remoteDns = "local"
             DataStore.mixedPort = ServerSocket(0).use { it.localPort }
-            DataStore.allowAccess = false; DataStore.enableClashAPI = false
+            DataStore.allowAccess = false
             DataStore.bypassLan = false; DataStore.bypassLanInCore = false
             DataStore.proxyApps = false; DataStore.enableFakeDns = false; DataStore.appendHttpProxy = false
             val vpnGroup = db.groupDao().createGroup(ProxyGroup(name = "$nonce-vpn")).also {

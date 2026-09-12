@@ -91,8 +91,6 @@ class VisualSurfaceCaptureTest {
         try {
             // Suppress automatic connection preference; no service controls are invoked.
             DataStore.configurationStore.putBoolean("isAutoConnect", false)
-            DataStore.enableClashAPI = true
-            DataStore.yacdURL = "data:text/html,%3Chtml%3E%3Cbody%3EOffline%20visual%20fixture%3C/body%3E%3C/html%3E"
             createFixtures()
             for ((mode, label) in listOf(2 to "light", 1 to "dark").filter { requestedMode == "all" || it.second == requestedMode }) {
                 DataStore.nightTheme = mode
@@ -193,7 +191,7 @@ class VisualSurfaceCaptureTest {
             onMain { activity.snackbar("QA offline feedback · 可撤销提示").setAction(R.string.undo) {}.show() }
             shot("$mode/snackbar", activity)
             for ((id, name) in listOf(R.id.nav_group to "groups", R.id.nav_route to "routes",
-                R.id.nav_settings to "settings", R.id.nav_traffic to "dashboard-local", R.id.nav_about to "about")) {
+                R.id.nav_settings to "settings", R.id.nav_about to "about")) {
                 onMain { activity.displayFragmentWithId(id) }
                 settle()
                 shot("$mode/$name-top", activity)

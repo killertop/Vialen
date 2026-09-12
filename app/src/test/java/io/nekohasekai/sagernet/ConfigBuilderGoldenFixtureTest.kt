@@ -95,7 +95,6 @@ class ConfigBuilderGoldenFixtureTest {
             every { DataStore.enableFakeDns } returns false
             every { DataStore.trafficSniffing } returns 1
             every { DataStore.ipv6Mode } returns IPv6Mode.ENABLE
-            every { DataStore.enableClashAPI } returns false
             every { DataStore.logLevel } returns 2
             every { DataStore.mixedPort } returns 2080
             every { DataStore.mtu } returns 1500

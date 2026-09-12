@@ -20,6 +20,7 @@ import (
 
 	box "github.com/sagernet/sing-box"
 	"github.com/sagernet/sing-box/constant"
+	sblog "github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing/service"
 	"github.com/sagernet/sing/service/pause"
@@ -94,16 +95,35 @@ func NewSingBoxInstance(config string, localTransport LocalDNSTransport) (b *Box
 		cancel()
 		return nil, fmt.Errorf("decode config: %v", err)
 	}
+	if options.Experimental != nil && options.Experimental.ClashAPI != nil {
+		cancel()
+		return nil, fmt.Errorf("Clash API and Yacd are no longer supported by Vialen; remove experimental.clash_api")
+	}
+	// PlatformLogWriter implicitly starts a Clash server in sing-box. Attach
+	// the Android logger after construction instead, retaining the cache that
+	// the platform writer previously enabled implicitly.
+	if options.Experimental == nil {
+		options.Experimental = &option.ExperimentalOptions{}
+	}
+	if options.Experimental.CacheFile == nil {
+		options.Experimental.CacheFile = &option.CacheFileOptions{Enabled: true}
+	}
 
 	// create box
 	instance, err := box.New(box.Options{
-		Options:           options,
-		Context:           ctx,
-		PlatformLogWriter: boxPlatformLogWriter,
+		Options: options,
+		Context: ctx,
 	})
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("create service: %v", err)
+	}
+	if factory, ok := instance.LogFactory().(sblog.ObservableFactory); ok {
+		factory.AttachPlatformWriter(boxPlatformLogWriter)
+	} else {
+		_ = instance.Close()
+		cancel()
+		return nil, fmt.Errorf("core logger does not support the Android log writer")
 	}
 
 	b = &BoxInstance{

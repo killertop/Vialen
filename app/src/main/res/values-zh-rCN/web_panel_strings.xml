@@ -1,6 +1,0 @@
-<resources>
-    <string name="panel_loading">正在加载面板</string>
-    <string name="panel_load_failed">无法加载面板。请检查面板地址和网络连接，然后重试。</string>
-    <string name="panel_retry">重试</string>
-    <string name="panel_invalid_url">请输入有效的 http:// 或 https:// 地址。</string>
-</resources>

@@ -19,7 +19,7 @@ class DnsDefaultCompatibilityNativeTest {
         {"mode":"snapshot","version":1,"selected":1,"for_test":false,"for_export":false,
         "settings":{"service_mode":"proxy","allow_access":false,"remote_dns":"https://dns.google/dns-query",
         "direct_dns":"https://223.5.5.5/dns-query","enable_dns_routing":true,"fake_dns":false,"sniffing":0,
-        "ipv6":1,"clash_api":false,"log_level":2,"tun":2,"mtu":9000,"mixed_port":2080,
+        "ipv6":1,"log_level":2,"tun":2,"mtu":9000,"mixed_port":2080,
         "resolve_destination":false,"bypass_lan":false,"global_insecure":false,"server_strategy":"","custom":null,
         "tun_v4":"172.19.0.1","tun_v6":"fdfe:dcba:9876::1"},
         "profiles":[{"id":1,"group_id":1,"name":"dns-compat","server":"127.0.0.1",

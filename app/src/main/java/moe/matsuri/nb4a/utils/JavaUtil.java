@@ -6,7 +6,6 @@ import android.app.Application;
 import android.content.Context;
 import android.os.Build;
 import android.text.TextUtils;
-import android.webkit.WebView;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -64,83 +63,6 @@ public class JavaUtil {
         // The remainder is the longest suffix of the encoded string such that the suffix contains no escapes.
         matcher.appendTail(decodedString);
         return new String(decodedString);
-    }
-
-    // Webview Utils
-
-    public static void handleWebviewDir(Context context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
-            return;
-        }
-        try {
-            Set<String> pathSet = new HashSet<>();
-            String suffix;
-            String dataPath = context.getDataDir().getAbsolutePath();
-            String webViewDir = "/app_webview";
-            String huaweiWebViewDir = "/app_hws_webview";
-            String lockFile = "/webview_data.lock";
-            String processName = Application.getProcessName();
-            if (!BuildConfig.APPLICATION_ID.equals(processName)) {//判断不等于默认进程名称
-                suffix = TextUtils.isEmpty(processName) ? context.getPackageName() : processName;
-                WebView.setDataDirectorySuffix(suffix);
-                suffix = "_" + suffix;
-                pathSet.add(dataPath + webViewDir + suffix + lockFile);
-                if (checkIsHuaweiRom()) {
-                    pathSet.add(dataPath + huaweiWebViewDir + suffix + lockFile);
-                }
-            } else {
-                //主进程
-                suffix = "_" + processName;
-                pathSet.add(dataPath + webViewDir + lockFile);//默认未添加进程名后缀
-                pathSet.add(dataPath + webViewDir + suffix + lockFile);//系统自动添加了进程名后缀
-                if (checkIsHuaweiRom()) {//部分华为手机更改了webview目录名
-                    pathSet.add(dataPath + huaweiWebViewDir + lockFile);
-                    pathSet.add(dataPath + huaweiWebViewDir + suffix + lockFile);
-                }
-            }
-            for (String path : pathSet) {
-                File file = new File(path);
-                if (file.exists()) {
-                    tryLockOrRecreateFile(file);
-                    break;
-                }
-            }
-        } catch (Exception e) {
-            Logs.INSTANCE.e(e);
-        }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.P)
-    private static void tryLockOrRecreateFile(File file) {
-        try {
-            FileLock tryLock = new RandomAccessFile(file, "rw").getChannel().tryLock();
-            if (tryLock != null) {
-                tryLock.close();
-            } else {
-                createFile(file, file.delete());
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            boolean deleted = false;
-            if (file.exists()) {
-                deleted = file.delete();
-            }
-            createFile(file, deleted);
-        }
-    }
-
-    private static void createFile(File file, boolean deleted) {
-        try {
-            if (deleted && !file.exists()) {
-                file.createNewFile();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private static boolean checkIsHuaweiRom() {
-        return Build.MANUFACTURER.contains("HUAWEI");
     }
 
     @SuppressLint("PrivateApi")

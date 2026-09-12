@@ -116,8 +116,6 @@ class MainActivity : ThemedActivity(),
         onBackPressedDispatcher.addCallback {
             if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
                 binding.drawerLayout.closeDrawers()
-            } else if ((supportFragmentManager.findFragmentById(R.id.fragment_holder) as? WebviewFragment)?.consumeBack() == true) {
-                // The panel consumes Back while its browser history has an entry.
             } else if (supportFragmentManager.findFragmentById(R.id.fragment_holder) is ConfigurationFragment) {
                 moveTaskToBack(true)
             } else {
@@ -148,7 +146,6 @@ class MainActivity : ThemedActivity(),
             onNewIntent(intent)
         }
 
-        refreshNavMenu(DataStore.enableClashAPI)
 
         if (isPreview) {
             MaterialAlertDialogBuilder(this)
@@ -159,11 +156,6 @@ class MainActivity : ThemedActivity(),
         }
     }
 
-    fun refreshNavMenu(clashApi: Boolean) {
-        if (::navigation.isInitialized) {
-            navigation.menu.findItem(R.id.nav_traffic)?.isVisible = clashApi
-        }
-    }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -316,7 +308,6 @@ class MainActivity : ThemedActivity(),
             is GroupFragment -> R.id.nav_group
             is RouteFragment -> R.id.nav_route
             is SettingsFragment -> R.id.nav_settings
-            is WebviewFragment -> R.id.nav_traffic
             is AboutFragment -> R.id.nav_about
             else -> return
         }
@@ -344,7 +335,6 @@ class MainActivity : ThemedActivity(),
             R.id.nav_group -> displayFragment(GroupFragment())
             R.id.nav_route -> displayFragment(RouteFragment())
             R.id.nav_settings -> displayFragment(SettingsFragment())
-            R.id.nav_traffic -> displayFragment(WebviewFragment())
 
             R.id.nav_about -> displayFragment(AboutFragment())
 

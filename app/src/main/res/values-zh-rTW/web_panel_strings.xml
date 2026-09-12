@@ -1,6 +1,0 @@
-<resources>
-    <string name="panel_loading">正在載入面板</string>
-    <string name="panel_load_failed">無法載入面板。請檢查面板位址和網路連線，然後重試。</string>
-    <string name="panel_retry">重試</string>
-    <string name="panel_invalid_url">請輸入有效的 http:// 或 https:// 位址。</string>
-</resources>

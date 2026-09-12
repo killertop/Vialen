@@ -21,14 +21,13 @@ class ChainTagIntegrityNativeTest {
         val db = SagerDatabase.instance
         val oldMode = DataStore.serviceMode; val oldDirect = DataStore.directDns
         val oldRemote = DataStore.remoteDns; val oldPort = DataStore.mixedPort
-        val oldCustom = DataStore.globalCustomConfig; val oldClash = DataStore.enableClashAPI
+        val oldCustom = DataStore.globalCustomConfig
         val group = ProxyGroup(name = "tag-integrity-${System.nanoTime()}")
         group.id = db.groupDao().createGroup(group)
         var ruleId = 0L
         try {
             DataStore.serviceMode = Key.MODE_PROXY; DataStore.directDns = "local"
             DataStore.remoteDns = "local"; DataStore.globalCustomConfig = ""
-            DataStore.enableClashAPI = false
             java.net.ServerSocket(0).use { DataStore.mixedPort = it.localPort }
             fun node(name: String): ProxyEntity = ProxyEntity(groupId = group.id).apply {
                 putBean(SOCKSBean().applyDefaultValues().apply {
@@ -93,7 +92,7 @@ class ChainTagIntegrityNativeTest {
         } finally {
             DataStore.serviceMode = oldMode; DataStore.directDns = oldDirect
             DataStore.remoteDns = oldRemote; DataStore.mixedPort = oldPort
-            DataStore.globalCustomConfig = oldCustom; DataStore.enableClashAPI = oldClash
+            DataStore.globalCustomConfig = oldCustom
             db.runInTransaction {
                 if (ruleId != 0L) db.rulesDao().deleteById(ruleId)
                 db.proxyDao().deleteByGroup(group.id); db.groupDao().deleteById(group.id)

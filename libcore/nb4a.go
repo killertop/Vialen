@@ -54,7 +54,6 @@ func InitCore(process, cachePath, internalAssets, externalAssets string,
 	// sing-box fs
 	resourcePaths = append(resourcePaths, externalAssets)
 	externalAssetsPath = externalAssets
-	internalAssetsPath = internalAssets
 
 	// Set up log
 	if maxLogSizeKb < 50 {
@@ -78,10 +77,6 @@ func InitCore(process, cachePath, internalAssets, externalAssets string,
 			updateRootCACerts(pem)
 		}
 
-		// bg
-		if isBgProcess {
-			extractAssets()
-		}
 	}()
 }
 

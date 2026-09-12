@@ -47,7 +47,7 @@ class VpnStartFailureRecoveryNativeTest {
         check(listOf("startRequested=true", "fgRequired=true", "isForeground=true").none { initialServices.contains(it) }) {
             "Existing started service; refusing to interrupt it"
         }
-        val keys = listOf(Key.MIXED_PORT, Key.ALLOW_ACCESS, Key.ENABLE_CLASH_API, Key.BYPASS_LAN,
+        val keys = listOf(Key.MIXED_PORT, Key.ALLOW_ACCESS, Key.BYPASS_LAN,
             Key.BYPASS_LAN_IN_CORE, Key.PROXY_APPS, Key.ENABLE_FAKEDNS, Key.APPEND_HTTP_PROXY)
         val publicDb = PublicDatabase.instance
         val kv = publicDb.keyValuePairDao()
@@ -82,7 +82,7 @@ class VpnStartFailureRecoveryNativeTest {
             val endpoint = checkNotNull(fixture)
             DataStore.serviceMode = Key.MODE_VPN
             DataStore.directDns = "local"; DataStore.remoteDns = "local"
-            DataStore.mixedPort = port; DataStore.allowAccess = false; DataStore.enableClashAPI = false
+            DataStore.mixedPort = port; DataStore.allowAccess = false
             DataStore.bypassLan = false; DataStore.bypassLanInCore = false
             DataStore.proxyApps = false; DataStore.enableFakeDns = false; DataStore.appendHttpProxy = false
             groupId = db.groupDao().createGroup(ProxyGroup(name = nonce))

@@ -108,7 +108,6 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     }
 
     var appTLSVersion by configurationStore.string(Key.APP_TLS_VERSION)
-    var enableClashAPI by configurationStore.boolean(Key.ENABLE_CLASH_API)
     var showBottomBar by configurationStore.boolean(Key.SHOW_BOTTOM_BAR)
 
     var allowInsecureOnRequest by configurationStore.boolean(Key.ALLOW_INSECURE_ON_REQUEST)
@@ -183,7 +182,6 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var tunImplementation by configurationStore.stringToInt(Key.TUN_IMPLEMENTATION) { TunImplementation.GVISOR }
     var profileTrafficStatistics by configurationStore.boolean(Key.PROFILE_TRAFFIC_STATISTICS) { true }
 
-    var yacdURL by configurationStore.string("yacdURL") { "http://127.0.0.1:9090/ui" }
 
     // protocol
 

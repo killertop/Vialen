@@ -54,6 +54,5 @@
         <moe.matsuri.nb4a.ui.MTUPreference app:defaultValue="9000" app:entries="@array/mtu_select" app:entryValues="@array/mtu_select" app:key="mtu" app:title="@string/mtu" />
         <SwitchPreference app:key="acquireWakeLock" app:summary="@string/acquire_wake_lock_summary" app:title="@string/acquire_wake_lock" />
         <moe.matsuri.nb4a.ui.EditConfigPreference app:key="globalCustomConfig" app:title="@string/custom_config" app:useSimpleSummaryProvider="true" />
-        <SwitchPreference app:key="enableClashAPI" app:summary="@string/enable_clash_api_summary" app:title="@string/enable_clash_api" />
     </PreferenceCategory>
 </PreferenceScreen>
