@@ -26,7 +26,11 @@ class RustPipelineVpnNativeTest {
     @get:org.junit.Rule
     val profileState = ProfileSelectionStateRule()
 
-    @Test fun importedRustProfilesCarryTunTrafficAcrossReconnectAndSwitch() = runBlocking {
+    @Test fun importedRustProfilesCarryTunTrafficAcrossReconnectAndSwitch() = runPipeline(false)
+
+    @Test fun nativeBinaryRuleSetCarriesTunTrafficAcrossReconnectAndSwitch() = runPipeline(true)
+
+    private fun runPipeline(nativeRuleSet: Boolean) = runBlocking {
         val app = ApplicationProvider.getApplicationContext<SagerNet>()
         assertNull("Grant VPN consent before this explicit lifecycle test", VpnService.prepare(app))
         check(!DataStore.serviceState.started) { "An existing VPN is running; refusing to interrupt it" }
@@ -44,7 +48,7 @@ class RustPipelineVpnNativeTest {
         val hadIndividual = kv[Key.INDIVIDUAL] != null
         val hadBypassMode = kv[Key.BYPASS_MODE] != null
         val db = SagerDatabase.instance
-        var groupId = 0L; var ruleId = 0L
+        var groupId = 0L; var ruleId = 0L; var fallbackRuleId = 0L
         val connection = SagerConnection(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND)
         suspend fun awaitState(expected: BaseService.State) {
             repeat(150) {
@@ -54,6 +58,7 @@ class RustPipelineVpnNativeTest {
             error("VPN state did not reach $expected; binder=${connection.service?.state}")
         }
         val nonce = "rust-${System.nanoTime()}"
+        val nativeFile = java.io.File(app.filesDir, "rule-sets/$nonce.srs")
         profileState.preservingFailure({
             DataStore.serviceMode = Key.MODE_VPN
             DataStore.directDns = "local"; DataStore.remoteDns = "local"
@@ -73,7 +78,20 @@ class RustPipelineVpnNativeTest {
                 }
                 val profiles = db.proxyDao().getByGroup(groupId)
                 assertEquals(2, profiles.size)
-                ruleId = db.rulesDao().createRule(RuleEntity(name = nonce, userOrder = Long.MIN_VALUE, enabled = true, ip = "198.18.0.254/32", outbound = 0))
+                val route = RuleEntity(name = nonce, userOrder = Long.MIN_VALUE, enabled = true, outbound = 0)
+                if (nativeRuleSet) {
+                    nativeFile.parentFile!!.mkdirs()
+                    // sing-box SRS v5: one destination predicate, 198.18.0.254/32.
+                    nativeFile.writeBytes(android.util.Base64.decode("U1JTBXjaYmRgY2SAAEaWY0IM/8DEfwZAAAAA//8cPgS9", android.util.Base64.DEFAULT))
+                    libcore.Libcore.validateRuleSet(nativeFile.absolutePath, "binary")
+                    route.ruleSets = RouteRuleSet.encode(listOf(RouteRuleSet(nonce, "rule-sets/${nativeFile.name}")))
+                    // An unrelated native destination must be ORed with the SRS, not ANDed.
+                    route.ip = "192.0.2.1/32"
+                } else route.ip = "198.18.0.254/32"
+                ruleId = db.rulesDao().createRule(route)
+                if (nativeRuleSet) fallbackRuleId = db.rulesDao().createRule(RuleEntity(
+                    name = "$nonce-fallback", userOrder = Long.MIN_VALUE + 1, enabled = true,
+                    ip = "198.18.0.254/32", outbound = -2))
                 app.startActivity(app.packageManager.getLaunchIntentForPackage(app.packageName)!!.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 connection.connect(app, object : SagerConnection.Callback {
                     override fun stateChanged(state: BaseService.State, profileName: String?, msg: String?) {}
@@ -139,12 +157,15 @@ class RustPipelineVpnNativeTest {
                 if (!hadBypassMode) kv.delete(Key.BYPASS_MODE)
                 db.runInTransaction {
                     if (ruleId != 0L) db.rulesDao().deleteById(ruleId)
+                    if (fallbackRuleId != 0L) db.rulesDao().deleteById(fallbackRuleId)
                     if (groupId != 0L) { db.proxyDao().deleteByGroup(groupId); db.groupDao().deleteById(groupId) }
                 }
+                check(!nativeFile.exists() || nativeFile.delete()) { "Cannot remove owned SRS fixture" }
             })
         })
         assertNull(db.groupDao().getById(groupId))
         assertNull(db.rulesDao().getById(ruleId))
+        if (fallbackRuleId != 0L) assertNull(db.rulesDao().getById(fallbackRuleId))
         assertEquals(oldMode, DataStore.serviceMode)
         assertEquals(oldProxy, DataStore.selectedProxy)
         assertEquals(oldBypass, DataStore.bypassLan)
