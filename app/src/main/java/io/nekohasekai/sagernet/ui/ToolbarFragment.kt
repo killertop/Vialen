@@ -19,6 +19,9 @@ open class ToolbarFragment : Fragment {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         toolbar = view.findViewById(R.id.toolbar)
+        // The five main destinations share the activity's continuous pearl surface.
+        // Keep editors, dialogs and secondary activity toolbars on their existing theme.
+        toolbar.setBackgroundColor(android.graphics.Color.TRANSPARENT)
         toolbar.setNavigationIcon(R.drawable.ic_navigation_menu)
         toolbar.setNavigationContentDescription(R.string.open_navigation_menu)
         toolbar.setNavigationOnClickListener {
