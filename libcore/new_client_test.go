@@ -124,6 +124,28 @@ func TestNewClientImportedProtocolsInitializePinnedCore(t *testing.T) {
 	}
 }
 
+func TestNewClientRealityImplicitAndExplicitFingerprintsInitializePinnedCore(t *testing.T) {
+	newClientPlatform(t)
+	const uri = "vless://00000000-0000-4000-8000-000000000001@127.0.0.1:443?security=reality&sni=synthetic.example&pbk=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	for _, fingerprint := range []string{"", "firefox"} {
+		t.Run("fingerprint="+fingerprint, func(t *testing.T) {
+			profiles := newClientImport(t, "links", uri+"&fp="+fingerprint)
+			plan := newClientConstruct(t, newClientRequest(profiles))
+			tls := plan.Options.Outbounds[0].Options.(*option.VLESSOutboundOptions).TLS
+			want := fingerprint
+			if want == "" {
+				want = "chrome"
+			}
+			if tls.UTLS == nil || !tls.UTLS.Enabled || tls.UTLS.Fingerprint != want {
+				t.Fatalf("Reality uTLS fingerprint: got %+v, want %s", tls.UTLS, want)
+			}
+			if profiles[0].TLS.Fingerprint != fingerprint {
+				t.Fatal("compilation changed the saved profile")
+			}
+		})
+	}
+}
+
 func TestNewClientDNSVariantsInitializePinnedCore(t *testing.T) {
 	newClientPlatform(t)
 	profiles := newClientImport(t, "links", "socks5://127.0.0.1:1080")

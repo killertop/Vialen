@@ -21,8 +21,13 @@ func tlsOptions(t *profile.TLS) option.OutboundTLSOptionsContainer {
 	if t.Certificate != "" {
 		o.Certificate = []string{t.Certificate}
 	}
-	if t.Fingerprint != "" {
-		o.UTLS = &option.OutboundUTLSOptions{Enabled: true, Fingerprint: t.Fingerprint}
+	fingerprint := t.Fingerprint
+	if fingerprint == "" && t.Reality != nil {
+		// Reality requires uTLS even when the share link leaves its fingerprint implicit.
+		fingerprint = "chrome"
+	}
+	if fingerprint != "" {
+		o.UTLS = &option.OutboundUTLSOptions{Enabled: true, Fingerprint: fingerprint}
 	}
 	if t.Reality != nil {
 		o.Reality = &option.OutboundRealityOptions{Enabled: true, PublicKey: t.Reality.PublicKey, ShortID: t.Reality.ShortID}

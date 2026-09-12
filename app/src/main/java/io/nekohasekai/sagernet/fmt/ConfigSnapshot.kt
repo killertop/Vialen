@@ -140,7 +140,10 @@ internal class ConfigSnapshot private constructor(
                 when (document.kind) {
                     "node" -> {
                         var profile = row.requireProfile().copy(id = raw(row.id))
-                        if (insecure) profile = profile.copy(tls = profile.tls?.copy(insecure = true))
+                        val tls = profile.tls
+                        if (insecure && tls?.enabled == true && tls.reality == null) {
+                            profile = profile.copy(tls = tls.copy(insecure = true))
+                        }
                         profiles += profile
                     }
                     // The form lists network-facing proxy first, then the destination.

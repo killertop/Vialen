@@ -8,6 +8,8 @@ import io.nekohasekai.sagernet.bg.proto.TestInstance
 import io.nekohasekai.sagernet.core.CoreClient
 import io.nekohasekai.sagernet.core.Profile
 import io.nekohasekai.sagernet.database.*
+import io.nekohasekai.sagernet.database.preference.KeyValuePair
+import io.nekohasekai.sagernet.database.preference.PublicDatabase
 import io.nekohasekai.sagernet.fmt.ConfigSnapshot
 import io.nekohasekai.sagernet.group.SubscriptionPersistence
 import kotlinx.coroutines.runBlocking
@@ -27,6 +29,12 @@ class NewClientCoreNativeTest {
 
     private suspend fun withGroup(body: suspend (ProxyGroup) -> Unit) {
         val db = SagerDatabase.instance
+        val preferences = PublicDatabase.kvPairDao
+        val overrides = listOf(Key.GLOBAL_CUSTOM_CONFIG, Key.GLOBAL_ALLOW_INSECURE).associateWith { key ->
+            preferences[key]?.let { saved -> KeyValuePair(saved.key).also {
+                it.valueType = saved.valueType; it.value = saved.value.copyOf()
+            } }
+        }
         val group = ProxyGroup(name = "new-client-${System.nanoTime()}", type = GroupType.SUBSCRIPTION,
             subscription = SubscriptionBean().apply { initializeDefaultValues() })
         group.id = db.groupDao().createGroup(group)
@@ -37,11 +45,17 @@ class NewClientCoreNativeTest {
             DataStore.globalAllowInsecure = false
             body(group)
         }, {
-            db.runInTransaction {
-                db.proxyDao().deleteByGroup(group.id)
-                db.groupDao().deleteById(group.id)
-            }
-            assertNull(db.groupDao().getById(group.id))
+            selectionState.cleanupSteps({
+                db.runInTransaction {
+                    db.proxyDao().deleteByGroup(group.id)
+                    db.groupDao().deleteById(group.id)
+                }
+                assertNull(db.groupDao().getById(group.id))
+            }, {
+                overrides.forEach { (key, saved) ->
+                    if (saved == null) preferences.delete(key) else preferences.put(saved)
+                }
+            })
         })
     }
 
@@ -101,6 +115,22 @@ class NewClientCoreNativeTest {
                 SubscriptionPersistence.apply(SagerDatabase.instance, group, partial.requireComplete())
             }.isFailure)
             assertEquals(before, SagerDatabase.proxyDao.getByGroup(group.id).map { it.id to it.document })
+        }
+    }
+
+    @Test fun realityWithoutFingerprintInitializesWithGlobalCertificateOverride() = runBlocking {
+        withGroup { group ->
+            val profile = CoreClient.parseURI("vless://00000000-0000-4000-8000-000000000001@127.0.0.1:443?security=reality&sni=synthetic.example&pbk=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+            val row = ProxyEntity(groupId = group.id).putProfile(profile)
+            row.id = SagerDatabase.proxyDao.addProxy(row)
+            DataStore.globalAllowInsecure = true
+            val config = ConfigSnapshot.capture(row, forTest = true, forExport = false).generate().result.config
+            initializeWithoutStarting(config)
+            val tls = JsonParser.parseString(config).asJsonObject.getAsJsonArray("outbounds")
+                .map { it.asJsonObject }.single { it["type"].asString == "vless" }.getAsJsonObject("tls")
+            assertEquals("chrome", tls.getAsJsonObject("utls")["fingerprint"].asString)
+            assertFalse(tls["insecure"]?.asBoolean ?: false)
+            assertEquals(profile.copy(id = row.requireProfile().id), SagerDatabase.proxyDao.getById(row.id)!!.requireProfile())
         }
     }
 

@@ -93,7 +93,8 @@ object ProfileAdapter {
         val tls = profile.tls
         when (bean) {
             is StandardV2RayBean -> {
-                bean.security = if (tls?.enabled == true) { if (tls.reality != null) "reality" else "tls" } else "none"
+                // The form represents Reality with TLS plus the separate public-key fields.
+                bean.security = if (tls?.enabled == true) "tls" else "none"
                 bean.sni = tls?.serverName.orEmpty(); bean.alpn = tls?.alpn?.joinToString(",").orEmpty()
                 bean.allowInsecure = tls?.insecure ?: false; bean.utlsFingerprint = tls?.fingerprint.orEmpty()
                 bean.certificates = tls?.certificate.orEmpty(); bean.realityPubKey = tls?.reality?.publicKey.orEmpty()
@@ -199,6 +200,8 @@ object ProfileAdapter {
     private fun mergeTransport(e: Profile.Transport?, b: Profile.Transport?, o: Profile.Transport?): Profile.Transport? {
         if (e == b) return o
         if (e == null || b == null || o == null) return e
+        // Hidden options belong to the original transport, not a newly selected protocol.
+        if (e.type != o.type) return e
         return e.copy(headers = o.headers, host = pick(e.host, b.host, o.host), maxEarlyData = pick(e.maxEarlyData, b.maxEarlyData, o.maxEarlyData))
     }
     private fun <T> pick(edited: T, baseline: T, original: T): T = if (edited == baseline) original else edited

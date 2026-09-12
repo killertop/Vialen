@@ -102,6 +102,44 @@ class FormLifecycleNativeTest {
         instrumentation.waitForIdleSync()
     }
 
+    @Test fun realityTlsFieldsRemainVisibleAndEditableAfterRecreation() {
+        val groupId = SagerDatabase.groupDao.createGroup(ProxyGroup(name = "reality-form-review"))
+        val profile = io.nekohasekai.sagernet.core.CoreClient.parseURI(
+            "vless://00000000-0000-4000-8000-000000000001@127.0.0.1:443?security=reality&sni=synthetic.example&pbk=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&sid=ab12")
+        val id = SagerDatabase.proxyDao.addProxy(ProxyEntity(groupId = groupId).putProfile(profile))
+        try {
+            val activityClass = io.nekohasekai.sagernet.ui.profile.VMessSettingsActivity::class.java
+            ActivityScenario.launch<io.nekohasekai.sagernet.ui.profile.VMessSettingsActivity>(Intent(context, activityClass)
+                .putExtra(io.nekohasekai.sagernet.ui.profile.ProfileSettingsActivity.EXTRA_PROFILE_ID, id)).useWithCleanup { scenario ->
+                ready(scenario)
+                repeat(2) { pass ->
+                    scenario.onActivity { activity ->
+                        val fragment = activity.supportFragmentManager.findFragmentById(R.id.settings)
+                            as io.nekohasekai.sagernet.ui.VialenPreferenceFragment
+                        val security = fragment.findPreference<moe.matsuri.nb4a.ui.SimpleMenuPreference>("security")!!
+                        assertEquals("tls", security.value)
+                        assertTrue(security.entryValues.any { it.toString() == security.value })
+                        for (key in listOf(Key.SERVER_SECURITY_CATEGORY, Key.SERVER_TLS_CAMOUFLAGE_CATEGORY)) {
+                            assertTrue("Visible Reality category $key", fragment.findPreference<androidx.preference.Preference>(key)!!.isVisible)
+                        }
+                        assertEquals("ab12", fragment.findPreference<androidx.preference.EditTextPreference>("realityShortId")!!.text)
+                        if (pass == 1) fragment.findPreference<androidx.preference.EditTextPreference>("sni")!!.text = "edited.example"
+                    }
+                    if (pass == 0) { scenario.recreate(); ready(scenario) }
+                }
+                lateinit var activity: io.nekohasekai.sagernet.ui.profile.StandardV2RaySettingsActivity
+                scenario.onActivity { activity = it }
+                runBlocking { activity.saveAndExit() }
+                val saved = SagerDatabase.proxyDao.getById(id)!!.requireProfile()
+                assertEquals("edited.example", saved.tls!!.serverName)
+                assertEquals(profile.tls!!.reality, saved.tls.reality)
+            }
+        } finally {
+            SagerDatabase.proxyDao.deleteByGroup(groupId)
+            SagerDatabase.groupDao.deleteById(groupId)
+        }
+    }
+
     @Test fun groupCleanRecreationThenEditPersistsToRoom() {
         val id = SagerDatabase.groupDao.createGroup(ProxyGroup().apply { name = "forms-before" })
         try {
