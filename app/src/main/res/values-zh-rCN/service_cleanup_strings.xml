@@ -1,0 +1,3 @@
+<resources>
+    <string name="service_cleanup_failed">连接清理失败，请重启应用后再连接。</string>
+</resources>

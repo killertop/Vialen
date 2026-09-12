@@ -28,6 +28,12 @@ import java.net.UnknownHostException
 
 class BaseService {
 
+    companion object {
+        // A new Service object cannot prove that a failed native close completed.
+        // Keep this gate for the background process lifetime, as with the VPN stop gate.
+        @Volatile internal var cleanupFailure: String? = null
+    }
+
     enum class State(
         val canStop: Boolean = false,
         val started: Boolean = false,
@@ -190,10 +196,8 @@ class BaseService {
                 val ent = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
                 val tag = data.proxy!!.config.profileTagMap[ent?.id] ?: ""
                 if (tag.isNotBlank() && ent != null) {
-                    // select from GUI
+                    // The native wrapper updates accounting and UI through its selection callback.
                     data.proxy!!.box.selectOutbound(tag)
-                    // or select from webui
-                    // => selector_OnProxySelected
                 }
                 return
             }
@@ -227,9 +231,6 @@ class BaseService {
         }
 
         suspend fun killProcesses() {
-            // Cancel native requests and join their workers before closing the running box.
-            data.recovery?.let { it.stop(); it.join() }
-            data.recovery = null
             var failure: Throwable? = null
             fun retain(error: Throwable) {
                 val previous = failure
@@ -240,6 +241,14 @@ class BaseService {
                         failure = error
                     } else previous.addSuppressed(error)
                 }
+            }
+            // A recovery shutdown failure must not skip the remaining resource cleanup.
+            try {
+                data.recovery?.let { it.stop(); it.join() }
+            } catch (error: Throwable) {
+                retain(error)
+            } finally {
+                data.recovery = null
             }
             try {
                 data.proxy?.close()
@@ -272,33 +281,50 @@ class BaseService {
             DataStore.vpnService = null
 
             if (data.state == State.Stopping) return
-            data.notification?.destroy()
-            data.notification = null
             this as Service
 
             data.changeState(State.Stopping)
-            data.recovery?.stop()
 
             runOnMainDispatcher {
-                data.connectingJob?.cancelAndJoin() // ensure stop connecting first
-                // we use a coroutineScope here to allow clean-up in parallel
-                coroutineScope {
-                    killProcesses()
-                    val data = data
-                    if (data.closeReceiverRegistered) {
-                        unregisterReceiver(data.receiver)
-                        data.closeReceiverRegistered = false
+                withContext(NonCancellable) {
+                    var failure: Throwable? = null
+                    suspend fun attempt(action: suspend () -> Unit) {
+                        try {
+                            action()
+                        } catch (error: Throwable) {
+                            val previous = failure
+                            if (previous == null) failure = error
+                            else if (previous !== error) previous.addSuppressed(error)
+                            cleanupFailure = getString(R.string.service_cleanup_failed)
+                        }
                     }
+                    attempt { data.notification?.destroy() }
+                    data.notification = null
+                    attempt { data.recovery?.stop() }
+                    attempt { data.connectingJob?.cancelAndJoin() }
+                    data.connectingJob = null
+                    attempt { killProcesses() }
+                    attempt {
+                        if (data.closeReceiverRegistered) unregisterReceiver(data.receiver)
+                    }
+                    data.closeReceiverRegistered = false
                     data.proxy = null
-                }
 
-                // change the state
-                val stopIssue = stopError()
-                val finalMessage = listOfNotNull(msg, stopIssue).distinct().joinToString("\n").ifEmpty { null }
-                data.changeState(State.Stopped, finalMessage)
-                // stop the service if nothing has bound to it
-                if (restart && stopIssue == null) startRunner() else {
-                    stopSelf()
+                    var stopIssue: String? = null
+                    attempt { stopIssue = stopError() }
+                    fun message() = listOfNotNull(msg, stopIssue, cleanupFailure)
+                        .distinct().joinToString("\n").ifEmpty { null }
+                    attempt { data.changeState(State.Stopped, message()) }
+                    var restarted = false
+                    if (restart && stopIssue == null && cleanupFailure == null && failure == null) {
+                        attempt { startRunner(); restarted = true }
+                    }
+                    if (!restarted) attempt { stopSelf() }
+                    if (failure != null) {
+                        // Also report a failure in the last restart/stop step to bound clients.
+                        attempt { data.changeState(State.Stopped, message()) }
+                        Logs.w(checkNotNull(failure))
+                    }
                 }
             }
         }
@@ -392,6 +418,11 @@ class BaseService {
 
             val data = data
             if (data.state != State.Stopped) return Service.START_NOT_STICKY
+            cleanupFailure?.let { message ->
+                data.notification = createNotification("")
+                stopRunner(false, message)
+                return Service.START_NOT_STICKY
+            }
             val profile = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
             this as Context
             if (profile == null) { // gracefully shutdown: https://stackoverflow.com/q/47337857/2245107

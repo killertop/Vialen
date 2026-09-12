@@ -1,5 +1,9 @@
 package io.nekohasekai.sagernet
 
+import androidx.room.Room
+import org.robolectric.RuntimeEnvironment
+import io.nekohasekai.sagernet.database.SagerDatabase
+import io.nekohasekai.sagernet.aidl.TrafficData
 import io.mockk.*
 import io.nekohasekai.sagernet.aidl.ISagerNetServiceCallback
 import io.nekohasekai.sagernet.bg.BaseService
@@ -16,6 +20,7 @@ import io.nekohasekai.sagernet.fmt.ConfigBuildResult
 import io.nekohasekai.sagernet.fmt.TAG_PROXY
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
+import io.nekohasekai.sagernet.ktx.Logs
 import kotlinx.coroutines.*
 import org.junit.*
 import org.junit.Assert.*
@@ -32,6 +37,8 @@ import java.util.concurrent.atomic.AtomicLong
 @RunWith(RustBridgeRobolectricTestRunner::class)
 @Config(sdk=[34],application=android.app.Application::class)
 class TrafficEfficiencyLifecycleTest {
+    private lateinit var database: SagerDatabase
+    private lateinit var listener: ProfileManager.Listener
     private lateinit var readStats:(String,String)->Long
     private val installs=AtomicInteger()
     private lateinit var data:BaseService.Data
@@ -53,11 +60,21 @@ class TrafficEfficiencyLifecycleTest {
         mockkObject(PublicDatabase.Companion,TempDatabase.Companion)
         every { PublicDatabase.kvPairDao } returns preferences
         every { TempDatabase.profileCacheDao } returns preferences
-        mockkObject(DataStore,ProfileManager)
+        database = Room.inMemoryDatabaseBuilder(RuntimeEnvironment.getApplication(), SagerDatabase::class.java)
+            .allowMainThreadQueries().build()
+        mockkObject(SagerDatabase.Companion)
+        every { SagerDatabase.instance } returns database
+        every { SagerDatabase.proxyDao } returns database.proxyDao()
+        listener = mockk(relaxed = true)
+        coEvery { listener.onUpdated(any<TrafficData>()) } coAnswers {
+            database.proxyDao().getById(firstArg<TrafficData>().id)?.let { persisted.add(it) }
+            Unit
+        }
+        ProfileManager.addListener(listener)
+        mockkObject(DataStore)
         every { DataStore.speedInterval } returns 20
         every { DataStore.profileTrafficStatistics } returns true
         every { DataStore.showDirectSpeed } returns false
-        coEvery { ProfileManager.updateProfile(any<ProxyEntity>()) } coAnswers { persisted.add(firstArg());Unit }
         readStats = { tag,direction ->
             queries.incrementAndGet()
             counters.computeIfAbsent("$tag/$direction") { AtomicLong() }.getAndSet(0)
@@ -79,6 +96,8 @@ class TrafficEfficiencyLifecycleTest {
             runBlocking { looper?.stop() }
         } finally {
             looper=null
+            ProfileManager.removeListener(listener)
+            database.close()
             unmockkAll()
         }
     }
@@ -86,6 +105,7 @@ class TrafficEfficiencyLifecycleTest {
         val rows=(1L..2L).map { id -> ProxyEntity(id=id,rx=id*100,tx=id*10).apply {
             putBean(SOCKSBean().applyDefaultValues())
         } }
+        database.proxyDao().insert(rows)
         val config=ConfigBuildResult("{}",emptyList(),1,
             linkedMapOf("one" to listOf(rows[0]),"two" to listOf(rows[1])),
             mapOf(1L to "one",2L to "two"),if(selector) 1 else -1)
@@ -230,4 +250,113 @@ class TrafficEfficiencyLifecycleTest {
         val before=queries.get();loop.selectMain(1)
         assertEquals(before,queries.get())
     }
+    private fun editSecondProfile() {
+        val row = checkNotNull(database.proxyDao().getById(2))
+        row.userOrder = 91
+        row.requireBean().apply { name = "edited while connected"; serverAddress = "new.example.com" }
+        database.proxyDao().updateProxy(row)
+    }
+
+    private fun assertSecondProfileEditSurvives() {
+        val row = checkNotNull(database.proxyDao().getById(2))
+        assertEquals(91L, row.userOrder)
+        assertEquals("edited while connected", row.requireBean().name)
+        assertEquals("new.example.com", row.requireBean().serverAddress)
+        coVerify(exactly = 0) { listener.onUpdated(any<ProxyEntity>(), any()) }
+    }
+
+    @Test fun neverSelectedProfileEditSurvivesStopWithoutTraffic() = runBlocking {
+        start(selector = true)
+        editSecondProfile()
+        stop()
+        assertSecondProfileEditSurvives()
+        assertEquals(20L, database.proxyDao().getById(2)!!.tx)
+        assertEquals(200L, database.proxyDao().getById(2)!!.rx)
+    }
+
+    @Test fun selectorWritesOnlyTrafficAfterOtherProfileWasEdited() = runBlocking {
+        val loop = start(selector = true)
+        editSecondProfile()
+        add(TAG_PROXY, 7, 11)
+        loop.selectMain(2)
+        awaitCondition { persisted.any { it.id == 1L } }
+        add(TAG_PROXY, 13, 17)
+        loop.selectMain(1)
+        awaitCondition { persisted.any { it.id == 2L } }
+        assertSecondProfileEditSurvives()
+        add(TAG_PROXY, 3, 5)
+        stop()
+        assertSecondProfileEditSurvives()
+        assertEquals(20L, database.proxyDao().getById(1)!!.tx)
+        assertEquals(116L, database.proxyDao().getById(1)!!.rx)
+        assertEquals(33L, database.proxyDao().getById(2)!!.tx)
+        assertEquals(217L, database.proxyDao().getById(2)!!.rx)
+    }
+
+    @Test fun disabledStatisticsNeverWritesProfilesEvenWithFinalBytes() = runBlocking {
+        every { DataStore.profileTrafficStatistics } returns false
+        val loop = start(selector = true)
+        editSecondProfile()
+        add(TAG_PROXY, 7, 11)
+        loop.selectMain(2)
+        add(TAG_PROXY, 13, 17)
+        stop()
+        assertSecondProfileEditSurvives()
+        assertTrue(persisted.isEmpty())
+        assertEquals(20L, database.proxyDao().getById(2)!!.tx)
+    }
+
+    @Test fun clearDoesNotRestoreHistoricalOrAlreadyFlushedBytes() = runBlocking {
+        val loop = start(selector = true)
+        add(TAG_PROXY, 7, 11)
+        loop.selectMain(2)
+        awaitCondition { persisted.any { it.id == 1L } }
+        editSecondProfile()
+        ProfileManager.clearTraffic(0)
+        assertEquals(0L, database.proxyDao().getById(1)!!.tx)
+        // Bytes still buffered by the running core are new pending session increments.
+        add(TAG_PROXY, 13, 17)
+        stop()
+        assertSecondProfileEditSurvives()
+        assertEquals(0L, database.proxyDao().getById(1)!!.tx)
+        assertEquals(0L, database.proxyDao().getById(1)!!.rx)
+        assertEquals(13L, database.proxyDao().getById(2)!!.tx)
+        assertEquals(17L, database.proxyDao().getById(2)!!.rx)
+    }
+
+    @Test fun listenerFailureCannotDuplicateCommittedBytesOrAbortQueuedWrites() = runBlocking {
+        // Android Go JNI is unavailable on the host; record the diagnostic boundary only.
+        mockkObject(Logs)
+        every { Logs.w(any<Throwable>()) } just Runs
+        val failures = AtomicInteger()
+        val broken = mockk<ProfileManager.Listener>(relaxed = true)
+        coEvery { broken.onUpdated(any<TrafficData>()) } coAnswers {
+            failures.incrementAndGet()
+            throw IllegalStateException("Deliberately broken traffic listener")
+        }
+        // Put the failing listener first to also prove later listeners still receive updates.
+        ProfileManager.removeListener(listener)
+        ProfileManager.addListener(broken)
+        ProfileManager.addListener(listener)
+        try {
+            val loop = start(selector = true)
+            add(TAG_PROXY, 7, 11)
+            loop.selectMain(2)
+            awaitCondition { persisted.any { it.id == 1L } }
+            add(TAG_PROXY, 13, 17)
+            loop.selectMain(1)
+            awaitCondition { persisted.any { it.id == 2L } }
+            add(TAG_PROXY, 3, 5)
+            stop()
+            assertEquals(3, failures.get())
+            verify(exactly = 3) { Logs.w(any<Throwable>()) }
+            assertEquals(20L, database.proxyDao().getById(1)!!.tx)
+            assertEquals(116L, database.proxyDao().getById(1)!!.rx)
+            assertEquals(33L, database.proxyDao().getById(2)!!.tx)
+            assertEquals(217L, database.proxyDao().getById(2)!!.rx)
+        } finally {
+            ProfileManager.removeListener(broken)
+        }
+    }
+
 }

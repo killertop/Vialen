@@ -66,9 +66,9 @@ class ChainTagIntegrityNativeTest {
                     } else if (value.isJsonArray) value.asJsonArray.forEach(::visit)
                 }
                 visit(config)
-                val target=if(selector) "first" else "proxy"
-                val chainTag=if(selector) "second-2" else "c-${chain.id}-${second.id}"
-                val expectedEdges=if(selector) setOf("second-1", "second-2") else setOf(chainTag)
+                val target=if(selector) "g-${first.id}" else "proxy"
+                val chainTag="c-${chain.id}-0-${second.id}"
+                val expectedEdges=setOf(chainTag)
                 val edges=config["outbounds"].asJsonArray.filter { it.asJsonObject.has("detour") }
                 assertEquals("Exact chain edges: $config", expectedEdges,
                     edges.map { it.asJsonObject["tag"].asString }.toSet())
@@ -82,7 +82,7 @@ class ChainTagIntegrityNativeTest {
                     val options=config["outbounds"].asJsonArray.single {
                         it.asJsonObject["tag"].asString=="proxy"
                     }.asJsonObject["outbounds"].asJsonArray.map { it.asString }.toSet()
-                    assertEquals(setOf("first", "second", "second-1"), options)
+                    assertEquals(setOf("g-${first.id}", "g-${second.id}", chainTag), options)
                 }
                 println("TAG_GRAPH selector=$selector edges=$expectedEdges target=$target route=$chainTag")
                 val core = Libcore.newSingBoxInstance(result.config, null)

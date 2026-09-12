@@ -1,0 +1,3 @@
+<resources>
+    <string name="service_cleanup_failed">Connection cleanup failed. Restart the app before reconnecting.</string>
+</resources>

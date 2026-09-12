@@ -154,11 +154,21 @@ class TrafficEfficiencyNativeTest {
                 assertEquals("Background request must remain pending in Go counters",beforeRequest,queries.get())
                 val beforeClose=db.proxyDao().getById(row.id)!!
                 assertEquals(11L,beforeClose.tx);assertEquals(37L,beforeClose.rx)
+                // Edit the live Room row after the looper captured its initial counters.
+                beforeClose.userOrder = 73
+                beforeClose.requireBean().apply {
+                    name = "$nonce-edited"
+                    serverAddress = "edited.example.com"
+                }
+                db.proxyDao().updateProxy(beforeClose)
                 // Production close orders actual core close before sampler final drain and Room writes.
                 proxy.close();instance=null
                 val final=db.proxyDao().getById(row.id)!!
                 assertTrue("Final uplink bytes were lost",final.tx>11)
                 assertTrue("Final downlink bytes were lost",final.rx>37)
+                assertEquals(73L, final.userOrder)
+                assertEquals("$nonce-edited", final.requireBean().name)
+                assertEquals("edited.example.com", final.requireBean().serverAddress)
                 val delivered=checkNotNull(callback.traffic[row.id])
                 assertEquals(final.tx,delivered.tx);assertEquals(final.rx,delivered.rx)
                 assertTrue("Stop must query final native counters",queries.get()>beforeRequest)

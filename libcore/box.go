@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"libcore/device"
+	"libcore/nekoutils"
 	"log"
 	"runtime"
 	"runtime/debug"
@@ -13,7 +14,6 @@ import (
 	"sync"
 
 	"github.com/matsuridayo/libneko/protect_server"
-	"github.com/matsuridayo/libneko/speedtest"
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/protocol/group"
 	"libcore/boxapi"
@@ -26,7 +26,15 @@ import (
 	"github.com/sagernet/sing/service/pause"
 )
 
+// mainInstanceAccess also serializes the matching protect server's lifetime.
+var mainInstanceAccess sync.Mutex
 var mainInstance *BoxInstance
+
+func mainInstanceSnapshot() *BoxInstance {
+	mainInstanceAccess.Lock()
+	defer mainInstanceAccess.Unlock()
+	return mainInstance
+}
 
 func VersionBox() string {
 	boxVer := constant.Version
@@ -57,14 +65,30 @@ func VersionBox() string {
 }
 
 func ResetAllConnections(system bool) {
-	if mainInstance != nil && mainInstance.Box != nil {
-		mainInstance.Network().ResetNetwork(context.Background())
+	instance := mainInstanceSnapshot()
+	if instance != nil {
+		ctx, done, err := instance.beginOperation(true)
+		if err != nil {
+			return
+		}
+		defer done()
+		if instance.Box != nil {
+			instance.Network().ResetNetwork(ctx)
+		}
 	}
 	log.Println("Reset connections done")
 }
 
 type BoxInstance struct {
-	access sync.Mutex
+	access           sync.Mutex
+	operationAccess  sync.Mutex
+	operations       sync.WaitGroup
+	operationContext context.Context
+	cancelOperations context.CancelFunc
+	closing          bool
+	started          bool
+	statsAccess      sync.RWMutex
+	selectorAccess   sync.Mutex
 
 	*box.Box
 	cancel context.CancelFunc
@@ -154,7 +178,13 @@ func (b *BoxInstance) Start() (err error) {
 
 	if b.state == 0 {
 		b.state = 1
-		return b.Box.Start()
+		err = b.Box.Start()
+		if err == nil {
+			b.operationAccess.Lock()
+			b.started = true
+			b.operationAccess.Unlock()
+		}
+		return err
 	}
 	return errors.New("already started")
 }
@@ -171,11 +201,25 @@ func (b *BoxInstance) Close() (err error) {
 	}
 	b.state = 2
 
-	// clear main instance
-	if mainInstance == b {
-		mainInstance = nil
-		goServeProtect(false)
+	// Stop admitting work before cancellation and draining. Keep a closing main
+	// registered until cleanup finishes so nil-instance requests cannot fall back
+	// to a direct connection during teardown.
+	b.operationAccess.Lock()
+	b.closing = true
+	cancelOperations := b.cancelOperations
+	b.operationAccess.Unlock()
+	defer func() {
+		mainInstanceAccess.Lock()
+		defer mainInstanceAccess.Unlock()
+		if mainInstance == b {
+			mainInstance = nil
+			goServeProtect(false)
+		}
+	}()
+	if cancelOperations != nil {
+		cancelOperations()
 	}
+	b.operations.Wait()
 
 	// close box
 	if b.cancel != nil {
@@ -194,6 +238,11 @@ func (b *BoxInstance) Close() (err error) {
 }
 
 func (b *BoxInstance) Sleep() {
+	_, done, err := b.beginOperation(true)
+	if err != nil {
+		return
+	}
+	defer done()
 	if b.pauseManager != nil {
 		b.pauseManager.DevicePause()
 	}
@@ -201,12 +250,24 @@ func (b *BoxInstance) Sleep() {
 }
 
 func (b *BoxInstance) Wake() {
+	_, done, err := b.beginOperation(true)
+	if err != nil {
+		return
+	}
+	defer done()
 	if b.pauseManager != nil {
 		b.pauseManager.DeviceWake()
 	}
 }
 
 func (b *BoxInstance) SetAsMain() {
+	mainInstanceAccess.Lock()
+	defer mainInstanceAccess.Unlock()
+	b.operationAccess.Lock()
+	defer b.operationAccess.Unlock()
+	if b.closing || mainInstance == b {
+		return
+	}
 	mainInstance = b
 	goServeProtect(true)
 }
@@ -214,6 +275,13 @@ func (b *BoxInstance) SetAsMain() {
 func (b *BoxInstance) SetV2rayStats(outbounds string) {
 	b.access.Lock()
 	defer b.access.Unlock()
+	_, done, err := b.beginOperation(false)
+	if err != nil {
+		return
+	}
+	defer done()
+	b.statsAccess.Lock()
+	defer b.statsAccess.Unlock()
 	if b.v2api != nil {
 		log.Println("duplicate call of SetV2rayStats")
 		return
@@ -225,43 +293,51 @@ func (b *BoxInstance) SetV2rayStats(outbounds string) {
 	b.Box.Router().AppendTracker(b.v2api.StatsService())
 }
 
+// Stats remain readable after Close for TrafficLooper's final accounting.
 func (b *BoxInstance) QueryStats(tag, direct string) int64 {
-	if b.v2api == nil {
+	stats := b.statsSnapshot()
+	if stats == nil {
 		return 0
 	}
-	return b.v2api.QueryStats(fmt.Sprintf("outbound>>>%s>>>traffic>>>%s", tag, direct))
+	return stats.QueryStats(fmt.Sprintf("outbound>>>%s>>>traffic>>>%s", tag, direct))
 }
 
 func (b *BoxInstance) SelectOutbound(tag string) bool {
-	if b.selector != nil {
-		return b.selector.SelectOutbound(tag)
+	ctx, done, err := b.beginOperation(true)
+	if err != nil {
+		return false
 	}
-	return false
+	defer done()
+	// Keep the previous tag, the switch, and its notification in the same order.
+	// The callback may synchronously reset connections; it holds neither the
+	// main-instance lock nor the operation gate needed by ResetAllConnections.
+	b.selectorAccess.Lock()
+	defer b.selectorAccess.Unlock()
+	if b.selector == nil || ctx.Err() != nil {
+		return false
+	}
+	previous := b.selector.Now()
+	if !b.selector.SelectOutbound(tag) {
+		return false
+	}
+	if previous != tag && ctx.Err() == nil {
+		if callback := nekoutils.Selector_OnProxySelected; callback != nil {
+			callback(b.selector.Tag(), tag)
+		}
+	}
+	return true
 }
 
 func UrlTest(i *BoxInstance, link string, timeout int32) (latency int32, err error) {
 	defer device.DeferPanicToError("box.UrlTest", func(err_ error) { err = err_ })
-	var connectionTracker adapter.ConnectionTracker
-	// test i
-	if i != nil {
-		if i.v2api != nil {
-			connectionTracker = i.v2api.StatsService()
-		}
-		return speedtest.UrlTest(boxapi.CreateProxyHttpClient(i.Box, connectionTracker), link, timeout, speedtest.UrlTestStandard_RTT)
-	}
-	// test direct
-	if mainInstance == nil {
-		return speedtest.UrlTest(boxapi.CreateProxyHttpClient(nil, nil), link, timeout, speedtest.UrlTestStandard_RTT)
-	}
-	// test mainInstance
-	if mainInstance.v2api != nil {
-		connectionTracker = mainInstance.v2api.StatsService()
-	}
-	return speedtest.UrlTest(boxapi.CreateProxyHttpClient(mainInstance.Box, connectionTracker), link, timeout, speedtest.UrlTestStandard_RTT)
+	session := NewUrlTestSession()
+	defer session.Cancel()
+	return session.Run(i, link, timeout)
 }
 
 var protectCloser io.Closer
 
+// Caller must hold mainInstanceAccess.
 func goServeProtect(start bool) {
 	if protectCloser != nil {
 		protectCloser.Close()

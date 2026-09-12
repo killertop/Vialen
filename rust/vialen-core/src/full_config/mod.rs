@@ -66,7 +66,8 @@ struct Settings {
 struct Node {
     id: i64,
     group_id: i64,
-    name: String,
+    #[serde(rename = "name")]
+    _name: String,
     server: String,
     outbound: Option<Value>,
     chain: Option<Vec<i64>>,
@@ -171,12 +172,11 @@ struct Builder<'a> {
     groups: HashMap<i64, &'a Group>,
     generated: Vec<Generated>,
     global: HashMap<i64, String>,
-    names: HashSet<String>,
+    chains: HashMap<i64, String>,
     tags: Vec<(i64, String)>,
     traffic: serde_json::Map<String, Value>,
     direct_domains: Vec<String>,
     bypass_nodes: HashSet<i64>,
-    selector: bool,
     domain_strategy: String,
 }
 impl Builder<'_> {
@@ -201,6 +201,9 @@ impl Builder<'_> {
         Ok(result)
     }
     fn chain(&mut self, chain_id: i64, id: i64) -> Result<String, &'static str> {
+        if let Some(tag) = self.chains.get(&chain_id) {
+            return Ok(tag.clone());
+        }
         let node = (*self.nodes.get(&id).ok_or("MISSING_PROFILE")?).clone();
         let mut profile_ids = self.internal_chain(id, &mut HashSet::new())?;
         if let Some(group) = self.groups.get(&node.group_id) {
@@ -224,24 +227,18 @@ impl Builder<'_> {
         for (index, node_id) in profile_ids.iter().enumerate() {
             let item = self.nodes[node_id];
             let is_global = index + 1 == profile_ids.len();
+            // Names are presentation only. The hop index distinguishes repeated
+            // nodes within one chain; cached chains share one generated graph.
             let mut tag = if is_global {
                 format!("g-{node_id}")
             } else {
-                format!("c-{chain_id}-{node_id}")
+                format!("c-{chain_id}-{index}-{node_id}")
             };
             if is_global {
                 self.bypass_nodes.insert(*node_id);
             }
             if chain_id == 0 && index == 0 {
                 tag = "proxy".into();
-            }
-            if self.selector && index == 0 {
-                tag = item.name.clone();
-                let mut n = 0;
-                while !self.names.insert(tag.clone()) {
-                    n += 1;
-                    tag = format!("{}-{n}", item.name);
-                }
             }
             if let Some(prev) = previous {
                 self.generated[prev].value["detour"] = json!(tag);
@@ -250,8 +247,8 @@ impl Builder<'_> {
             }
             if is_global {
                 if let Some(existing) = self.global.get(node_id) {
-                    // The global node may have been emitted as "proxy" or a
-                    // selector name, so the provisional g-id is not a valid tag.
+                    // The global node may have been emitted as "proxy",
+                    // so the provisional g-id may not exist.
                     if let Some(prev) = previous {
                         self.generated[prev].value["detour"] = json!(existing);
                     } else {
@@ -296,6 +293,7 @@ impl Builder<'_> {
                 endpoint: profile.get("kind") == Some(&json!("WireGuard")),
             });
         }
+        self.chains.insert(chain_id, chain_tag.clone());
         self.traffic.insert(chain_tag.clone(), json!(traffic));
         Ok(chain_tag)
     }
@@ -328,12 +326,11 @@ fn build(req: Request) -> Result<Value, String> {
         groups,
         generated: vec![],
         global: HashMap::new(),
-        names: HashSet::new(),
+        chains: HashMap::new(),
         tags: vec![],
         traffic: serde_json::Map::new(),
         direct_domains: vec![],
         bypass_nodes: HashSet::new(),
-        selector,
         domain_strategy: domain_strategy.clone(),
     };
     let mut outbounds = vec![];
@@ -462,8 +459,9 @@ fn build(req: Request) -> Result<Value, String> {
             b.direct_domains.push(format!("full:{host}"));
         }
     }
-    // An omitted detour uses the core direct dialer; an empty direct outbound
-    // is not a valid detour in current sing-box. User overlays are merged below.
+    // Bootstrap DNS uses the core direct dialer (an empty direct outbound is
+    // not a valid detour). Remote queries explicitly use the selected proxy;
+    // their server hostname still resolves through dns-direct. Overlays follow.
     let mut servers = vec![
         dns::server("local", "dns-local", None, None),
         dns::server(
@@ -478,7 +476,7 @@ fn build(req: Request) -> Result<Value, String> {
             remote.first().ok_or("NO_REMOTE_DNS")?,
             "dns-remote",
             Some("dns-direct"),
-            None,
+            Some("proxy"),
         ));
     }
     if req.for_test {
@@ -540,7 +538,7 @@ fn build(req: Request) -> Result<Value, String> {
     } else if matches!(ipv6, 0..=3) {
         dns_options["strategy"] = json!(strategy(ipv6));
     }
-    let mut route = json!({"auto_detect_interface":true,"rules":route_rules,"rule_set":rule_sets});
+    let mut route = json!({"final":"proxy","auto_detect_interface":true,"rules":route_rules,"rule_set":rule_sets});
     let mut config = json!({"log":{"level":match s.log_level{0=>"panic",1=>"warn",3=>"debug",4=>"trace",_=>"info"}},"dns":dns_options,"inbounds":inbounds,"outbounds":outbounds,"endpoints":endpoints});
     if !rule_sets.is_empty() {
         route["default_http_client"] = json!("default-http-client");
@@ -759,7 +757,7 @@ mod tests {
             .as_array()
             .unwrap()
             .iter()
-            .find(|v| v["tag"] == "c-3-2")
+            .find(|v| v["tag"] == "c-3-0-2")
             .unwrap();
         assert_eq!(hop["detour"], "proxy");
     }
@@ -775,9 +773,72 @@ mod tests {
                 .as_array()
                 .unwrap()
                 .iter()
-                .find(|v| v["tag"] == "two")
+                .find(|v| v["tag"] == "c-3-0-2")
                 .unwrap();
-            assert_eq!(hop["detour"], if reverse_order { "g-1" } else { "one" });
+            assert_eq!(hop["detour"], "g-1");
+        }
+    }
+    #[test]
+    fn selector_tags_ignore_names_and_reuse_chains_with_repeated_hops() {
+        for name in ["direct", "bypass", "proxy", "g-1", "c-3-0-2", "renamed"] {
+            let mut v = reused_global_request(true, false);
+            for node in v["profiles"].as_array_mut().unwrap() {
+                node["name"] = json!(name);
+            }
+            v["profiles"][2]["chain"] = json!([1, 2, 2]);
+            v["extra_ids"] = json!([3, 3]);
+            let output = run(&v);
+            assert_eq!(output["status"], "SUCCESS", "{output}");
+            let config: Value = serde_json::from_str(output["config"].as_str().unwrap()).unwrap();
+            assert_outbound_tag_integrity(&config);
+            assert_eq!(output["tags"], json!([[1, "g-1"], [3, "c-3-0-2"]]));
+            let outbounds = config["outbounds"].as_array().unwrap();
+            assert_eq!(outbounds.iter().find(|o| o["tag"] == "c-3-0-2").unwrap()["detour"], "c-3-1-2");
+            assert_eq!(outbounds.iter().find(|o| o["tag"] == "c-3-1-2").unwrap()["detour"], "g-1");
+            assert_eq!(config["route"]["final"], "proxy");
+        }
+    }
+    #[test]
+    fn nested_chain_tags_are_unique_and_bootstrap_dns_stays_direct() {
+        let mut v = reused_global_request(true, false);
+        let mut nested = v["profiles"][2].clone();
+        nested["id"] = json!(4);
+        nested["chain"] = json!([3, 3]);
+        v["profiles"].as_array_mut().unwrap().push(nested);
+        v["selector_ids"] = json!([1, 3, 4]);
+        v["selector_order"] = json!([1, 3, 4]);
+        v["extra_ids"] = json!([4]);
+        v["settings"]["server_strategy"] = json!("prefer_ipv4");
+        let output = run(&v);
+        assert_eq!(output["status"], "SUCCESS", "{output}");
+        let config: Value = serde_json::from_str(output["config"].as_str().unwrap()).unwrap();
+        assert_outbound_tag_integrity(&config);
+        let dns = &config["dns"];
+        assert!(dns["servers"][0].get("detour").is_none());
+        assert!(dns["servers"][1].get("detour").is_none());
+        assert_eq!(dns["servers"][2]["domain_resolver"], "dns-direct");
+        assert!(dns["rules"].as_array().unwrap().iter().any(|r| r["server"] == "dns-direct" && r.to_string().contains("dns.example")));
+        v["for_test"] = json!(true);
+        let output = run(&v);
+        let config: Value = serde_json::from_str(output["config"].as_str().unwrap()).unwrap();
+        assert_eq!(config["dns"]["final"], "dns-direct");
+        assert_eq!(config["dns"]["servers"].as_array().unwrap().len(), 2);
+    }
+    #[test]
+    fn wireguard_final_targets_endpoint_in_standalone_selector_and_chain() {
+        for mode in 0..3 {
+            let mut v = if mode == 0 { request() } else { reused_global_request(mode == 1, false) };
+            v["profiles"][0]["outbound"] = json!({"kind":"WireGuard","server":"127.0.0.1","port":51820,
+                "local_address":"10.77.0.2/32","private_key":"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+                "public_key":"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=","pre_shared_key":"","mtu":1420,"reserved":""});
+            if mode == 2 { v["selected"] = json!(3); v["extra_ids"] = json!([]); }
+            let output = run(&v);
+            assert_eq!(output["status"], "SUCCESS", "{output}");
+            let config: Value = serde_json::from_str(output["config"].as_str().unwrap()).unwrap();
+            assert_outbound_tag_integrity(&config);
+            assert_eq!(config["route"]["final"], "proxy");
+            assert_eq!(config["endpoints"].as_array().unwrap().len(), 1);
+            assert_eq!(config["dns"]["servers"][2]["detour"], "proxy");
         }
     }
     #[test]
@@ -866,7 +927,7 @@ mod tests {
                     assert_eq!(servers[1]["domain_resolver"], "dns-local");
                 }
                 if !for_test {
-                    assert_eq!(servers[2], json!({"tag":"dns-remote","type":"https","server":"dns.example","domain_resolver":"dns-direct"}));
+                    assert_eq!(servers[2], json!({"tag":"dns-remote","type":"https","server":"dns.example","domain_resolver":"dns-direct","detour":"proxy"}));
                 }
             }
         }
@@ -876,7 +937,8 @@ mod tests {
         let mut v = request();
         let custom = json!({
             "dns":{"servers":[{"tag":"custom-dns","type":"https","server":"1.1.1.1","detour":"proxy"}],"final":"custom-dns"},
-            "http_clients":[{"tag":"custom-http","detour":"direct"}]
+            "http_clients":[{"tag":"custom-http","detour":"direct"}],
+            "route":{"final":"bypass"}
         });
         for profile_level in [false, true] {
             v["settings"]["custom"] = if profile_level { Value::Null } else { custom.clone() };
@@ -886,6 +948,7 @@ mod tests {
             let config: Value = serde_json::from_str(output["config"].as_str().unwrap()).unwrap();
             assert_eq!(config["dns"]["servers"], custom["dns"]["servers"]);
             assert_eq!(config["http_clients"], custom["http_clients"]);
+            assert_eq!(config["route"]["final"], "bypass");
         }
     }
     #[test]

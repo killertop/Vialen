@@ -407,6 +407,15 @@ data class ProxyEntity(
         @Query("UPDATE proxy_entities SET userOrder = :order WHERE id = :id")
         fun updateOrder(id: Long, order: Long): Int
 
+        @Query("UPDATE proxy_entities SET tx = tx + :tx, rx = rx + :rx WHERE id = :id")
+        fun addTraffic(id: Long, tx: Long, rx: Long): Int
+
+        @Query("SELECT id, tx, rx FROM proxy_entities WHERE id = :id")
+        fun getTraffic(id: Long): io.nekohasekai.sagernet.aidl.TrafficData?
+
+        @Query("UPDATE proxy_entities SET tx = 0, rx = 0 WHERE id IN (:ids)")
+        fun clearTraffic(ids: List<Long>)
+
         @Update
         fun updateProxy(proxy: ProxyEntity): Int
 

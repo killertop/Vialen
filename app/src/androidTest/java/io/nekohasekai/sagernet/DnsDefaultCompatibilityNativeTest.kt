@@ -41,7 +41,7 @@ class DnsDefaultCompatibilityNativeTest {
         assertEquals(JsonParser.parseString("""[
             {"tag":"dns-local","type":"local"},
             {"tag":"dns-direct","type":"https","server":"223.5.5.5","domain_resolver":"dns-local"},
-            {"tag":"dns-remote","type":"https","server":"dns.google","domain_resolver":"dns-direct"}
+            {"tag":"dns-remote","type":"https","server":"dns.google","domain_resolver":"dns-direct","detour":"proxy"}
         ]"""), config.getAsJsonObject("dns")["servers"])
         assertEquals("dns-remote", config.getAsJsonObject("dns")["final"].asString)
     }
@@ -82,7 +82,8 @@ class DnsDefaultCompatibilityNativeTest {
             try {
                 val request = snapshot()
                 request.add("rules", JsonParser.parseString("""[{
-                    "id":1,"domains":"http://127.0.0.1:${server.localPort}/dns-compat.json","ip":"",
+                    "id":1,"domains":"","ip":"",
+                    "rule_sets":[{"name":"dns-compat","source":"https://127.0.0.1:${server.localPort}/dns-compat.json","format":"source","match":"destination"}],
                     "port":"","source_port":"","network":"","source":"","protocol":"",
                     "outbound":-1,"uids":[],"package_count":0,"custom":null}]
                 """))
@@ -91,8 +92,12 @@ class DnsDefaultCompatibilityNativeTest {
                 assertEquals(JsonParser.parseString("""[{"tag":"default-http-client"}]"""), config["http_clients"])
                 assertEquals("default-http-client", config.getAsJsonObject("route")["default_http_client"].asString)
                 val ruleSet = config.getAsJsonObject("route").getAsJsonArray("rule_set").single().asJsonObject
-                assertEquals("http://127.0.0.1:${server.localPort}/dns-compat.json", ruleSet["url"].asString)
+                assertEquals("https://127.0.0.1:${server.localPort}/dns-compat.json", ruleSet["url"].asString)
                 assertEquals("source", ruleSet["format"].asString)
+                // Production references remain HTTPS, as asserted above. This transport
+                // fixture changes only that URL to local HTTP; generated HTTP-client and
+                // DNS fields are untouched. TLS itself is outside this compatibility test.
+                ruleSet.addProperty("url", "http://127.0.0.1:${server.localPort}/dns-compat.json")
                 startAndClose(config)
                 worker.join(15000)
                 assertFalse("Loopback fixture did not finish", worker.isAlive)

@@ -6,7 +6,6 @@ import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.SagerConnection
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
-import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.fmt.TAG_BYPASS
 import io.nekohasekai.sagernet.fmt.TAG_PROXY
 import kotlinx.coroutines.*
@@ -28,7 +27,7 @@ class TrafficLooper internal constructor(
     private var updater: TrafficUpdater? = null
     private val idMap = mutableMapOf<Long, TrafficUpdater.TrafficLooperData>()
     private val tagMap = mutableMapOf<String, TrafficUpdater.TrafficLooperData>()
-    private val profiles = mutableMapOf<Long, ProxyEntity>()
+    private val persisted = mutableMapOf<Long, TrafficData>()
     private var selectedId = Long.MIN_VALUE // -1 is the bypass counter, never a selection sentinel.
     private var selectedTag = ""
     private val statistics = DataStore.profileTrafficStatistics
@@ -44,7 +43,7 @@ class TrafficLooper internal constructor(
             proxy.config.trafficMap.forEach { (tag, entities) ->
                 tags.add(tag)
                 entities.forEach { entity ->
-                    profiles.putIfAbsent(entity.id, entity)
+                    persisted.putIfAbsent(entity.id, TrafficData(entity.id, entity.tx, entity.rx))
                     val item = TrafficUpdater.TrafficLooperData(tag = tag, rx = entity.rx,
                         tx = entity.tx, rxBase = entity.rx, txBase = entity.tx,
                         ignore = proxy.config.selectorGroupId >= 0L)
@@ -57,8 +56,7 @@ class TrafficLooper internal constructor(
             updater = TrafficUpdater(readStats ?: proxy.box::queryStats, idMap.values.toList())
             writer = scope.launch {
                 for (id in writes) {
-                    val row = synchronized(lock) { profileWithTraffic(id) }
-                    if (row != null) ProfileManager.updateProfile(row)
+                    persistTraffic(id)
                 }
             }
             job = scope.launch { loop() }
@@ -89,10 +87,20 @@ class TrafficLooper internal constructor(
         updater?.resetRate(next)
     }
 
-    private fun profileWithTraffic(id: Long): ProxyEntity? {
-        val item = idMap[id] ?: return null
-        val row = profiles[id] ?: return null
-        return row.copy(rx = item.rx, tx = item.tx).apply { putBean(row.requireBean()) }
+    private suspend fun persistTraffic(id: Long): TrafficData? {
+        val total = synchronized(lock) {
+            val item = idMap[id] ?: return null
+            if (id !in persisted) return null
+            TrafficData(id, item.tx, item.rx)
+        }
+        val previous = checkNotNull(persisted[id])
+        val delta = TrafficData(id, total.tx - previous.tx, total.rx - previous.rx)
+        val saved = ProfileManager.addTraffic(delta)
+        // Only the single writer (then stop after join) advances this checkpoint.
+        persisted[id] = total
+        // The database commit is checkpointed even if notification delivery fails.
+        if (saved != null) ProfileManager.postUpdate(saved)
+        return saved
     }
 
     /** Core counters remain readable after close and include final socket bytes. */
@@ -105,12 +113,12 @@ class TrafficLooper internal constructor(
             val final = synchronized(lock) {
                 if (!statistics || updater == null) emptyList() else {
                     updater!!.updateAll()
-                    idMap.keys.mapNotNull(::profileWithTraffic)
+                    persisted.keys.toList()
                 }
             }
-            for (row in final) ProfileManager.updateProfile(row)
-            if (final.isNotEmpty()) data.binder.broadcast { callback ->
-                final.forEach { callback.cbTrafficUpdate(TrafficData(id = it.id, rx = it.rx, tx = it.tx)) }
+            val totals = final.mapNotNull { persistTraffic(it) }
+            if (totals.isNotEmpty()) data.binder.broadcast { callback ->
+                totals.forEach { callback.cbTrafficUpdate(it) }
             }
         } finally {
             scope.cancel()

@@ -30,7 +30,8 @@
         "domain_resolver": "dns-direct",
         "server": "8.8.8.8",
         "tag": "dns-remote",
-        "type": "tls"
+        "type": "tls",
+        "detour": "proxy"
       }
     ],
     "strategy": "prefer_ipv4"
@@ -107,6 +108,7 @@
           "ff00::/8"
         ]
       }
-    ]
+    ],
+    "final": "proxy"
   }
 }

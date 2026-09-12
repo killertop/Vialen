@@ -7,6 +7,7 @@ import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
+import kotlinx.coroutines.CancellationException
 import java.io.IOException
 import java.sql.SQLException
 import java.util.*
@@ -126,6 +127,25 @@ object ProfileManager {
         DataStore.selectProxyIfUnchanged(selected, first)
     }
 
+    /** Commit only new bytes. The caller must checkpoint success before notifying listeners. */
+    fun addTraffic(delta: TrafficData): TrafficData? {
+        if (delta.tx == 0L && delta.rx == 0L) return null
+        val total = SagerDatabase.instance.runInTransaction<TrafficData?> {
+            if (SagerDatabase.proxyDao.addTraffic(delta.id, delta.tx, delta.rx) == 0) null
+            else SagerDatabase.proxyDao.getTraffic(delta.id)
+        }
+        return total
+    }
+
+    suspend fun clearTraffic(groupId: Long) {
+        val ids = SagerDatabase.instance.runInTransaction<List<Long>> {
+            val ids = SagerDatabase.proxyDao.getIdsByGroup(groupId)
+            if (ids.isNotEmpty()) SagerDatabase.proxyDao.clearTraffic(ids)
+            ids
+        }
+        ids.forEach { postUpdate(TrafficData(id = it)) }
+    }
+
     suspend fun updateProfile(profile: ProxyEntity) {
         SagerDatabase.proxyDao.updateProxy(profile)
         iterator { onUpdated(profile, false) }
@@ -191,7 +211,16 @@ object ProfileManager {
     }
 
     suspend fun postUpdate(data: TrafficData) {
-        iterator { onUpdated(data) }
+        iterator {
+            try {
+                onUpdated(data)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                // UI callbacks must not abort the persistence queue or hide updates from peers.
+                Logs.w(error)
+            }
+        }
     }
 
     suspend fun createRule(rule: RuleEntity, post: Boolean = true): RuleEntity {

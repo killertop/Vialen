@@ -57,8 +57,8 @@ fun buildLegacyConfig(
 
     val trafficMap = HashMap<String, List<ProxyEntity>>()
     val tagMap = HashMap<Long, String>()
+    val builtChains = HashMap<Long, String>()
     val globalOutbounds = HashMap<Long, String>()
-    val selectorNames = ArrayList<String>()
     val group = SagerDatabase.groupDao.getById(proxy.groupId)
     // The migrated generators receive one build-level policy snapshot.
     val outboundGlobalAllowInsecure = DataStore.globalAllowInsecure
@@ -76,17 +76,6 @@ fun buildLegacyConfig(
             return beanList.asReversed()
         }
         return mutableListOf(this)
-    }
-
-    fun selectorName(name_: String): String {
-        var name = name_
-        var count = 0
-        while (selectorNames.contains(name)) {
-            count++
-            name = "$name_-$count"
-        }
-        selectorNames.add(name)
-        return name
     }
 
     fun ProxyEntity.resolveChain(): MutableList<ProxyEntity> {
@@ -202,6 +191,7 @@ fun buildLegacyConfig(
 
         // init routing object
         route = RouteOptions().apply {
+            final_ = TAG_PROXY
             auto_detect_interface = true
             rules = mutableListOf()
             rule_set = mutableListOf()
@@ -211,6 +201,7 @@ fun buildLegacyConfig(
         fun buildChain(
             chainId: Long, entity: ProxyEntity
         ): String {
+            builtChains[chainId]?.let { return it }
             val profileList = entity.resolveChain()
             val chainTrafficSet = HashSet<ProxyEntity>().apply {
                 plusAssign(profileList)
@@ -236,7 +227,7 @@ fun buildLegacyConfig(
                 // profile2 (in) (global)   tag g-(id)
                 // profile1                 tag (chainTag)-(id)
                 // profile0 (out)           tag (chainTag)-(id) / single: "proxy"
-                var tagOut = "$chainTag-${proxyEntity.id}"
+                var tagOut = "$chainTag-$index-${proxyEntity.id}"
 
                 // needGlobal: can only contain one?
                 var needGlobal = false
@@ -253,11 +244,6 @@ fun buildLegacyConfig(
                     tagOut = TAG_PROXY
                 }
 
-                // selector human readable name
-                if (buildSelector && index == 0) {
-                    tagOut = selectorName(bean.displayName())
-                }
-
                 // chain rules
                 if (index > 0) {
                     pastOutbound._hack_config_map["detour"] = tagOut
@@ -269,7 +255,7 @@ fun buildLegacyConfig(
                 // now tagOut is determined
                 if (needGlobal) {
                     globalOutbounds[proxyEntity.id]?.let {
-                        if (index == 0) chainTagOut = it // single, duplicate chain
+                        if (index == 0) chainTagOut = it else pastOutbound._hack_config_map["detour"] = it
                         return@forEachIndexed
                     }
                     globalOutbounds[proxyEntity.id] = tagOut
@@ -354,6 +340,7 @@ fun buildLegacyConfig(
             }
 
             trafficMap[chainTagOut] = chainTrafficSet.toList()
+            builtChains[chainId] = chainTagOut
             return chainTagOut
         }
 
@@ -647,7 +634,8 @@ fun buildLegacyConfig(
                     SingBoxOptionsUtil.parseTypedDnsServer(
                         s,
                         "dns-remote",
-                        domainResolver = "dns-direct"
+                        domainResolver = "dns-direct",
+                        detour = TAG_PROXY
                     )
                 )
             }

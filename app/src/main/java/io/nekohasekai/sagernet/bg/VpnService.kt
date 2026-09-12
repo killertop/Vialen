@@ -163,6 +163,7 @@ class VpnService : BaseVpnService(),
             linkExpectation = null
             failure?.let {
                 stopGate.markFailed()
+                BaseService.cleanupFailure = getString(R.string.service_cleanup_failed)
                 lastStopError = "VPN cleanup could not be confirmed. Restart the app before reconnecting."
                 Logs.w(it)
             }
