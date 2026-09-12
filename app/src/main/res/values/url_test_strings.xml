@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="url_test_dialog_title">URL test</string>
+    <string name="url_test_preparing">Preparing test…</string>
+    <string name="url_test_running">Testing nodes…</string>
+    <string name="url_test_stopping">Stopping test…</string>
+    <string name="url_test_finished">Test complete</string>
+    <string name="url_test_stopped">Test stopped</string>
+    <string name="url_test_error">Test interrupted</string>
+    <string name="url_test_counts">%1$d / %2$d completed</string>
+    <string name="url_test_statistics">%1$d available · %2$d failed</string>
+    <string name="url_test_latest">Latest result</string>
+    <string name="url_test_waiting">Waiting for the first result</string>
+    <string name="url_test_waiting_detail">Results appear as nodes finish testing</string>
+    <string name="url_test_stop">Stop test</string>
+    <string name="url_test_background">Continue in background</string>
+    <string name="url_test_done">Done</string>
+    <string name="url_test_elapsed">Elapsed %1$d s</string>
+    <string name="url_test_no_result">No completed results</string>
+    <string name="url_test_available">Available</string>
+    <string name="url_test_failed">Failed</string>
+</resources>
