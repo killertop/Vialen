@@ -1,0 +1,4 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The inert test APK is the explicit external app in isolated VPN allowlists. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>

@@ -9,15 +9,22 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import androidx.preference.*
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.database.AppRoutingStore
+import io.nekohasekai.sagernet.utils.InstalledAppAccess
 import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.utils.RuntimeDiagnostics
 import moe.matsuri.nb4a.ui.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFragment() {
 
@@ -35,7 +42,7 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
         }
     }
 
-    private lateinit var isProxyApps: SwitchPreference
+    private var appRoutingSummaryJob: Job? = null
 
 
 
@@ -107,13 +114,6 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
         if (Build.VERSION.SDK_INT < 28) {
             metedNetwork.remove()
         }
-        isProxyApps = findPreference(Key.PROXY_APPS)!!
-        isProxyApps.setOnPreferenceChangeListener { _, newValue ->
-            DataStore.dirty = true
-            needReload()
-            true
-        }
-
         findPreference<Preference>("uiEditApps")!!.setOnPreferenceClickListener {
             startActivity(Intent(activity, AppManagerActivity::class.java))
             true
@@ -159,12 +159,25 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
             showManagedSettingsNotice()
         }
 
-        if (::isProxyApps.isInitialized) {
-            isProxyApps.isChecked = DataStore.proxyApps
+        appRoutingSummaryJob?.cancel()
+        appRoutingSummaryJob = lifecycleScope.launch {
+            val context = requireContext().applicationContext
+            val config = AppRoutingStore.read()
+            val valid = withContext(Dispatchers.IO) {
+                !config.enabled || config.validate(InstalledAppAccess.read(context).packages?.keys,
+                    context.packageName) == null
+            }
+            findPreference<Preference>("uiEditApps")?.summary = when {
+                !config.enabled -> getString(R.string.app_routing_off_summary)
+                !valid -> getString(R.string.app_routing_needs_attention)
+                else -> getString(if (config.bypass) R.string.app_routing_bypass_summary
+                    else R.string.app_routing_proxy_summary, config.packages.size)
+            }
         }
     }
 
     override fun onPause() {
+        appRoutingSummaryJob?.cancel()
         diagnosticsHandler.removeCallbacks(refreshDiagnostics)
         super.onPause()
     }

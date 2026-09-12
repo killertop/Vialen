@@ -105,7 +105,7 @@ class RemoteSubscriptionVpnNativeTest {
             DataStore.enableDnsRouting = false
             DataStore.bypassLan = false; DataStore.bypassLanInCore = false
             DataStore.proxyApps = true; DataStore.bypass = false
-            DataStore.individual = app.packageName
+            DataStore.individual = isolatedAppRoutingSelection()
             DataStore.enableFakeDns = false; DataStore.appendHttpProxy = false
             VpnConsentTestUi.launchMainResumed()
             connection.connect(app, object : SagerConnection.Callback {

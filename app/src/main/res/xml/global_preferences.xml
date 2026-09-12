@@ -4,8 +4,7 @@
         <SwitchPreference app:singleLineTitle="false" app:icon="@drawable/ic_settings_location_on_outline" app:layout="@layout/preference_settings_row" app:key="alwaysShowAddress" app:summary="@string/always_show_address_sum" app:title="@string/always_show_address" />
     </PreferenceCategory>
     <PreferenceCategory app:layout="@layout/preference_settings_category" app:key="uiAppRouting" app:title="@string/ui_app_routing">
-        <SwitchPreference app:singleLineTitle="false" app:icon="@drawable/ic_settings_apps_outline" app:layout="@layout/preference_settings_row" app:key="proxyApps" app:summary="@string/proxied_apps_summary" app:title="@string/proxied_apps" />
-        <Preference app:singleLineTitle="false" app:icon="@drawable/ic_profile_edit_outline" app:layout="@layout/preference_settings_row" app:key="uiEditApps" app:title="@string/ui_edit_apps" app:summary="@string/ui_edit_apps_summary" />
+        <Preference app:singleLineTitle="false" app:icon="@drawable/ic_settings_apps_outline" app:layout="@layout/preference_settings_row" app:key="uiEditApps" app:title="@string/proxied_apps" app:summary="@string/app_routing_off_summary" />
     </PreferenceCategory>
     <PreferenceCategory app:layout="@layout/preference_settings_category" app:key="uiConnection" app:title="@string/ui_connection">
         <SwitchPreference app:defaultValue="false" app:singleLineTitle="false" app:icon="@drawable/ic_settings_link_outline" app:layout="@layout/preference_settings_row" app:key="isAutoConnect" app:summary="@string/auto_connect_summary" app:title="@string/auto_connect" />

@@ -172,6 +172,7 @@ class RealDeviceVpnLifecycleTest {
             DataStore.bypassLan = false
             DataStore.bypassLanInCore = false
             DataStore.proxyApps = InstrumentationRegistry.getArguments().getString("restrict_test_apps") == "true"
+            if (DataStore.proxyApps) { DataStore.individual = isolatedAppRoutingSelection(); DataStore.bypass = false }
             DataStore.enableFakeDns = false
             DataStore.appendHttpProxy = false
 

@@ -45,7 +45,8 @@ class ManagedSettingsResourceTest {
 
     @Test fun userIntentAndUnverifiedCompatibilityControlsRemain() {
         val keys = keys()
-        for (retained in listOf("isAutoConnect", "proxyApps", "uiEditApps", "remoteDns", "directDns",
+        assertFalse("Per-app routing must have only one editor entry", "proxyApps" in keys)
+        for (retained in listOf("isAutoConnect", "uiEditApps", "remoteDns", "directDns",
             "enableDnsRouting", "enableFakeDns", "bypassLan", "bypassLanInCore", "allowAccess",
             "profileTrafficStatistics", "mtu", "ipv6Mode",
             "tunImplementation", "acquireWakeLock", "networkChangeResetConnections", "wakeResetConnections")) {

@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_routing_proxy">Proxy selected</string>
+    <string name="app_routing_bypass">Bypass selected</string>
+    <string name="app_routing_off_summary">Off · All apps follow routing rules</string>
+    <string name="app_routing_proxy_summary">Proxy selected · %1$d apps</string>
+    <string name="app_routing_bypass_summary">Bypass selected · %1$d apps</string>
+    <string name="app_routing_access_required">Allow access to the installed app list before enabling per-app routing. Your saved mode and selection have not been changed.</string>
+    <string name="app_routing_empty_selection">Select at least one app to proxy, or turn per-app routing off.</string>
+    <string name="app_routing_missing_apps">Some selected apps are uninstalled or unavailable. Check app-list permission, then reselect or clear the selection before saving.</string>
+    <string name="app_routing_load_failed">Unable to load the app list. Your saved selection has been kept. Please retry.</string>
+    <string name="app_routing_retry">Reload app list</string>
+    <string name="app_routing_needs_attention">Needs attention · Open to check app access and selection</string>
+    <string name="app_routing_loading">Loading app list…</string>
+    <string name="app_routing_save_failed">Could not save. Your previous configuration has been kept. Please retry.</string>
+    <string name="app_routing_changed_elsewhere">The saved configuration changed while you were editing. Reopen this page before saving.</string>
+</resources>

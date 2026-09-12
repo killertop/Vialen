@@ -193,7 +193,7 @@ class MainUiRecoveryNativeTest {
                         val settings = it.supportFragmentManager.findFragmentById(R.id.settings)
                             as io.nekohasekai.sagernet.ui.SettingsPreferenceFragment
                         val adapter = settings.listView.adapter as androidx.preference.PreferenceGroupAdapter
-                        for (key in listOf("proxyApps", "uiEditApps", "remoteDns", "mixedPort",
+                        for (key in listOf("uiEditApps", "remoteDns", "mixedPort",
                             "uiDetailedDiagnostics", "globalAllowInsecure", "tunImplementation", "acquireWakeLock")) {
                             assertTrue("Setting must be exposed without expansion: $key",
                                 adapter.getPreferenceAdapterPosition(key) >= 0)

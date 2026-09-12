@@ -74,7 +74,7 @@ class CorePipelineVpnNativeTest {
             DataStore.directDns = "local"; DataStore.remoteDns = "local"
             DataStore.bypassLan = false; DataStore.bypassLanInCore = false
             DataStore.proxyApps = androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("restrict_test_apps") == "true"; DataStore.enableFakeDns = false; DataStore.appendHttpProxy = false
-            if (DataStore.proxyApps) { DataStore.individual = app.packageName; DataStore.bypass = false }
+            if (DataStore.proxyApps) { DataStore.individual = isolatedAppRoutingSelection(); DataStore.bypass = false }
             LoopbackSocksFixture(nonce, setOf("198.18.0.254", "198.18.0.253")).use { first -> LoopbackSocksFixture(nonce).use { second ->
                 LoopbackHttpFixture().use { server ->
                     val secondLink = "socks5://127.0.0.1:${second.port}#CoreVPN_B"

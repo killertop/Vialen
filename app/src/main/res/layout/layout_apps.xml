@@ -7,8 +7,8 @@
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="8dp">
                         <com.google.android.material.chip.ChipGroup android:id="@+id/bypassGroup" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" app:selectionRequired="true" app:singleLine="false" app:singleSelection="true">
                             <com.google.android.material.chip.Chip android:id="@+id/appProxyModeDisable" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/off" />
-                            <com.google.android.material.chip.Chip android:id="@+id/appProxyModeOn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/route_proxy" />
-                            <com.google.android.material.chip.Chip android:id="@+id/appProxyModeBypass" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true" android:text="@string/bypass_apps" />
+                            <com.google.android.material.chip.Chip android:id="@+id/appProxyModeOn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/app_routing_proxy" />
+                            <com.google.android.material.chip.Chip android:id="@+id/appProxyModeBypass" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true" android:text="@string/app_routing_bypass" />
                         </com.google.android.material.chip.ChipGroup>
                         <TextView android:id="@+id/selection_summary" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="14sp" android:textColor="@color/vialen_text_secondary" android:paddingTop="8dp" android:paddingBottom="12dp" android:accessibilityLiveRegion="polite" />
                         <com.google.android.material.chip.ChipGroup android:layout_width="match_parent" android:layout_height="wrap_content">

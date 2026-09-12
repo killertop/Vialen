@@ -7,6 +7,7 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.listenForPackageChanges
+import io.nekohasekai.sagernet.ktx.Logs
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -14,9 +15,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 object PackageCache {
 
-    lateinit var installedPackages: Map<String, PackageInfo>
-    lateinit var installedApps: Map<String, ApplicationInfo>
-    lateinit var packageMap: Map<String, Int>
+    var installedPackages: Map<String, PackageInfo> = emptyMap()
+    var installedApps: Map<String, ApplicationInfo> = emptyMap()
+    var packageMap: Map<String, Int> = emptyMap()
     val uidMap = HashMap<Int, HashSet<String>>()
     val loaded = Mutex(true)
     var registerd = AtomicBoolean(false)
@@ -34,6 +35,19 @@ object PackageCache {
 
     @SuppressLint("InlinedApi")
     fun reload() {
+        try {
+            reloadAvailablePackages()
+        } catch (error: Exception) {
+            // OEM app-list revocation must not crash application startup or lock cache consumers forever.
+            Logs.w(error)
+            installedPackages = emptyMap()
+            installedApps = emptyMap()
+            packageMap = emptyMap()
+            uidMap.clear()
+        }
+    }
+
+    private fun reloadAvailablePackages() {
         val rawPackageInfo = app.packageManager.getInstalledPackages(
             PackageManager.MATCH_UNINSTALLED_PACKAGES
                     or PackageManager.GET_PERMISSIONS
@@ -62,7 +76,7 @@ object PackageCache {
     operator fun get(packageName: String) = packageMap[packageName]
 
     fun awaitLoadSync() {
-        if (::packageMap.isInitialized) {
+        if (!loaded.isLocked) {
             return
         }
         if (!registerd.get()) {

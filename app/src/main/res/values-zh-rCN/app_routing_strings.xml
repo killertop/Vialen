@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_routing_proxy">仅代理所选</string>
+    <string name="app_routing_bypass">绕过所选</string>
+    <string name="app_routing_off_summary">已关闭 · 所有应用遵循路由规则</string>
+    <string name="app_routing_proxy_summary">仅代理所选 · %1$d 个应用</string>
+    <string name="app_routing_bypass_summary">绕过所选 · %1$d 个应用</string>
+    <string name="app_routing_access_required">请先允许读取应用列表，再启用分应用代理。已保存的模式和应用选择不会改变。</string>
+    <string name="app_routing_empty_selection">请至少选择一个要代理的应用，或关闭分应用代理。</string>
+    <string name="app_routing_missing_apps">部分已选应用已卸载或无法读取。请检查应用列表权限，再重新选择或清空名单后保存。</string>
+    <string name="app_routing_load_failed">应用列表读取失败，已保留原选择，请重试。</string>
+    <string name="app_routing_retry">重新读取应用列表</string>
+    <string name="app_routing_needs_attention">待处理 · 请检查应用列表权限和已选应用</string>
+    <string name="app_routing_loading">正在读取应用列表…</string>
+    <string name="app_routing_save_failed">保存失败，已保留原配置，请重试。</string>
+    <string name="app_routing_changed_elsewhere">编辑期间配置已在其他地方改变，请重新进入本页后再保存。</string>
+</resources>

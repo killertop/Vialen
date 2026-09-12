@@ -124,7 +124,7 @@ class ControlledNetworkHandoverNativeTest {
             DataStore.serviceMode = Key.MODE_VPN; DataStore.directDns = "local"; DataStore.remoteDns = "local"
             DataStore.bypassLan = false; DataStore.bypassLanInCore = false
             // Keep unrelated system validation traffic outside this strict local fixture.
-            DataStore.proxyApps = true; DataStore.bypass = false; DataStore.individual = app.packageName
+            DataStore.proxyApps = true; DataStore.bypass = false; DataStore.individual = isolatedAppRoutingSelection()
             DataStore.enableFakeDns = false; DataStore.appendHttpProxy = false
             val group = ProxyGroup(name = fixture.nonce)
             group.id = db.groupDao().createGroup(group); groupId = group.id

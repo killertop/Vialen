@@ -69,6 +69,8 @@ open class RoomPreferenceDataStore(private val kvPairDao: KeyValuePair.Dao) :
     }
 
     private val listeners = HashSet<OnPreferenceDataStoreChangeListener>()
+    internal fun notifyCommittedChange(key: String) = fireChangeListener(key)
+
     private fun fireChangeListener(key: String) {
         val listeners = synchronized(listeners) {
             listeners.toList()

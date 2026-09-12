@@ -12,6 +12,9 @@ import android.os.ParcelFileDescriptor
 import android.os.PowerManager
 import io.nekohasekai.sagernet.*
 import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.database.AppRoutingStore
+import io.nekohasekai.sagernet.utils.InstalledAppAccess
+import io.nekohasekai.sagernet.utils.AppRoutingConfig
 import io.nekohasekai.sagernet.fmt.LOCALHOST
 import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
 import io.nekohasekai.sagernet.ktx.*
@@ -74,6 +77,7 @@ class VpnService : BaseVpnService(),
 
     override suspend fun startProcesses() {
         stopGate.checkCanStart()
+        validateAppRouting()
         lastStopError = null
         linkExpectation = null
         val lifecycle = VpnNetworkLifecycle(SagerNet.connectivity, ::matchesVpnLink)
@@ -88,6 +92,17 @@ class VpnService : BaseVpnService(),
     }
 
     override var wakeLock: PowerManager.WakeLock? = null
+
+    private class AppRoutingException(message: String) : IllegalStateException(message), BaseService.ExpectedException
+
+    private fun validateAppRouting(): Pair<AppRoutingConfig, InstalledAppAccess.Snapshot?> {
+        val config = AppRoutingStore.read()
+        val access = if (config.enabled) InstalledAppAccess.read(this) else null
+        config.validate(access?.packages?.keys, packageName)?.let {
+            throw AppRoutingException(getString(InstalledAppAccess.problemMessage(it)))
+        }
+        return config to access
+    }
 
     @SuppressLint("WakelockTimeout")
     override fun acquireWakeLock() {
@@ -252,8 +267,9 @@ class VpnService : BaseVpnService(),
 
         // app route
         val packageName = packageName
-        val proxyApps = DataStore.proxyApps
-        var bypass = DataStore.bypass
+        val (appRouting, appAccess) = validateAppRouting()
+        val proxyApps = appRouting.enabled
+        var bypass = appRouting.bypass
         val workaroundSYSTEM = false /* DataStore.tunImplementation == TunImplementation.SYSTEM */
         val needBypassRootUid = workaroundSYSTEM || data.proxy!!.config.trafficMap.values.any {
             it[0].hysteriaBean?.protocol == HysteriaBean.PROTOCOL_FAKETCP
@@ -262,7 +278,7 @@ class VpnService : BaseVpnService(),
         if (proxyApps || needBypassRootUid) {
             val individual = mutableSetOf<String>()
             val allApps by lazy {
-                packageManager.getInstalledPackages(PackageManager.GET_PERMISSIONS).filter {
+                appAccess?.packages?.keys?.toList() ?: packageManager.getInstalledPackages(PackageManager.GET_PERMISSIONS).filter {
                     when (it.packageName) {
                         packageName -> false
                         "android" -> true
@@ -273,7 +289,7 @@ class VpnService : BaseVpnService(),
                 }
             }
             if (proxyApps) {
-                individual.addAll(DataStore.individual.split('\n').filter { it.isNotBlank() })
+                individual.addAll(appRouting.packages)
                 if (bypass && needBypassRootUid) {
                     val individualNew = allApps.toMutableList()
                     individualNew.removeAll(individual)
@@ -301,6 +317,7 @@ class VpnService : BaseVpnService(),
                     }
                     added.add(it)
                 } catch (ex: PackageManager.NameNotFoundException) {
+                    if (proxyApps) throw AppRoutingException(getString(R.string.app_routing_missing_apps))
                     Logs.w(ex)
                 }
             }
