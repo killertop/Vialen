@@ -130,6 +130,14 @@ func singboxProfile(m map[string]any) (profile.Profile, error) {
 	}
 	if f.has("tls") {
 		t := f.child("tls")
+		// Refuse constraints the profile model cannot preserve.
+		for key := range t.m {
+			switch key {
+			case "disable_sni", "enabled", "server_name", "insecure", "alpn", "ech", "certificate", "utls", "reality":
+			default:
+				return p, bad("UNSUPPORTED_TLS_FIELD", "Unsupported TLS field: tls."+key)
+			}
+		}
 		tls := &profile.TLS{DisableSNI: t.boolean("disable_sni"), Enabled: t.boolean("enabled"), ServerName: t.str("server_name"), Insecure: t.boolean("insecure"), ALPN: listable(t, "alpn")}
 		if t.has("ech") {
 			e := t.child("ech")
@@ -194,6 +202,15 @@ func singboxProfile(m map[string]any) (profile.Profile, error) {
 }
 func singboxWireGuardPeer(endpoint map[string]any, value any) (profile.Profile, error) {
 	root := fields{m: endpoint}
+	if root.has("detour") {
+		detour := root.str("detour")
+		if root.err != nil {
+			return profile.Profile{}, root.err
+		}
+		if detour != "" {
+			return profile.Profile{}, bad("DEPENDENT_NODE", "Detour nodes require an explicit chain and cannot be imported independently")
+		}
+	}
 	m, e := object(value)
 	if e != nil {
 		return profile.Profile{}, e

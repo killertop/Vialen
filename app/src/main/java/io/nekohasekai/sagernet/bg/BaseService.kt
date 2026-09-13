@@ -191,6 +191,7 @@ class BaseService {
         fun reload() {
             if (DataStore.selectedProxy == 0L) {
                 stopRunner(false, (this as Context).getString(R.string.profile_empty))
+                return
             }
             if (canReloadSelector()) {
                 val ent = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
@@ -198,8 +199,8 @@ class BaseService {
                 if (tag.isNotBlank() && ent != null) {
                     // The native wrapper updates accounting and UI through its selection callback.
                     data.proxy!!.box.selectOutbound(tag)
+                    return
                 }
-                return
             }
             val s = data.state
             when {
@@ -210,14 +211,17 @@ class BaseService {
         }
 
         fun canReloadSelector(): Boolean {
+            val running = data.proxy ?: return false
+            if (data.state != State.Connected || !running.isInitialized()) return false
             if ((data.proxy?.config?.selectorGroupId ?: -1L) < 0) return false
             val ent = SagerDatabase.proxyDao.getById(DataStore.selectedProxy) ?: return false
             val tmpBox = ProxyInstance(ent)
             tmpBox.buildConfigTmp()
-            if (tmpBox.lastSelectorGroupId == data.proxy?.lastSelectorGroupId) {
-                return true
-            }
-            return false
+            return SelectorReloadPolicy.canReuse(
+                running.lastSelectorGroupId, tmpBox.lastSelectorGroupId,
+                running.config.config, tmpBox.config.config,
+                running.config.profileTagMap, tmpBox.config.profileTagMap, ent.id,
+            )
         }
 
         suspend fun startProcesses() {
