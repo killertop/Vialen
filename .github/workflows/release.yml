@@ -26,7 +26,7 @@ jobs:
         shell: bash
         working-directory: Vialen
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_ref }}
           path: Vialen
@@ -38,7 +38,7 @@ jobs:
           source_sha=$(git rev-parse --verify HEAD)
           [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]]
           printf 'sha=%s\n' "$source_sha" >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.27.1'
           cache: false
@@ -61,7 +61,7 @@ jobs:
         shell: bash
         working-directory: Vialen
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.core-tests.outputs.source_sha }}
           path: Vialen
@@ -75,11 +75,11 @@ jobs:
           printf 'sha=%s\n' "$source_sha" >> "$GITHUB_OUTPUT"
           mkdir -p ci-artifacts/core
           python3 scripts/ci/artifacts.py source ci-artifacts/core/source-manifest.json
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.27.1'
           cache: false
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '25.0.2'
@@ -110,7 +110,7 @@ jobs:
           set -euo pipefail
           digest=$(sha256sum ci-artifacts/core/core-manifest.json | cut -d ' ' -f 1)
           printf 'sha=%s\n' "$digest" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Vialen-Core-${{ steps.source.outputs.sha }}
           path: Vialen/ci-artifacts/core/
@@ -125,12 +125,12 @@ jobs:
         shell: bash
         working-directory: Vialen
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.libcore.outputs.source_sha }}
           path: Vialen
           persist-credentials: false
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: Vialen-Core-${{ needs.libcore.outputs.source_sha }}
           path: Vialen/ci-artifacts/core
@@ -143,11 +143,11 @@ jobs:
           python3 scripts/ci/artifacts.py verify-core ci-artifacts/core
           mkdir -p app/libs
           cp ci-artifacts/core/libcore.aar app/libs/libcore.aar
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.27.1'
           cache: false
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '25.0.2'
@@ -174,7 +174,7 @@ jobs:
           test -s app/build/outputs/mapping/release/mapping.txt
           cp app/build/outputs/mapping/release/mapping.txt ci-artifacts/apk/
           python3 scripts/ci/artifacts.py apk ci-artifacts/apk
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Vialen-UNSIGNED-${{ needs.libcore.outputs.source_sha }}
           path: Vialen/ci-artifacts/
