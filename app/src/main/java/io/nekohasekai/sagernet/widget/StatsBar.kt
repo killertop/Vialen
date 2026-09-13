@@ -100,9 +100,10 @@ class StatsBar @JvmOverloads constructor(
         super.setOnClickListener(l)
     }
 
-    private fun setStatus(text: CharSequence) {
+    private fun setStatus(text: CharSequence, detail: CharSequence = text) {
+        statusText.contentDescription = detail
         NativeMotion.text(statusText, text)
-        TooltipCompat.setTooltipText(this, "${serviceStatusText.text}\n$text")
+        TooltipCompat.setTooltipText(this, "${serviceStatusText.contentDescription}\n$detail")
     }
 
     fun changeState(state: BaseService.State) {
@@ -117,7 +118,7 @@ class StatsBar @JvmOverloads constructor(
 
     private fun showConnectionState() {
         if (!::statusText.isInitialized) return
-        NativeMotion.text(serviceStatusText, context.getText(when (renderedState) {
+        val description = context.getText(when (renderedState) {
             BaseService.State.Connected -> if (DataStore.serviceMode == Key.MODE_VPN) {
                 R.string.ui_vpn_service_connected
             } else {
@@ -126,7 +127,10 @@ class StatsBar @JvmOverloads constructor(
             BaseService.State.Connecting -> R.string.connecting
             BaseService.State.Stopping -> R.string.stopping
             else -> R.string.not_connected
-        }))
+        })
+        serviceStatusText.contentDescription = description
+        NativeMotion.text(serviceStatusText, if (renderedState.connected)
+            context.getText(R.string.ui_service_connected_short) else description)
         serviceStatusText.setCompoundDrawablesRelativeWithIntrinsicBounds(
             if (renderedState.connected) R.drawable.ic_service_status_dot else 0, 0, 0, 0
         )
@@ -185,6 +189,7 @@ class StatsBar @JvmOverloads constructor(
                 val elapsed = withContext(Dispatchers.IO) { service.urlTest() }
                 if (isCurrent()) {
                     setStatus(
+                        app.getString(R.string.ui_connectivity_result_short, elapsed),
                         app.getString(
                             if (testUrl.startsWith("https://")) {
                                 R.string.connection_test_available

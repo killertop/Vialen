@@ -159,10 +159,11 @@
                         android:layout_height="wrap_content"
                         android:accessibilityLiveRegion="polite"
                         android:drawablePadding="6dp"
-                        android:maxLines="2"
+                        android:maxLines="1"
+                        android:ellipsize="end"
                         android:textAppearance="@style/TextAppearance.Vialen.ListTitle"
                         android:textColor="@color/vialen_text_primary"
-                        tools:text="@string/ui_vpn_service_connected" />
+                        tools:text="@string/ui_service_connected_short" />
                     <TextView
                         android:id="@+id/status"
                         android:layout_width="match_parent"
@@ -170,7 +171,7 @@
                         android:layout_marginTop="4dp"
                         android:accessibilityLiveRegion="polite"
                         android:ellipsize="end"
-                        android:maxLines="2"
+                        android:maxLines="1"
                         android:textAppearance="@style/TextAppearance.Vialen.Secondary"
                         android:textColor="@color/vialen_text_secondary"
                         tools:text="@string/ui_connectivity_testing" />

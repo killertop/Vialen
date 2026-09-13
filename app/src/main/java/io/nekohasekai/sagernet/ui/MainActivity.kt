@@ -352,7 +352,8 @@ class MainActivity : ThemedActivity(),
 
     override fun stateChanged(state: BaseService.State, profileName: String?, msg: String?) {
         changeState(state, msg, true)
-        if (state == BaseService.State.Stopped && connection.boundServiceMode != DataStore.serviceMode) onBinderDied()
+        if (state == BaseService.State.Stopped &&
+            connection.boundServiceMode?.let { it != DataStore.serviceMode } == true) onBinderDied()
     }
 
     val connection = SagerConnection(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_BACKGROUND, true)

@@ -6,6 +6,8 @@
     <string name="ui_traffic_download_value">Download: %1$s</string>
     <string name="ui_vpn_service_connected">VPN connected</string>
     <string name="ui_proxy_service_connected">Proxy connected</string>
-    <string name="ui_connectivity_check_hint">Tap to check connectivity</string>
-    <string name="ui_connectivity_testing">Checking connectivity…</string>
+    <string name="ui_connectivity_check_hint">Tap to test</string>
+    <string name="ui_connectivity_testing">Testing…</string>
+    <string name="ui_service_connected_short">Connected</string>
+    <string name="ui_connectivity_result_short">Latency: %dms</string>
 </resources>

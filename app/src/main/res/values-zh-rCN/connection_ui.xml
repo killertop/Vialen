@@ -6,6 +6,8 @@
     <string name="ui_traffic_download_value">下载：%1$s</string>
     <string name="ui_vpn_service_connected">VPN 已连接</string>
     <string name="ui_proxy_service_connected">代理已连接</string>
-    <string name="ui_connectivity_check_hint">点击检测连通性</string>
-    <string name="ui_connectivity_testing">连通性检测中…</string>
+    <string name="ui_connectivity_check_hint">点击测速</string>
+    <string name="ui_connectivity_testing">测速中…</string>
+    <string name="ui_service_connected_short">已连接</string>
+    <string name="ui_connectivity_result_short">测速：%dms</string>
 </resources>

@@ -382,10 +382,40 @@ class MainUiRecoveryNativeTest {
                 val serviceStatus = if (!selector) R.string.not_connected else
                     if (DataStore.serviceMode == Key.MODE_VPN) R.string.ui_vpn_service_connected
                     else R.string.ui_proxy_service_connected
-                assertEquals(it.getString(serviceStatus),
+                assertEquals(it.getString(if (selector) R.string.ui_service_connected_short else serviceStatus),
                     it.binding.stats.findViewById<TextView>(R.id.service_status).text.toString())
+                assertEquals(it.getString(serviceStatus),
+                    it.binding.stats.findViewById<TextView>(R.id.service_status).contentDescription.toString())
                 assertTrue(it.binding.stats.isEnabled)
             }
         }
+    }
+
+    @Test fun compactSuccessKeepsDetailsWithoutWrapping() = withMain { scenario ->
+        val call = ControlledCall(false)
+        val job = startTest(scenario, call)
+        finishTest(call, job)
+        // Allow StatsBar's existing delayed reveal and the following layout pass.
+        android.os.SystemClock.sleep(250)
+        instrumentation.waitForIdleSync()
+        scenario.onActivity { activity ->
+            val status = activity.binding.stats.findViewById<TextView>(R.id.status)
+            val service = activity.binding.stats.findViewById<TextView>(R.id.service_status)
+            assertEquals(activity.getString(R.string.ui_connectivity_result_short, 731), status.text.toString())
+            assertEquals(activity.getString(R.string.ui_service_connected_short), service.text.toString())
+            assertTrue(status.contentDescription.toString().contains("731"))
+            assertTrue(activity.binding.stats.isEnabled)
+            assertTrue(status.isShown)
+            assertEquals(1, status.lineCount)
+            assertEquals(1, service.lineCount)
+            assertEquals(0, status.layout.getEllipsisCount(0))
+            assertEquals(0, service.layout.getEllipsisCount(0))
+        }
+        val screenshot = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+        try {
+            java.io.File(instrumentation.targetContext.cacheDir, "compact-status-regression.png").outputStream().use {
+                check(screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+            }
+        } finally { screenshot.recycle() }
     }
 }
