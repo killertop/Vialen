@@ -1,0 +1,7 @@
+<resources>
+    <string name="ui_import_choose">选择一种导入方式</string>
+    <string name="ui_import_clipboard_description">导入已复制的节点链接</string>
+    <string name="ui_import_subscription_description">使用机场订阅链接</string>
+    <string name="ui_import_scan_description">扫描节点或订阅二维码</string>
+    <string name="ui_import_manual_description">自行填写节点参数</string>
+</resources>

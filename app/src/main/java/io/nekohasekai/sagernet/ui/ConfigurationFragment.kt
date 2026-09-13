@@ -421,38 +421,102 @@ class ConfigurationFragment @JvmOverloads constructor(
         val sheet = com.google.android.material.bottomsheet.BottomSheetDialog(context)
         val content = android.widget.LinearLayout(context).apply {
             orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(dp2px(24), dp2px(24), dp2px(24), dp2px(32))
+            setPadding(dp2px(18), dp2px(12), dp2px(18), dp2px(12))
         }
-        content.addView(android.widget.TextView(context).apply {
-            setText(R.string.ui_add_node)
-            TextViewCompat.setTextAppearance(this, R.style.TextAppearance_Vialen_PanelTitle)
-            setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.vialen_text_primary))
-            setPadding(0, 0, 0, dp2px(16))
+        fun color(id: Int) = androidx.core.content.ContextCompat.getColor(context, id)
+        fun label(text: Int, size: Float, secondary: Boolean = false) = android.widget.TextView(context).apply {
+            setText(text)
+            textSize = size
+            setTextColor(color(if (secondary) R.color.vialen_text_secondary else R.color.vialen_text_primary))
+        }
+        content.addView(View(context).apply {
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(color(R.color.vialen_text_secondary))
+                alpha = 90
+                cornerRadius = dp2px(3).toFloat()
+            }
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }, android.widget.LinearLayout.LayoutParams(dp2px(42), dp2px(5)).apply {
+            gravity = android.view.Gravity.CENTER_HORIZONTAL
+            bottomMargin = dp2px(24)
+        })
+        content.addView(label(R.string.ui_add_node, 24f).apply {
+            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+            setPadding(dp2px(10), 0, dp2px(10), dp2px(6))
+        })
+        content.addView(label(R.string.ui_import_choose, 14f, true).apply {
+            setPadding(dp2px(10), 0, dp2px(10), dp2px(16))
         })
         val actions = PopupMenu(context, toolbar).menu.apply { requireActivity().menuInflater.inflate(R.menu.node_creation_menu, this) }
-        fun action(title: Int, run: () -> Unit) {
-            content.addView(com.google.android.material.button.MaterialButton(context, null,
-                com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
-                setText(title)
-                minimumHeight = dp2px(48)
-                cornerRadius = dp2px(12)
-                isAllCaps = false
+        fun action(title: Int, description: Int, icon: Int, primary: Boolean = false, last: Boolean = false, run: () -> Unit) {
+            val row = android.widget.LinearLayout(context).apply {
+                orientation = android.widget.LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                minimumHeight = dp2px(82)
+                setPadding(dp2px(10), dp2px(14), dp2px(10), dp2px(14))
+                val value = android.util.TypedValue()
+                context.theme.resolveAttribute(android.R.attr.selectableItemBackground, value, true)
+                setBackgroundResource(value.resourceId)
+                isFocusable = true
+                contentDescription = getString(title) + ", " + getString(description)
                 setOnClickListener { sheet.dismiss(); run() }
-            }, android.widget.LinearLayout.LayoutParams(-1, -2))
+            }
+            row.addView(androidx.appcompat.widget.AppCompatImageView(context).apply {
+                setImageResource(icon)
+                imageTintList = android.content.res.ColorStateList.valueOf(color(
+                    if (primary) R.color.vialen_accent else R.color.vialen_text_secondary))
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, android.widget.LinearLayout.LayoutParams(dp2px(30), dp2px(30)).apply { marginEnd = dp2px(26) })
+            row.addView(android.widget.LinearLayout(context).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+                addView(label(title, 17f).apply {
+                    typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+                })
+                addView(label(description, 13f, true).apply { setPadding(0, dp2px(5), 0, 0) })
+            }, android.widget.LinearLayout.LayoutParams(0, -2, 1f))
+            row.addView(androidx.appcompat.widget.AppCompatImageView(context).apply {
+                setImageResource(R.drawable.ic_import_chevron)
+                imageTintList = android.content.res.ColorStateList.valueOf(color(R.color.vialen_text_secondary))
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, android.widget.LinearLayout.LayoutParams(dp2px(24), dp2px(24)))
+            content.addView(row, android.widget.LinearLayout.LayoutParams(-1, -2))
+            if (!last) content.addView(View(context).apply {
+                setBackgroundColor(color(R.color.vialen_text_secondary))
+                alpha = 0.15f
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, android.widget.LinearLayout.LayoutParams(-1, dp2px(1)))
         }
-        action(R.string.ui_add_subscription) {
+        action(R.string.action_import, R.string.ui_import_clipboard_description, R.drawable.ic_import_clipboard, primary = true) {
+            onMenuItemClick(actions.findItem(R.id.action_import_clipboard))
+        }
+        action(R.string.ui_add_subscription, R.string.ui_import_subscription_description, R.drawable.ic_settings_link_outline) {
             startActivity(Intent(context, GroupSettingsActivity::class.java).putExtra("newSubscription", true))
         }
-        action(R.string.add_profile_methods_scan_qr_code) { onMenuItemClick(actions.findItem(R.id.action_scan_qr_code)) }
-        action(R.string.action_import) { onMenuItemClick(actions.findItem(R.id.action_import_clipboard)) }
-        action(R.string.action_import_file) { onMenuItemClick(actions.findItem(R.id.action_import_file)) }
-        action(R.string.ui_manual_config) { showProtocolPicker(actions) }
-        content.addView(android.widget.TextView(context).apply {
-            setText(R.string.ui_import_hint)
-            TextViewCompat.setTextAppearance(this, R.style.TextAppearance_Vialen_Secondary)
-            setPadding(0, dp2px(16), 0, 0)
-        })
-        sheet.setContentView(content)
+        action(R.string.add_profile_methods_scan_qr_code, R.string.ui_import_scan_description, R.drawable.ic_import_scan) {
+            onMenuItemClick(actions.findItem(R.id.action_scan_qr_code))
+        }
+        action(R.string.ui_manual_config, R.string.ui_import_manual_description, R.drawable.ic_settings_settings_outline, last = true) {
+            showProtocolPicker(actions)
+        }
+        content.addView(com.google.android.material.button.MaterialButton(context, null,
+            android.R.attr.borderlessButtonStyle).apply {
+            setText(R.string.action_import_file)
+            isAllCaps = false
+            minimumHeight = dp2px(48)
+            setOnClickListener { sheet.dismiss(); onMenuItemClick(actions.findItem(R.id.action_import_file)) }
+        }, android.widget.LinearLayout.LayoutParams(-1, -2))
+        val scroll = androidx.core.widget.NestedScrollView(context).apply { addView(content) }
+        sheet.setContentView(scroll)
+        sheet.setOnShowListener {
+            val panel = sheet.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+            panel?.background = com.google.android.material.shape.MaterialShapeDrawable(
+                com.google.android.material.shape.ShapeAppearanceModel.builder()
+                    .setTopLeftCorner(com.google.android.material.shape.CornerFamily.ROUNDED, dp2px(24).toFloat())
+                    .setTopRightCorner(com.google.android.material.shape.CornerFamily.ROUNDED, dp2px(24).toFloat())
+                    .build()).apply { fillColor = android.content.res.ColorStateList.valueOf(color(R.color.vialen_surface)) }
+            sheet.behavior.state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+        }
         sheet.show()
     }
 

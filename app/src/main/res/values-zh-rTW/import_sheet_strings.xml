@@ -1,0 +1,7 @@
+<resources>
+    <string name="ui_import_choose">選擇一種匯入方式</string>
+    <string name="ui_import_clipboard_description">匯入已複製的節點連結</string>
+    <string name="ui_import_subscription_description">使用機場訂閱連結</string>
+    <string name="ui_import_scan_description">掃描節點或訂閱 QR 碼</string>
+    <string name="ui_import_manual_description">自行填寫節點參數</string>
+</resources>

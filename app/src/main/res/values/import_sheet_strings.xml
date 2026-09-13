@@ -1,0 +1,7 @@
+<resources>
+    <string name="ui_import_choose">Choose an import method</string>
+    <string name="ui_import_clipboard_description">Import a copied node link</string>
+    <string name="ui_import_subscription_description">Use a subscription link</string>
+    <string name="ui_import_scan_description">Scan a node or subscription QR code</string>
+    <string name="ui_import_manual_description">Enter node parameters</string>
+</resources>
