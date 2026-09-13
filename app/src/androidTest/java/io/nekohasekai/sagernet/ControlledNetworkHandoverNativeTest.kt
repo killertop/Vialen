@@ -1,6 +1,5 @@
 package io.nekohasekai.sagernet
 
-import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -137,7 +136,6 @@ class ControlledNetworkHandoverNativeTest {
             row.id = db.proxyDao().addProxy(row)
             ruleId = db.rulesDao().createRule(RuleEntity(name = fixture.nonce, userOrder = Long.MIN_VALUE, enabled = true, ip = "198.18.0.254/32", outbound = 0))
             DataStore.selectedProxy = row.id
-            app.startActivity(app.packageManager.getLaunchIntentForPackage(app.packageName)!!.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             connection.connect(app, object : SagerConnection.Callback {
                 override fun stateChanged(state: BaseService.State, profileName: String?, msg: String?) {}
                 override fun onServiceConnected(service: ISagerNetService) {}
