@@ -208,6 +208,35 @@ class MainUiRecoveryNativeTest {
                 if (show) {
                     scenario.onActivity { it.stateChanged(State.Connected, null, null) }
                     android.os.SystemClock.sleep(300)
+                    scenario.onActivity { assertConnectedFooterClear(it) }
+                    for (text in listOf(
+                        instrumentation.targetContext.getString(R.string.ui_connectivity_result_short, 128),
+                        instrumentation.targetContext.getString(R.string.ui_connectivity_testing),
+                        instrumentation.targetContext.getString(R.string.connection_test_failed),
+                    )) {
+                        scenario.onActivity { it.binding.status.text = text }
+                        android.os.SystemClock.sleep(150)
+                        instrumentation.waitForIdleSync()
+                        scenario.onActivity { assertConnectedFooterClear(it) }
+                    }
+                    if (InstrumentationRegistry.getArguments().getString("vialenFooterCapture") == "true") {
+                        scenario.onActivity {
+                            it.binding.tx.text = "42.16 kB/s"
+                            it.binding.rx.text = "7.30 kB/s"
+                            it.binding.status.text = instrumentation.targetContext.getString(
+                                R.string.ui_connectivity_result_short, 128)
+                        }
+                        android.os.SystemClock.sleep(150)
+                        instrumentation.waitForIdleSync()
+                        val screenshot = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+                        try {
+                            val file = java.io.File(instrumentation.targetContext.getExternalFilesDir(null),
+                                "footer-option-one.png")
+                            file.outputStream().use {
+                                screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+                            }
+                        } finally { screenshot.recycle() }
+                    }
                     scenario.onActivity { it.stateChanged(State.Stopped, null, null) }
                     android.os.SystemClock.sleep(400)
                     instrumentation.waitForIdleSync()
@@ -230,6 +259,27 @@ class MainUiRecoveryNativeTest {
         assertTrue("Disconnected label overlaps button: $button / $label", label.bottom <= button.top)
         assertTrue("Disconnected label leaves viewport", root.contains(label))
         assertEquals(activity.binding.connectionSummary.height, label.height())
+    }
+
+    private fun assertConnectedFooterClear(activity: MainActivity) {
+        val button = android.graphics.Rect()
+        assertTrue(activity.binding.fab.getGlobalVisibleRect(button))
+        val labels = listOf(activity.binding.tx, activity.binding.rx,
+            activity.binding.serviceStatus, activity.binding.status)
+        val bounds = labels.map { view -> android.graphics.Rect().also {
+            assertTrue(view.getGlobalVisibleRect(it))
+            assertEquals("Footer text must remain fully visible", view.height, it.height())
+            assertTrue("Footer text overlaps power control", it.top >= button.bottom)
+            assertEquals("Footer text must not be truncated", 0, view.layout.getEllipsisCount(0))
+        } }
+        assertEquals("Status lines share a trailing edge", bounds[2].right, bounds[3].right)
+        val tolerance = (3 * activity.resources.displayMetrics.density).toInt()
+        for ((left, right) in listOf(0 to 2, 1 to 3)) {
+            val delta = bounds[left].top + labels[left].baseline -
+                bounds[right].top - labels[right].baseline
+            assertTrue("Traffic and status rows align", kotlin.math.abs(delta) <= tolerance)
+            assertTrue("Traffic and status must not overlap", bounds[left].right < bounds[right].left)
+        }
     }
 
     @Test fun settingsDetailsRetainOverridesAcrossModesAndRecreation() {

@@ -78,16 +78,16 @@
                 android:gravity="center_vertical"
                 android:minHeight="96dp"
                 android:orientation="horizontal"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:paddingTop="20dp"
+                android:paddingStart="24dp"
+                android:paddingEnd="24dp"
+                android:paddingTop="32dp"
                 android:paddingBottom="16dp">
 
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginEnd="12dp"
+                    android:layout_marginEnd="24dp"
                     android:orientation="vertical">
 
                     <LinearLayout
@@ -154,11 +154,14 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:gravity="end"
                     android:orientation="vertical">
                     <TextView
                         android:id="@+id/service_status"
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:minHeight="26dp"
+                        android:gravity="end|center_vertical"
                         android:accessibilityLiveRegion="polite"
                         android:drawablePadding="6dp"
                         android:maxLines="1"
@@ -168,9 +171,10 @@
                         tools:text="@string/ui_service_connected_short" />
                     <TextView
                         android:id="@+id/status"
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
+                        android:minHeight="26dp"
+                        android:gravity="end|center_vertical"
                         android:accessibilityLiveRegion="polite"
                         android:ellipsize="end"
                         android:maxLines="1"
