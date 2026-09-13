@@ -70,7 +70,7 @@ class ServiceButton @JvmOverloads constructor(
     private val iconConnected by lazy {
         AnimatedState(R.drawable.ic_service_connected) {
             delayedAnimation?.cancel()
-            setProgressCompat(1, true)
+            setProgressCompat(1, NativeMotion.enabled(context))
         }
     }
     private val iconStopping by lazy { AnimatedState(R.drawable.ic_service_stopping) }
@@ -162,28 +162,28 @@ class ServiceButton @JvmOverloads constructor(
     }
 
     private fun changeState(icon: AnimatedState, animate: Boolean) {
-        fun counters(a: AnimatedState, b: AnimatedState): Boolean =
-            a == iconStopped && b == iconConnecting ||
-                    a == iconConnecting && b == iconStopped ||
-                    a == iconConnected && b == iconStopping ||
-                    a == iconStopping && b == iconConnected
-        if (animate) {
-            if (animationQueue.size < 2 || !counters(animationQueue.last, icon)) {
-                animationQueue.add(icon)
-                if (animationQueue.size == 1) icon.start()
-            } else animationQueue.removeLast()
-        } else {
-            animationQueue.peekFirst()?.stop()
-            animationQueue.clear()
-            icon.start()    // force ensureAnimatorSet to be called so that stop() will work
-            icon.stop()
+        val previous = animationQueue.peekFirst()
+        animationQueue.clear() // Clear before stop: an end callback cannot start stale work.
+        previous?.stop()
+        animationQueue.add(icon)
+        icon.start()
+        if (!animate || !NativeMotion.enabled(context) || !isAttachedToWindow) icon.stop()
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (::progress.isInitialized) {
+            progress.progressDrawable?.removeSpringAnimationEndListener(this)
+            progress.progressDrawable?.addSpringAnimationEndListener(this)
+            if (pageAllowsControls && renderedState == BaseService.State.Connecting) scheduleProgress()
         }
     }
 
     override fun onDetachedFromWindow() {
         delayedAnimation?.cancel()
-        animationQueue.peekFirst()?.stop()
+        val previous = animationQueue.peekFirst()
         animationQueue.clear()
+        previous?.stop()
         if (::progress.isInitialized) {
             progress.progressDrawable?.removeSpringAnimationEndListener(this)
             progress.hide()

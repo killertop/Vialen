@@ -7,6 +7,7 @@ import io.nekohasekai.sagernet.database.ProxyGroup
 import io.nekohasekai.sagernet.ktx.onMainDispatcher
 import io.nekohasekai.sagernet.ktx.runOnMainDispatcher
 import io.nekohasekai.sagernet.ui.ThemedActivity
+import io.nekohasekai.sagernet.widget.operationSucceeded
 import kotlinx.coroutines.delay
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
@@ -36,13 +37,17 @@ class GroupInterfaceAdapter(val context: ThemedActivity) : GroupManager.Interfac
         byUser: Boolean
     ) {
         if (changed == 0 && duplicate.isEmpty()) {
-            if (byUser) context.snackbar(
+            if (byUser) onMainDispatcher { if (!context.isFinishing && !context.isDestroyed) context.snackbar(
                     context.getString(
                             R.string.group_no_difference, group.displayName()
                     )
-            ).show()
+            ).operationSucceeded().show() }
         } else {
-            context.snackbar(context.getString(R.string.group_updated, group.name, changed)).show()
+            onMainDispatcher {
+                if (!context.isFinishing && !context.isDestroyed) {
+                    context.snackbar(context.getString(R.string.group_updated, group.name, changed)).operationSucceeded().show()
+                }
+            }
 
             var status = ""
             if (added.isNotEmpty()) {
@@ -69,6 +74,7 @@ class GroupInterfaceAdapter(val context: ThemedActivity) : GroupManager.Interfac
 
             onMainDispatcher {
                 delay(1000L)
+                if (context.isFinishing || context.isDestroyed) return@onMainDispatcher
 
                 MaterialAlertDialogBuilder(context).setTitle(
                         context.getString(

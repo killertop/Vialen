@@ -81,14 +81,14 @@ class UrlTestDialog(
     fun render(state: UrlTestDialogState) {
         this.state = state
         val terminal = state.phase.isTerminal()
-        phase.setText(when (state.phase) {
+        NativeMotion.text(phase, context.getText(when (state.phase) {
             UrlTestPhase.PREPARING -> R.string.url_test_preparing
             UrlTestPhase.RUNNING -> R.string.url_test_running
             UrlTestPhase.STOPPING -> R.string.url_test_stopping
             UrlTestPhase.FINISHED -> R.string.url_test_finished
             UrlTestPhase.STOPPED -> R.string.url_test_stopped
             UrlTestPhase.ERROR -> R.string.url_test_error
-        })
+        }))
         val total = state.total.coerceAtLeast(0)
         val completed = state.completed.coerceIn(0, total)
         progress.max = total.coerceAtLeast(1)

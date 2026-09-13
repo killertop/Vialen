@@ -334,6 +334,26 @@ class MainUiRecoveryNativeTest {
         instrumentation.waitForIdleSync()
     }
 
+    @Test fun rapidServiceStateReversalKeepsLatestActionAndNoAnimationBacklog() = withMain { scenario ->
+        scenario.onActivity { activity ->
+            repeat(8) {
+                activity.stateChanged(State.Connecting, null, null)
+                activity.stateChanged(State.Connected, null, null)
+                activity.stateChanged(State.Stopping, null, null)
+                activity.stateChanged(State.Stopped, null, null)
+            }
+            val button = activity.binding.fab
+            assertTrue(button.isEnabled)
+            assertEquals(activity.getString(R.string.connect), button.contentDescription.toString())
+            val queue = button.javaClass.getDeclaredField("animationQueue").apply { isAccessible = true }
+                .get(button) as java.util.ArrayDeque<*>
+            assertTrue("Only the current vector may remain", queue.size <= 1)
+        }
+        scenario.recreate()
+        isolate(scenario)
+        scenario.onActivity { assertEquals(it.getString(R.string.connect), it.binding.fab.contentDescription.toString()) }
+    }
+
     @Test fun urlTestExceptionShowsFailureAndRestoresClickability() = withMain { scenario ->
         val call = ControlledCall(fail = true)
         val job = startTest(scenario, call)

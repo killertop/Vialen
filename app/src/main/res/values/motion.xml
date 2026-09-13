@@ -1,0 +1,12 @@
+<resources>
+    <item name="native_motion_tracking" type="id" />
+    <style name="Animation.Vialen.Surface" parent="@android:style/Animation.Dialog">
+        <item name="android:windowEnterAnimation">@anim/vialen_surface_enter</item>
+        <item name="android:windowExitAnimation">@anim/vialen_surface_exit</item>
+    </style>
+    <style name="Widget.Vialen.PopupWindow" parent="Widget.AppCompat.PopupWindow">
+        <item name="android:popupAnimationStyle">@style/Animation.Vialen.Surface</item>
+        <item name="android:popupEnterTransition">@null</item>
+        <item name="android:popupExitTransition">@null</item>
+    </style>
+</resources>

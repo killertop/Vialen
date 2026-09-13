@@ -3,6 +3,7 @@
     <style name="Base.Theme.Vialen" parent="Theme.MaterialComponents.Light.NoActionBar">
         <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
         <item name="actionBarStyle">@style/Widget.MaterialComponents.ActionBar.Solid</item>
+        <item name="popupWindowStyle">@style/Widget.Vialen.PopupWindow</item>
         <item name="actionModeCloseDrawable">@drawable/ic_navigation_close</item>
         <item name="colorButtonNormal">@color/vialen_selected_background</item>
         <item name="android:navigationBarColor">@color/vialen_surface</item>
@@ -66,6 +67,7 @@
         <item name="snackbarButtonStyle">@style/Widget.Vialen.Snackbar.Button</item>
     </style>
     <style name="Base.Theme.Vialen.Dialog" parent="Theme.MaterialComponents.Light.Dialog.Alert">
+        <item name="android:windowAnimationStyle">@style/Animation.Vialen.Surface</item>
         <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
         <item name="actionBarStyle">@style/Widget.MaterialComponents.ActionBar.Solid</item>
         <item name="actionModeCloseDrawable">@drawable/ic_navigation_close</item>
@@ -136,6 +138,7 @@
         <item name="android:textStyle">bold</item>
     </style>
     <style name="ThemeOverlay.Vialen.DialogBase" parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog">
+        <item name="android:windowAnimationStyle">@style/Animation.Vialen.Surface</item>
         <item name="android:statusBarColor">@color/vialen_legacy_system_bar</item>
         <item name="android:navigationBarColor">@color/vialen_legacy_system_bar</item>
         <item name="android:checkedTextViewStyle">@style/Widget.Vialen.DialogChoice</item>

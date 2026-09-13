@@ -30,6 +30,7 @@ import io.nekohasekai.sagernet.aidl.SpeedDisplayData
 import io.nekohasekai.sagernet.aidl.TrafficData
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.SagerConnection
+import io.nekohasekai.sagernet.widget.operationSucceeded
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.GroupManager
 import io.nekohasekai.sagernet.database.ProfileManager
@@ -249,7 +250,7 @@ class MainActivity : ThemedActivity(),
         onMainDispatcher {
             displayFragmentWithId(R.id.nav_configuration)
 
-            snackbar(getString(R.string.ui_import_next)).show()
+            snackbar(getString(R.string.ui_import_next)).operationSucceeded().show()
         }
     }
 

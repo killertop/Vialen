@@ -101,7 +101,7 @@ class StatsBar @JvmOverloads constructor(
     }
 
     private fun setStatus(text: CharSequence) {
-        statusText.text = text
+        NativeMotion.text(statusText, text)
         TooltipCompat.setTooltipText(this, "${serviceStatusText.text}\n$text")
     }
 
@@ -117,7 +117,7 @@ class StatsBar @JvmOverloads constructor(
 
     private fun showConnectionState() {
         if (!::statusText.isInitialized) return
-        serviceStatusText.text = context.getText(when (renderedState) {
+        NativeMotion.text(serviceStatusText, context.getText(when (renderedState) {
             BaseService.State.Connected -> if (DataStore.serviceMode == Key.MODE_VPN) {
                 R.string.ui_vpn_service_connected
             } else {
@@ -126,7 +126,7 @@ class StatsBar @JvmOverloads constructor(
             BaseService.State.Connecting -> R.string.connecting
             BaseService.State.Stopping -> R.string.stopping
             else -> R.string.not_connected
-        })
+        }))
         serviceStatusText.setCompoundDrawablesRelativeWithIntrinsicBounds(
             if (renderedState.connected) R.drawable.ic_service_status_dot else 0, 0, 0, 0
         )

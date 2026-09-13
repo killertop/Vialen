@@ -100,6 +100,8 @@ import io.nekohasekai.sagernet.ui.profile.VMessSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.WireGuardSettingsActivity
 import io.nekohasekai.sagernet.widget.QRCodeDialog
 import io.nekohasekai.sagernet.widget.UndoSnackbarManager
+import io.nekohasekai.sagernet.widget.NativeMotion
+import io.nekohasekai.sagernet.widget.operationSucceeded
 import io.nekohasekai.sagernet.widget.UrlTestDialog
 import io.nekohasekai.sagernet.widget.UrlTestDialogState
 import io.nekohasekai.sagernet.widget.UrlTestPhase
@@ -150,6 +152,8 @@ class ConfigurationFragment @JvmOverloads constructor(
         get() = ::adapter.isInitialized
     lateinit var tabLayout: TabLayout
     lateinit var groupPager: ViewPager2
+    private var tabMediator: TabLayoutMediator? = null
+    private var tabMotionEnabled: Boolean? = null
     private var pendingExportProfileId: Long? = null
     private var pendingImportGroupId: Long? = null
     private var pendingImportOriginGroupId: Long? = null
@@ -234,14 +238,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         groupPager.adapter = adapter
         groupPager.offscreenPageLimit = 2
 
-        TabLayoutMediator(tabLayout, groupPager) { tab, position ->
-            if (adapter.groupList.size > position) {
-                tab.text = adapter.groupList[position].displayName()
-            }
-            tab.view.setOnLongClickListener { // clear toast
-                true
-            }
-        }.attach()
+        configureTabMotion()
 
         toolbar.setOnClickListener {
             val fragment = getCurrentGroupFragment()
@@ -289,7 +286,27 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
     }
 
+    private fun configureTabMotion() {
+        val enabled = NativeMotion.enabled(requireContext())
+        if (tabMediator != null && tabMotionEnabled == enabled) return
+        tabMediator?.detach()
+        tabMotionEnabled = enabled
+        tabLayout.tabIndicatorAnimationMode = TabLayout.INDICATOR_ANIMATION_MODE_LINEAR
+        tabMediator = TabLayoutMediator(tabLayout, groupPager, true, enabled) { tab, position ->
+            if (position in adapter.groupList.indices) tab.text = adapter.groupList[position].displayName()
+            tab.view.setOnLongClickListener { true }
+        }.also { it.attach() }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::groupPager.isInitialized && view != null) configureTabMotion()
+    }
+
     override fun onDestroyView() {
+        tabMediator?.detach()
+        tabMediator = null
+        groupPager.unregisterOnPageChangeCallback(updateSelectedCallback)
         backgroundUrlTest?.invoke()
         backgroundUrlTest = null
         urlTestDialog?.dismiss()
@@ -389,7 +406,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 if (isAdded && view != null && DataStore.selectedGroup == originGroupId) {
                     DataStore.editingGroup = targetId
                 }
-                owner.snackbar(getString(R.string.ui_import_next)).show()
+                owner.snackbar(getString(R.string.ui_import_next)).operationSucceeded().show()
             }
         }
 
