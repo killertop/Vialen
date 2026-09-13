@@ -5,7 +5,6 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.os.SystemClock
-import android.provider.OpenableColumns
 import android.text.SpannableStringBuilder
 import android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
 import android.text.format.Formatter
@@ -66,10 +65,6 @@ import io.nekohasekai.sagernet.fmt.toUniversalLink
 import io.nekohasekai.sagernet.group.GroupUpdater
 import io.nekohasekai.sagernet.group.RawUpdater
 import io.nekohasekai.sagernet.ktx.FixedLinearLayoutManager
-import io.nekohasekai.sagernet.ktx.MAX_PROFILE_INPUT_BYTES
-import io.nekohasekai.sagernet.ktx.MAX_IMPORTED_PROFILES
-import io.nekohasekai.sagernet.ktx.readProfileBytes
-import io.nekohasekai.sagernet.ktx.readProfileText
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.SubscriptionFoundException
 import io.nekohasekai.sagernet.ktx.alert
@@ -134,7 +129,6 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
-import java.util.zip.ZipInputStream
 
 class ConfigurationFragment @JvmOverloads constructor(
     val select: Boolean = false, val selectedItem: ProxyEntity? = null, val titleRes: Int = 0
@@ -155,8 +149,6 @@ class ConfigurationFragment @JvmOverloads constructor(
     private var tabMediator: TabLayoutMediator? = null
     private var tabMotionEnabled: Boolean? = null
     private var pendingExportProfileId: Long? = null
-    private var pendingImportGroupId: Long? = null
-    private var pendingImportOriginGroupId: Long? = null
     private var urlTestDialog: UrlTestDialog? = null
     private var backgroundUrlTest: (() -> Unit)? = null
 
@@ -186,8 +178,6 @@ class ConfigurationFragment @JvmOverloads constructor(
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         pendingExportProfileId = savedInstanceState?.getLong("pendingExportProfileId")?.takeIf { it > 0 }
-        pendingImportGroupId = savedInstanceState?.getLong("pendingImportGroupId")?.takeIf { it > 0 }
-        pendingImportOriginGroupId = savedInstanceState?.getLong("pendingImportOriginGroupId")?.takeIf { it > 0 }
 
         if (savedInstanceState != null) {
             parentFragmentManager.beginTransaction()
@@ -201,8 +191,6 @@ class ConfigurationFragment @JvmOverloads constructor(
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         pendingExportProfileId?.let { outState.putLong("pendingExportProfileId", it) }
-        pendingImportGroupId?.let { outState.putLong("pendingImportGroupId", it) }
-        pendingImportOriginGroupId?.let { outState.putLong("pendingImportOriginGroupId", it) }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -338,66 +326,6 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
     }
 
-    private val importFile =
-        registerForActivityResult(ActivityResultContracts.GetContent()) { file ->
-            val targetId = pendingImportGroupId
-            val originGroupId = pendingImportOriginGroupId
-            pendingImportGroupId = null
-            pendingImportOriginGroupId = null
-            if (file == null) return@registerForActivityResult
-            if (targetId == null) {
-                showMessage(app.getString(R.string.profile_import_target_missing))
-                return@registerForActivityResult
-            }
-            val resolver = app.contentResolver
-            val owner = activity as? MainActivity
-            runOnDefaultDispatcher {
-                try {
-                    val fileName = resolver.query(file, null, null, null, null)?.use { cursor ->
-                        if (!cursor.moveToFirst()) return@use null
-                        cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                            .takeIf { it >= 0 }?.let(cursor::getString)
-                    }
-                    val proxies = mutableListOf<Profile>()
-                    if (fileName?.endsWith(".zip", ignoreCase = true) == true) {
-                        // A broken entry must close the archive as well as the underlying provider stream.
-                        checkNotNull(resolver.openInputStream(file)).use { input ->
-                            ZipInputStream(input).use { zip ->
-                                var bytesLeft = MAX_PROFILE_INPUT_BYTES
-                                var entryCount = 0
-                                while (true) {
-                                    val entry = zip.nextEntry ?: break
-                                    require(++entryCount <= MAX_IMPORTED_PROFILES) { "Too many archive entries" }
-                                    if (!entry.isDirectory) {
-                                        val bytes = zip.readProfileBytes(bytesLeft)
-                                        bytesLeft -= bytes.size
-                                        proxies.addAll(RawUpdater.parseRaw(bytes.decodeToString(throwOnInvalidSequence = true), entry.name))
-                                        require(proxies.size <= MAX_IMPORTED_PROFILES) { "Import exceeds 10000 profiles" }
-                                    }
-                                    zip.closeEntry()
-                                }
-                            }
-                        }
-                    } else {
-                        val fileText = checkNotNull(resolver.openInputStream(file)).use { it.readProfileText() }
-                        proxies.addAll(RawUpdater.parseRaw(fileText, fileName ?: ""))
-                    }
-                    if (proxies.isEmpty()) {
-                        showMessage(app.getString(R.string.no_proxies_found_in_file))
-                    } else {
-                        import(proxies, targetId, originGroupId)
-                    }
-                } catch (e: SubscriptionFoundException) {
-                    if (owner != null && !owner.isFinishing && !owner.isDestroyed) {
-                        owner.importSubscription(e.link.toUri())
-                    }
-                } catch (e: Exception) {
-                    Logs.w(e)
-                    showMessage(e.readableMessage)
-                }
-            }
-        }
-
     suspend fun import(proxies: List<Profile>, targetId: Long, originGroupId: Long? = null) {
         ProfileManager.createProfilesForImport(targetId, proxies)
         onMainDispatcher {
@@ -438,22 +366,22 @@ class ConfigurationFragment @JvmOverloads constructor(
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }, android.widget.LinearLayout.LayoutParams(dp2px(42), dp2px(5)).apply {
             gravity = android.view.Gravity.CENTER_HORIZONTAL
-            bottomMargin = dp2px(24)
+            bottomMargin = dp2px(16)
         })
         content.addView(label(R.string.ui_add_node, 24f).apply {
             typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
             setPadding(dp2px(10), 0, dp2px(10), dp2px(6))
         })
         content.addView(label(R.string.ui_import_choose, 14f, true).apply {
-            setPadding(dp2px(10), 0, dp2px(10), dp2px(16))
+            setPadding(dp2px(10), 0, dp2px(10), dp2px(10))
         })
         val actions = PopupMenu(context, toolbar).menu.apply { requireActivity().menuInflater.inflate(R.menu.node_creation_menu, this) }
         fun action(title: Int, description: Int, icon: Int, primary: Boolean = false, last: Boolean = false, run: () -> Unit) {
             val row = android.widget.LinearLayout(context).apply {
                 orientation = android.widget.LinearLayout.HORIZONTAL
                 gravity = android.view.Gravity.CENTER_VERTICAL
-                minimumHeight = dp2px(82)
-                setPadding(dp2px(10), dp2px(14), dp2px(10), dp2px(14))
+                minimumHeight = dp2px(68)
+                setPadding(dp2px(10), dp2px(10), dp2px(10), dp2px(10))
                 val value = android.util.TypedValue()
                 context.theme.resolveAttribute(android.R.attr.selectableItemBackground, value, true)
                 setBackgroundResource(value.resourceId)
@@ -499,13 +427,6 @@ class ConfigurationFragment @JvmOverloads constructor(
         action(R.string.ui_manual_config, R.string.ui_import_manual_description, R.drawable.ic_settings_settings_outline, last = true) {
             showProtocolPicker(actions)
         }
-        content.addView(com.google.android.material.button.MaterialButton(context, null,
-            android.R.attr.borderlessButtonStyle).apply {
-            setText(R.string.action_import_file)
-            isAllCaps = false
-            minimumHeight = dp2px(48)
-            setOnClickListener { sheet.dismiss(); onMenuItemClick(actions.findItem(R.id.action_import_file)) }
-        }, android.widget.LinearLayout.LayoutParams(-1, -2))
         val scroll = androidx.core.widget.NestedScrollView(context).apply { addView(content) }
         sheet.setContentView(scroll)
         sheet.setOnShowListener {
@@ -522,7 +443,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     private fun showProtocolPicker(menu: android.view.Menu) {
         val items = (0 until menu.size()).map { menu.getItem(it) }.filter {
-            it.itemId !in setOf(R.id.action_scan_qr_code, R.id.action_import_clipboard, R.id.action_import_file)
+            it.itemId !in setOf(R.id.action_scan_qr_code, R.id.action_import_clipboard)
         }
         val context = requireContext()
         val content = android.widget.LinearLayout(context).apply {
@@ -625,22 +546,6 @@ class ConfigurationFragment @JvmOverloads constructor(
                             showMessage(e.readableMessage)
                         }
                     }
-                }
-            }
-
-            R.id.action_import_file -> {
-                pendingImportOriginGroupId = DataStore.selectedGroup
-                pendingImportGroupId = try {
-                    DataStore.selectedGroupForImport()
-                } catch (error: Exception) {
-                    pendingImportOriginGroupId = null
-                    Logs.w(error)
-                    snackbar(error.readableMessage).show()
-                    return true
-                }
-                if (!startFilesForResult(importFile, "*/*")) {
-                    pendingImportGroupId = null
-                    pendingImportOriginGroupId = null
                 }
             }
 
