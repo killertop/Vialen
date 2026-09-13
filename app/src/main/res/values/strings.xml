@@ -510,8 +510,7 @@
     <string name="sniff_override">Sniff result for destination</string>
     <string name="resolve_server">Resolve the server address according to the IPv6 policy</string>
     <string name="auto_select_proxy_apps">Auto select proxy apps</string>
-    <string name="auto_select_proxy_apps_message">Auto select proxy apps, this will clear your
-        current selection.</string>
+    <string name="auto_select_proxy_apps_message">Apply exact package recommendations? Existing selections are kept. In bypass mode, recommended proxy apps are removed from the bypass list.</string>
     <string name="enable_ech">Enable ECH</string>
     <string name="enable_ech_sum">Enable Encrypted Client Hello</string>
     <string name="ech_settings">ECH Settings</string>

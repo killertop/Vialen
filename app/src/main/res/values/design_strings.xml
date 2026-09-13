@@ -31,7 +31,11 @@
     <string name="ui_apps_bypass">Selected apps bypass the proxy; other apps use it.</string>
     <string name="ui_selected_apps">%1$d apps selected</string>
     <string name="ui_auto_select">Auto select</string>
-    <string name="ui_auto_select_help">Select apps using the built-in proxy rules. Review the selection before connecting.</string>
+    <string name="ui_auto_select_help">Add exact package recommendations without clearing your current choices. Shared-UID apps stay together.</string>
+    <string name="ui_auto_select_added">Added %1$d apps from %2$d exact recommendations. Existing choices were kept.</string>
+    <string name="ui_auto_select_removed">Removed %1$d recommended proxy apps from the bypass list. Other choices were kept.</string>
+    <string name="ui_auto_select_no_changes">No changes. %2$d installed apps match the current recommendations.</string>
+    <string name="ui_auto_select_applied_offline">Applied cached recommendations to %2$d installed apps; %1$d choices changed. The online update was unavailable.</string>
     <string name="ui_node_count">%1$d nodes</string>
     <string name="ui_use_selector">Switch nodes without reloading</string>
     <string name="ui_use_selector_help">Use a selector for this group.</string>

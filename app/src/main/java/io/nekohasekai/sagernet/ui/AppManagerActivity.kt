@@ -25,6 +25,7 @@ import io.nekohasekai.sagernet.databinding.LayoutAppsItemBinding
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.utils.AppRoutingConfig
 import io.nekohasekai.sagernet.utils.InstalledAppAccess
+import io.nekohasekai.sagernet.utils.ProxyAppRecommendations
 import io.nekohasekai.sagernet.widget.ListListener
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +50,7 @@ class AppManagerActivity : ThemedActivity() {
     private var loader: Job? = null
     private var loading = false
     private var saving = false
+    private var recommending = false
     private var sysApps = true
     private val ready get() = !loading && snapshot.packages != null
     private fun isSelected(item: ProxiedApp) = apps.any { it.uid == item.uid && it.packageName in draft.packages }
@@ -95,12 +97,12 @@ class AppManagerActivity : ThemedActivity() {
         })
         binding.selectionSummary.text = explanation + "\n" +
             getString(R.string.ui_selected_apps, draft.packages.size)
-        binding.appProxyModeDisable.isEnabled = !saving
-        binding.appProxyModeOn.isEnabled = ready && !saving
-        binding.appProxyModeBypass.isEnabled = ready && !saving
-        binding.autoSelectProxyApps.isEnabled = ready && !saving
-        binding.showSystemApps.isEnabled = ready && !saving
-        binding.search.isEnabled = ready && !saving
+        binding.appProxyModeDisable.isEnabled = !saving && !recommending
+        binding.appProxyModeOn.isEnabled = ready && !saving && !recommending
+        binding.appProxyModeBypass.isEnabled = ready && !saving && !recommending
+        binding.autoSelectProxyApps.isEnabled = ready && !saving && !recommending
+        binding.showSystemApps.isEnabled = ready && !saving && !recommending
+        binding.search.isEnabled = ready && !saving && !recommending
         invalidateOptionsMenu()
     }
 
@@ -298,16 +300,40 @@ class AppManagerActivity : ThemedActivity() {
         MaterialAlertDialogBuilder(this).setTitle(R.string.confirm)
             .setMessage(R.string.auto_select_proxy_apps_message)
             .setPositiveButton(R.string.yes) { _, _ ->
-                if (!ready || saving) return@setPositiveButton
-                try {
-                    val proxyPackages = assets.open("proxy_packagename.txt").bufferedReader().use { it.readLines().toSet() }
-                    val proxyUids = apps.filter { it.packageName in proxyPackages || it.uid == 1000 }.map { it.uid }.toSet()
-                    draft = draft.copy(packages = apps.filter { (it.uid in proxyUids) != draft.bypass }
-                        .map { it.packageName }.toSet())
-                    filterApps(); updateControls()
-                } catch (error: Exception) { Logs.w(error); message(R.string.action_import_err) }
+                if (!ready || saving || recommending) return@setPositiveButton
+                recommending = true
+                updateControls()
+                lifecycleScope.launch {
+                    try {
+                        val rules = withContext(Dispatchers.IO) {
+                            ProxyAppRecommendations.load(this@AppManagerActivity)
+                        }
+                        val plan = ProxyAppRecommendations.plan(apps.map {
+                            ProxyAppRecommendations.App(it.packageName, it.uid)
+                        }, draft.packages, rules.packages, draft.bypass)
+                        draft = draft.copy(packages = plan.packages)
+                        filterApps()
+                        message(when {
+                            rules.refreshFailed -> R.string.ui_auto_select_applied_offline
+                            plan.changed == 0 -> R.string.ui_auto_select_no_changes
+                            draft.bypass -> R.string.ui_auto_select_removed
+                            else -> R.string.ui_auto_select_added
+                        }, plan.changed, plan.matched)
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Exception) {
+                        Logs.w(error)
+                        message(R.string.action_import_err)
+                    } finally {
+                        recommending = false
+                        updateControls()
+                    }
+                }
             }.setNegativeButton(R.string.no, null).show()
     }
+
+    private fun message(resource: Int, first: Int, second: Int) = Snackbar.make(binding.root,
+        getString(resource, first, second), Snackbar.LENGTH_LONG).show()
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent?) = if (keyCode == KeyEvent.KEYCODE_MENU) {
         if (binding.toolbar.isOverflowMenuShowing) binding.toolbar.hideOverflowMenu() else binding.toolbar.showOverflowMenu()
