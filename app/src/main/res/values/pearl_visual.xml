@@ -2,7 +2,7 @@
 <resources>
     <!-- Main-screen skin only; shared dialog/editor surfaces remain unchanged. -->
     <color name="vialen_pearl_background">#F7F8FA</color>
-    <color name="vialen_pearl_edge">#F0F4FC</color>
+    <color name="vialen_pearl_edge">#DCE7FA</color>
     <color name="vialen_pearl_outline">#E9EDF3</color>
     <color name="vialen_pearl_selected">#F1F5FF</color>
     <dimen name="vialen_pearl_corner">16dp</dimen>

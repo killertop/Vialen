@@ -5,15 +5,15 @@
     <item>
         <shape>
             <gradient android:type="radial" android:centerX="0" android:centerY="0"
-                android:gradientRadius="360dp" android:startColor="@color/vialen_pearl_edge"
-                android:endColor="#00F0F4FC" />
+                android:gradientRadius="480dp" android:startColor="@color/vialen_pearl_edge"
+                android:endColor="#00DCE7FA" />
         </shape>
     </item>
     <item>
         <shape>
             <gradient android:type="radial" android:centerX="1" android:centerY="1"
-                android:gradientRadius="320dp" android:startColor="@color/vialen_pearl_edge"
-                android:endColor="#00F0F4FC" />
+                android:gradientRadius="440dp" android:startColor="@color/vialen_pearl_edge"
+                android:endColor="#00DCE7FA" />
         </shape>
     </item>
 </layer-list>

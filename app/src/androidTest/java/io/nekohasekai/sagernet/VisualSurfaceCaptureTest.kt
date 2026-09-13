@@ -215,14 +215,6 @@ class VisualSurfaceCaptureTest {
                         shot("$mode/settings-dialog-$key", activity)
                         dismissFloating(activity)
                     }
-                    val diagnosticsWereEnabled = libcore.Libcore.diagnosticRemainingMillis() > 0
-                    clickPreference(activity, "uiDetailedDiagnostics")
-                    shot("$mode/settings-diagnostics-confirmation", activity)
-                    // Back cancels; never press the enable/disable action.
-                    dismissFloating(activity)
-                    if (!diagnosticsWereEnabled) check(libcore.Libcore.diagnosticRemainingMillis() == 0L) {
-                        "Cancelling diagnostics confirmation enabled diagnostics"
-                    }
                 }
             }
         }

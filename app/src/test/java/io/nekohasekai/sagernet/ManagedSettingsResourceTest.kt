@@ -56,14 +56,12 @@ class ManagedSettingsResourceTest {
         return result
     }
 
-    @Test fun retiredKnobsAreReplacedByBoundedExplicitDiagnosticsAndNotice() {
+    @Test fun retiredKnobsAndDiagnosticEntriesStayHiddenWithManagedPolicyRetained() {
         val keys = keys()
         for (removed in listOf("speedInterval", "appTLSVersion", "logLevel", "uiLogBuffer", "nightTheme",
-            "showBottomBar", "showGroupInNotification")) {
+            "showBottomBar", "showGroupInNotification", "uiDetailedDiagnostics", "uiManagedSettings")) {
             assertFalse(removed, removed in keys)
         }
-        assertTrue("uiDetailedDiagnostics" in keys)
-        assertTrue("uiManagedSettings" in keys)
         assertEquals(256, RuntimeDiagnostics.LOG_CAPACITY_KIB)
         assertEquals(2, RuntimeDiagnostics.NORMAL_LOG_LEVEL)
     }
@@ -79,7 +77,7 @@ class ManagedSettingsResourceTest {
         }
     }
 
-    @Test fun settingsAreGroupedByUserPurposeWithoutSingletonCards() {
+    @Test fun settingsRemainGroupedByUserPurpose() {
         assertEquals(linkedMapOf(
             "uiDisplayStatistics" to listOf(
                 "alwaysShowAddress", "profileTrafficStatistics", "showDirectSpeed"),
@@ -96,8 +94,7 @@ class ManagedSettingsResourceTest {
                 "enableFakeDns"),
             "uiLocalProxy" to listOf("mixedPort", "appendHttpProxy", "allowAccess"),
             "uiSecurity" to listOf("globalAllowInsecure", "allowInsecureOnRequest"),
-            "uiDiagnosticsMaintenance" to listOf(
-                "connectionTestURL", "uiDetailedDiagnostics", "uiManagedSettings"),
+            "uiDiagnosticsMaintenance" to listOf("connectionTestURL"),
         ), categories())
     }
 }

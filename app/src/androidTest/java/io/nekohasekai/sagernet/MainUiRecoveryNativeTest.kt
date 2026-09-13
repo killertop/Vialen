@@ -194,9 +194,13 @@ class MainUiRecoveryNativeTest {
                             as io.nekohasekai.sagernet.ui.SettingsPreferenceFragment
                         val adapter = settings.listView.adapter as androidx.preference.PreferenceGroupAdapter
                         for (key in listOf("uiEditApps", "remoteDns", "mixedPort",
-                            "uiDetailedDiagnostics", "globalAllowInsecure", "tunImplementation", "acquireWakeLock")) {
+                            "globalAllowInsecure", "tunImplementation", "acquireWakeLock")) {
                             assertTrue("Setting must be exposed without expansion: $key",
                                 adapter.getPreferenceAdapterPosition(key) >= 0)
+                        }
+                        for (key in listOf("uiDetailedDiagnostics", "uiManagedSettings")) {
+                            assertEquals("Removed setting must not return after recreation: $key",
+                                -1, adapter.getPreferenceAdapterPosition(key))
                         }
                     }
                 }

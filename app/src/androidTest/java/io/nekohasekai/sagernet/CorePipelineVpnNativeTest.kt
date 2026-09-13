@@ -27,10 +27,16 @@ import java.net.URL
 /** Requires pre-granted VPN consent. Uses only local synthetic endpoints. */
 @RunWith(AndroidJUnit4::class)
 class CorePipelineVpnNativeTest {
+    @get:org.junit.Rule(order = Int.MIN_VALUE)
+    val foreground = BenchmarkForegroundRule(requireRetainedHost = false)
     @get:org.junit.Rule
     val profileState = ProfileSelectionStateRule()
 
     @Test fun importedCoreProfilesCarryTunTrafficAcrossReconnectAndSwitch() = runPipeline(false)
+
+    @Test fun selectorReloadKeepsTunForSelectionAndRebuildsForPlatformChanges() = runPipeline(false, reload = true)
+
+    @Test fun confirmedShortcutsStartAndStopRealTun() = runPipeline(false, shortcuts = true)
 
     @Test fun nativeBinaryRuleSetCarriesTunTrafficAcrossReconnectAndSwitch() = runPipeline(true)
 
@@ -39,7 +45,7 @@ class CorePipelineVpnNativeTest {
     @Test fun ruleSetAndDestinationMustBothMatchBeforeTunTrafficIsForwarded() =
         runPipeline(true, mismatchFirst = true)
 
-    private fun runPipeline(nativeRuleSet: Boolean, bootstrap: Boolean = false, mismatchFirst: Boolean = false) = runBlocking {
+    private fun runPipeline(nativeRuleSet: Boolean, bootstrap: Boolean = false, mismatchFirst: Boolean = false, reload: Boolean = false, shortcuts: Boolean = false) = runBlocking {
         val app = ApplicationProvider.getApplicationContext<SagerNet>()
         assertNull("Grant VPN consent before this explicit lifecycle test", VpnService.prepare(app))
         check(!DataStore.serviceState.started) { "An existing VPN is running; refusing to interrupt it" }
@@ -66,6 +72,30 @@ class CorePipelineVpnNativeTest {
             }
             error("VPN state did not reach $expected; binder=${connection.service?.state}")
         }
+        suspend fun confirmShortcut(start: Boolean) {
+            val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+            val target = if (start) io.nekohasekai.sagernet.ui.QuickEnableShortcut::class.java
+                else io.nekohasekai.sagernet.ui.QuickDisableShortcut::class.java
+            val bindDeadline = System.nanoTime() + 5_000_000_000L
+            while (connection.service == null && System.nanoTime() < bindDeadline) delay(50)
+            val before = checkNotNull(connection.service).state
+            app.startActivity(Intent(app, target).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            val deadline = System.nanoTime() + 5_000_000_000L
+            var confirmed = false
+            while (!confirmed && System.nanoTime() < deadline) {
+                val root = instrumentation.uiAutomation.rootInActiveWindow
+                if (root?.packageName?.toString() == app.packageName) {
+                    val button = root.findAccessibilityNodeInfosByViewId("android:id/button1").singleOrNull()
+                    if (button != null && button.isEnabled) {
+                        assertEquals("Shortcut acted before confirmation", before, connection.service?.state)
+                        check(button.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK))
+                        confirmed = true
+                    }
+                }
+                if (!confirmed) delay(50)
+            }
+            check(confirmed) { "Shortcut confirmation did not appear" }
+        }
         val nonce = "core-${System.nanoTime()}"
         val remoteRef = RouteRuleSet(nonce, "https://127.0.0.1:1/$nonce.srs")
         val nativeFile = if (bootstrap) RuleSetDownloads.file(app.filesDir, remoteRef) else java.io.File(app.filesDir, "rule-sets/$nonce.srs")
@@ -80,7 +110,7 @@ class CorePipelineVpnNativeTest {
                     val secondLink = "socks5://127.0.0.1:${second.port}#CoreVPN_B"
                     server.reply.set(LoopbackHttpFixture.Reply(body = "socks5://127.0.0.1:${first.port}#CoreVPN_A\n$secondLink"))
                     val sub = SubscriptionBean().apply { initializeDefaultValues(); link = "http://127.0.0.1:${server.port}/subscription"; deduplication = true; forceResolve = false }
-                    val group = ProxyGroup(name = nonce, type = GroupType.SUBSCRIPTION, subscription = sub)
+                    val group = ProxyGroup(name = nonce, type = GroupType.SUBSCRIPTION, subscription = sub, isSelector = reload)
                     group.id = db.groupDao().createGroup(group); groupId = group.id
                     RawUpdater.doUpdate(group, sub, null, false)
                 }
@@ -195,19 +225,55 @@ class CorePipelineVpnNativeTest {
                     diagnostic(-1, "conditions_corrected_vpn_stopped")
                     // The following stages rebuild VPN, then reconnect and switch the same profiles.
                 }
-                repeat(3) { stage ->
+                if (reload) {
+                    fun vpnHandle(): Long? = SagerNet.connectivity.allNetworks.firstOrNull {
+                        SagerNet.connectivity.getNetworkCapabilities(it)?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN) == true
+                    }?.networkHandle
+                    DataStore.selectedProxy = profiles.first().id
+                    SagerNet.startService(); awaitState(BaseService.State.Connected)
+                    assertEquals("RUST_VPN_E2E_$nonce", requestThroughTun(10))
+                    val originalHandle = checkNotNull(vpnHandle())
+                    DataStore.selectedProxy = profiles.last().id
+                    SagerNet.reloadService()
+                    val selectionDeadline = System.nanoTime() + 5_000_000_000L
+                    while (connection.service?.profileName != profiles.last().displayName() && System.nanoTime() < selectionDeadline) delay(50)
+                    assertEquals(profiles.last().displayName(), connection.service?.profileName)
+                    assertEquals(originalHandle, vpnHandle())
+                    assertEquals("RUST_VPN_E2E_$nonce", requestThroughTun(11))
+                    assertEquals(1, second.requests.get())
+                    DataStore.appendHttpProxy = true
+                    SagerNet.reloadService()
+                    val rebuildDeadline = System.nanoTime() + 15_000_000_000L
+                    while ((vpnHandle() == null || vpnHandle() == originalHandle || connection.service?.state != BaseService.State.Connected.ordinal) && System.nanoTime() < rebuildDeadline) delay(50)
+                    assertEquals(BaseService.State.Connected.ordinal, connection.service?.state)
+                    val rebuiltHandle = checkNotNull(vpnHandle())
+                    assertNotEquals(originalHandle, rebuiltHandle)
+                    assertEquals("RUST_VPN_E2E_$nonce", requestThroughTun(12))
+                    val stored = checkNotNull(db.rulesDao().getById(ruleId))
+                    stored.domains = "regexp:["
+                    db.rulesDao().updateRule(stored)
+                    SagerNet.reloadService()
+                    delay(1_000)
+                    assertEquals(BaseService.State.Connected.ordinal, connection.service?.state)
+                    assertEquals(rebuiltHandle, vpnHandle())
+                    assertEquals("RUST_VPN_E2E_$nonce", requestThroughTun(13))
+                    SagerNet.stopService(); awaitState(BaseService.State.Stopped)
+                    println("TUN_RELOAD selection_same_tun=true platform_new_tun=true invalid_candidate_kept_tun=true http_payloads=4 stopped=true")
+                } else repeat(3) { stage ->
                     DataStore.selectedProxy = profiles[if (stage == 2) 1 else 0].id
                     diagnostic(stage, "before_start")
-                    SagerNet.startService(); awaitState(BaseService.State.Connected)
+                    if (shortcuts) confirmShortcut(true) else SagerNet.startService()
+                    awaitState(BaseService.State.Connected)
                     diagnostic(stage, "connected")
                     val response = requestThroughTun(stage)
                     diagnostic(stage, "http_success")
                     assertEquals("RUST_VPN_E2E_$nonce", response)
                     assertEquals((if (stage == 0) 1 else 2) + (if (mismatchFirst) 2 else 0), first.requests.get())
                     assertEquals(if (stage == 2) 1 else 0, second.requests.get())
-                    SagerNet.stopService(); awaitState(BaseService.State.Stopped)
+                    if (shortcuts) confirmShortcut(false) else SagerNet.stopService()
+                    awaitState(BaseService.State.Stopped)
                     diagnostic(stage, "stopped")
-                    println("CORE_VPN_E2E stage=$stage binder_connected=true tun_payload=true binder_stopped=true")
+                    println("CORE_VPN_E2E stage=$stage binder_connected=true tun_payload=true binder_stopped=true confirmed_shortcuts=$shortcuts")
                 }
             } }
         }, {

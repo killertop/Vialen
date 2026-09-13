@@ -3,14 +3,11 @@ package io.nekohasekai.sagernet.ui
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import androidx.preference.*
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
@@ -19,7 +16,6 @@ import io.nekohasekai.sagernet.database.AppRoutingStore
 import io.nekohasekai.sagernet.utils.InstalledAppAccess
 import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
 import io.nekohasekai.sagernet.ktx.*
-import io.nekohasekai.sagernet.utils.RuntimeDiagnostics
 import moe.matsuri.nb4a.ui.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -27,20 +23,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFragment() {
-
-    private val diagnosticsHandler = Handler(Looper.getMainLooper())
-    private var managedNotice: androidx.appcompat.app.AlertDialog? = null
-    private fun diagnosticService() = (activity as? MainActivity)?.connection?.service
-    private val refreshDiagnostics = object : Runnable {
-        override fun run() {
-            val remaining = RuntimeDiagnostics.remainingMillis(diagnosticService())
-            findPreference<Preference>("uiDetailedDiagnostics")?.summary =
-                if (remaining > 0) getString(R.string.runtime_diagnostics_active,
-                    (remaining + 59_999) / 60_000)
-                else getString(R.string.runtime_diagnostics_summary)
-            diagnosticsHandler.postDelayed(this, 1_000)
-        }
-    }
 
     private var appRoutingSummaryJob: Job? = null
 
@@ -85,28 +67,6 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
         val enableFakeDns = findPreference<SwitchPreference>(Key.ENABLE_FAKEDNS)!!
 
         val mtu = findPreference<MTUPreference>(Key.MTU)!!
-
-        findPreference<Preference>("uiDetailedDiagnostics")!!.setOnPreferenceClickListener {
-            val enabled = RuntimeDiagnostics.remainingMillis(diagnosticService()) > 0
-            MaterialAlertDialogBuilder(requireContext())
-                .setTitle(R.string.runtime_diagnostics_title)
-                .setMessage(if (enabled) R.string.runtime_diagnostics_stop_message else R.string.runtime_diagnostics_start_message)
-                .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton(if (enabled) R.string.runtime_diagnostics_stop else R.string.runtime_diagnostics_start) { _, _ ->
-                    runCatching { RuntimeDiagnostics.setEnabled(diagnosticService(), !enabled) }
-                        .onFailure { error ->
-                            android.widget.Toast.makeText(requireContext(), error.readableMessage,
-                                android.widget.Toast.LENGTH_LONG).show()
-                        }
-                    diagnosticsHandler.removeCallbacks(refreshDiagnostics)
-                    refreshDiagnostics.run()
-                }.show()
-            true
-        }
-        findPreference<Preference>("uiManagedSettings")!!.setOnPreferenceClickListener {
-            showManagedSettingsNotice()
-            true
-        }
 
         mixedPort.setOnBindEditTextListener(EditTextPreferenceModifiers.Port)
 
@@ -153,12 +113,6 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
     override fun onResume() {
         super.onResume()
 
-        diagnosticsHandler.removeCallbacks(refreshDiagnostics)
-        refreshDiagnostics.run()
-        if (!DataStore.configurationStore.getBoolean("managedRuntimeNoticeAcknowledged", false)) {
-            showManagedSettingsNotice()
-        }
-
         appRoutingSummaryJob?.cancel()
         appRoutingSummaryJob = lifecycleScope.launch {
             val context = requireContext().applicationContext
@@ -178,25 +132,7 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
 
     override fun onPause() {
         appRoutingSummaryJob?.cancel()
-        diagnosticsHandler.removeCallbacks(refreshDiagnostics)
         super.onPause()
-    }
-
-    private fun showManagedSettingsNotice() {
-        if (managedNotice?.isShowing == true) return
-        managedNotice = MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.runtime_managed_title)
-            .setMessage(R.string.runtime_managed_message)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                DataStore.configurationStore.putBoolean("managedRuntimeNoticeAcknowledged", true)
-            }.show()
-    }
-
-    override fun onDestroyView() {
-        diagnosticsHandler.removeCallbacks(refreshDiagnostics)
-        managedNotice?.dismiss()
-        managedNotice = null
-        super.onDestroyView()
     }
 
 }

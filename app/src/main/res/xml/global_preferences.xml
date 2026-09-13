@@ -43,7 +43,5 @@
     </PreferenceCategory>
     <PreferenceCategory app:layout="@layout/preference_settings_category" app:key="uiDiagnosticsMaintenance" app:title="@string/ui_diagnostics_maintenance">
         <moe.matsuri.nb4a.ui.UrlTestPreference app:defaultValue="http://cp.cloudflare.com/" app:singleLineTitle="false" app:icon="@drawable/ic_settings_link_outline" app:layout="@layout/preference_settings_row" app:key="connectionTestURL" app:title="@string/connection_test_url" app:useSimpleSummaryProvider="true" />
-        <Preference app:singleLineTitle="false" app:icon="@drawable/ic_settings_bug_report_outline" app:layout="@layout/preference_settings_row" app:key="uiDetailedDiagnostics" app:title="@string/runtime_diagnostics_title" app:summary="@string/runtime_diagnostics_summary" />
-        <Preference app:singleLineTitle="false" app:icon="@drawable/ic_settings_settings_outline" app:layout="@layout/preference_settings_row" app:key="uiManagedSettings" app:title="@string/runtime_managed_title" app:summary="@string/runtime_managed_summary" />
     </PreferenceCategory>
 </PreferenceScreen>
