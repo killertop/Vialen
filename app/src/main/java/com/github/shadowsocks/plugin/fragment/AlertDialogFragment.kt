@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.os.Parcelable
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDialogFragment
+import androidx.core.os.BundleCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.setFragmentResult
 import androidx.fragment.app.setFragmentResultListener
@@ -26,7 +27,9 @@ abstract class AlertDialogFragment<Arg : Parcelable, Ret : Parcelable?> :
         fun <Ret : Parcelable> setResultListener(fragment: Fragment, requestKey: String,
                                                  listener: (Int, Ret?) -> Unit) {
             fragment.setFragmentResultListener(requestKey) { _, bundle ->
-                listener(bundle.getInt(KEY_WHICH, Activity.RESULT_CANCELED), bundle.getParcelable(KEY_RET))
+                @Suppress("UNCHECKED_CAST")
+                val result = BundleCompat.getParcelable(bundle, KEY_RET, Parcelable::class.java) as? Ret
+                listener(bundle.getInt(KEY_WHICH, Activity.RESULT_CANCELED), result)
             }
         }
         inline fun <reified T : AlertDialogFragment<*, Ret>, Ret : Parcelable?> setResultListener(
@@ -36,7 +39,11 @@ abstract class AlertDialogFragment<Arg : Parcelable, Ret : Parcelable?> :
     protected abstract fun AlertDialog.Builder.prepare(listener: DialogInterface.OnClickListener)
 
     private val resultKey get() = requireArguments().getString(KEY_RESULT)
-    protected val arg by lazy { requireArguments().getParcelable<Arg>(KEY_ARG)!! }
+    protected val arg by lazy {
+        @Suppress("UNCHECKED_CAST")
+        (BundleCompat.getParcelable(requireArguments(), KEY_ARG, Parcelable::class.java) as? Arg)
+            ?: error("Missing dialog argument")
+    }
     protected open fun ret(which: Int): Ret? = null
 
     private fun args() = arguments ?: Bundle().also { arguments = it }

@@ -76,16 +76,12 @@ public abstract class AbstractBean extends Serializable {
     }
 
 
-    private transient boolean serializeWithoutName;
-
     @Override
     public void serializeToBuffer(@NonNull ByteBufferOutput output) {
         serialize(output);
 
         output.writeInt(1);
-        if (!serializeWithoutName) {
-            output.writeString(name);
-        }
+        output.writeString(name);
         output.writeString(customOutboundJson);
         output.writeString(customConfigJson);
     }
@@ -119,24 +115,15 @@ public abstract class AbstractBean extends Serializable {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        try {
-            serializeWithoutName = true;
-            ((AbstractBean) o).serializeWithoutName = true;
-            return Arrays.equals(KryoConverters.serialize(this), KryoConverters.serialize((AbstractBean) o));
-        } finally {
-            serializeWithoutName = false;
-            ((AbstractBean) o).serializeWithoutName = false;
-        }
+        return Arrays.equals(
+                KryoConverters.serializeForEquality(this),
+                KryoConverters.serializeForEquality((AbstractBean) o)
+        );
     }
 
     @Override
     public int hashCode() {
-        try {
-            serializeWithoutName = true;
-            return Arrays.hashCode(KryoConverters.serialize(this));
-        } finally {
-            serializeWithoutName = false;
-        }
+        return Arrays.hashCode(KryoConverters.serializeForEquality(this));
     }
 
     @NotNull

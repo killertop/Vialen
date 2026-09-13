@@ -24,6 +24,7 @@ import androidx.annotation.VisibleForTesting
 import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.Toolbar
 import androidx.core.net.toUri
+import androidx.core.os.BundleCompat
 import androidx.core.view.isGone
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
@@ -1396,7 +1397,9 @@ class ConfigurationFragment @JvmOverloads constructor(
         override fun onViewStateRestored(savedInstanceState: Bundle?) {
             super.onViewStateRestored(savedInstanceState)
 
-            savedInstanceState?.getParcelable<ProxyGroup>("proxyGroup")?.also {
+            savedInstanceState?.let {
+                BundleCompat.getParcelable(it, "proxyGroup", ProxyGroup::class.java)
+            }?.also {
                 proxyGroup = it
                 onViewCreated(requireView(), null)
             }

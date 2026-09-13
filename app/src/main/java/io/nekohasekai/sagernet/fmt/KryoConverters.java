@@ -55,8 +55,28 @@ public class KryoConverters {
         return out.toByteArray();
     }
 
+    /** Stable equality content matching the historical AbstractBean semantics.
+     * The display name is excluded, while locally retained JSON overrides remain
+     * significant. This must not mutate the bean because equality and persistence
+     * can run concurrently on shared Room/UI objects.
+     */
+    static byte[] serializeForEquality(AbstractBean bean) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteBufferOutput buffer = KryosKt.byteBuffer(out);
+        bean.serialize(buffer);
+        buffer.writeInt(1);
+        buffer.writeString(bean.customOutboundJson);
+        buffer.writeString(bean.customConfigJson);
+        buffer.flush();
+        buffer.close();
+        return out.toByteArray();
+    }
+
     public static <T extends Serializable> T deserialize(T bean, byte[] bytes) {
-        if (bytes == null) return bean;
+        if (bytes == null) {
+            bean.initializeDefaultValues();
+            return bean;
+        }
         ByteArrayInputStream input = new ByteArrayInputStream(bytes);
         ByteBufferInput buffer = KryosKt.byteBuffer(input);
         try {
