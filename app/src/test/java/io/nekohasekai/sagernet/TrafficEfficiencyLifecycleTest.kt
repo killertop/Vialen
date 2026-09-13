@@ -74,7 +74,6 @@ class TrafficEfficiencyLifecycleTest {
         mockkObject(DataStore)
         every { DataStore.speedInterval } returns 20
         every { DataStore.profileTrafficStatistics } returns true
-        every { DataStore.showDirectSpeed } returns false
         readStats = { tag,direction ->
             queries.incrementAndGet()
             counters.computeIfAbsent("$tag/$direction") { AtomicLong() }.getAndSet(0)

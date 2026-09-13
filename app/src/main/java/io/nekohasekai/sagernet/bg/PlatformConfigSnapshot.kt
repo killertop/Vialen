@@ -16,7 +16,10 @@ internal data class PlatformConfigSnapshot(
     val metered: Boolean,
 ) {
     companion object {
-        fun capture() = PlatformConfigSnapshot(DataStore.serviceMode, DataStore.mtu,
+        fun capture() = PlatformConfigSnapshot(DataStore.serviceMode,
+            if (DataStore.serviceMode == io.nekohasekai.sagernet.Key.MODE_VPN)
+                io.nekohasekai.sagernet.utils.TunMtu.requireValid(DataStore.mtu)
+            else io.nekohasekai.sagernet.utils.TunMtu.DEFAULT,
             DataStore.ipv6Mode, AppRoutingStore.read(),
             DataStore.bypassLan, DataStore.appendHttpProxy, DataStore.mixedPort,
             DataStore.meteredNetwork)

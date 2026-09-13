@@ -15,7 +15,9 @@ internal object SubscriptionFetch {
     @OptIn(ExperimentalCoroutinesApi::class)
     suspend fun fetch(link: String, userAgent: String): Result = coroutineScope {
         val client = Libcore.newHttpClient().apply {
-            trySocks5(DataStore.mixedPort)
+            // A newly saved port applies to the next connection. Until then use the
+            // live listener, not a port at which nothing is listening yet.
+            trySocks5(DataStore.baseService?.data?.proxy?.platformConfig?.mixedPort ?: DataStore.mixedPort)
             tryH3Direct()
             modernTLS()
         }

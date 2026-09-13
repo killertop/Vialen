@@ -22,7 +22,9 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
 
     override fun buildConfig() {
         super.buildConfig()
-        platformConfig = PlatformConfigSnapshot.capture()
+        platformConfig = PlatformConfigSnapshot.capture().let { platform ->
+            config.tunMtu?.let { platform.copy(mtu = it) } ?: platform
+        }
         lastSelectorGroupId = super.config.selectorGroupId
         //
         if (notTmp) Logs.d("Runtime configuration built")

@@ -25,6 +25,9 @@ import kotlinx.coroutines.withContext
 class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFragment() {
 
     private var appRoutingSummaryJob: Job? = null
+    private lateinit var settingsRoot: PreferenceScreen
+    private lateinit var details: SettingsDetails
+    private lateinit var detailBack: androidx.activity.OnBackPressedCallback
 
 
 
@@ -37,10 +40,23 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
         setDivider(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
         setDividerHeight(resources.displayMetrics.density.toInt().coerceAtLeast(1))
         listView.addItemDecoration(io.nekohasekai.sagernet.widget.PreferenceSurfaceDecoration(requireContext()))
+        detailBack = object : androidx.activity.OnBackPressedCallback(preferenceScreen !== settingsRoot) {
+            override fun handleOnBackPressed() { onNavigateToScreen(settingsRoot) }
+        }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, detailBack)
+        details.refresh()
     }
 
     private val reloadListener = Preference.OnPreferenceChangeListener { _, _ ->
-        needReload()
+        // Preference listeners run before persistence; refresh and offer reconnect afterwards.
+        view?.post {
+            details.refresh()
+            if (DataStore.serviceState.started) {
+                snackbar(R.string.settings_next_connection).setAction(R.string.settings_reconnect) {
+                    SagerNet.reloadService(forceRestart = true)
+                }.show()
+            }
+        }
         true
     }
 
@@ -54,7 +70,6 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
         val allowAccess = findPreference<Preference>(Key.ALLOW_ACCESS)!!
         val appendHttpProxy = findPreference<SwitchPreference>(Key.APPEND_HTTP_PROXY)!!
 
-        val showDirectSpeed = findPreference<SwitchPreference>(Key.SHOW_DIRECT_SPEED)!!
         val ipv6Mode = findPreference<Preference>(Key.IPV6_MODE)!!
         val trafficSniffing = findPreference<Preference>(Key.TRAFFIC_SNIFFING)!!
 
@@ -71,31 +86,31 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
         mixedPort.setOnBindEditTextListener(EditTextPreferenceModifiers.Port)
 
         val metedNetwork = findPreference<Preference>(Key.METERED_NETWORK)!!
-        if (Build.VERSION.SDK_INT < 28) {
-            metedNetwork.remove()
-        }
+        metedNetwork.onPreferenceChangeListener = reloadListener
         findPreference<Preference>("uiEditApps")!!.setOnPreferenceClickListener {
             startActivity(Intent(activity, AppManagerActivity::class.java))
             true
         }
         findPreference<SwitchPreference>(Key.PROFILE_TRAFFIC_STATISTICS)!!.onPreferenceChangeListener = reloadListener
 
-        serviceMode.setOnPreferenceChangeListener { _, _ ->
-            if (DataStore.serviceState.started) SagerNet.stopService()
-            true
-        }
+        serviceMode.onPreferenceChangeListener = reloadListener
 
         val tunImplementation = findPreference<SimpleMenuPreference>(Key.TUN_IMPLEMENTATION)!!
         val resolveDestination = findPreference<SwitchPreference>(Key.RESOLVE_DESTINATION)!!
         val acquireWakeLock = findPreference<SwitchPreference>(Key.ACQUIRE_WAKE_LOCK)!!
 
-        mixedPort.onPreferenceChangeListener = reloadListener
+        mixedPort.setOnPreferenceChangeListener { preference, value ->
+            value.toString().toIntOrNull()?.let { it in 1..65535 } == true &&
+                reloadListener.onPreferenceChange(preference, value)
+        }
         appendHttpProxy.onPreferenceChangeListener = reloadListener
-        showDirectSpeed.onPreferenceChangeListener = reloadListener
         trafficSniffing.onPreferenceChangeListener = reloadListener
         bypassLan.onPreferenceChangeListener = reloadListener
         bypassLanInCore.onPreferenceChangeListener = reloadListener
-        mtu.onPreferenceChangeListener = reloadListener
+        mtu.setOnPreferenceChangeListener { preference, value ->
+            value.toString().toIntOrNull()?.let { it in io.nekohasekai.sagernet.utils.TunMtu.range } == true &&
+                reloadListener.onPreferenceChange(preference, value)
+        }
 
         enableFakeDns.onPreferenceChangeListener = reloadListener
         remoteDns.onPreferenceChangeListener = reloadListener
@@ -108,6 +123,27 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
         resolveDestination.onPreferenceChangeListener = reloadListener
         tunImplementation.onPreferenceChangeListener = reloadListener
         acquireWakeLock.onPreferenceChangeListener = reloadListener
+        listOf("domain_strategy_for_remote", "domain_strategy_for_direct", "domain_strategy_for_server",
+            Key.GLOBAL_ALLOW_INSECURE).forEach {
+            findPreference<Preference>(it)!!.onPreferenceChangeListener = reloadListener
+        }
+        settingsRoot = preferenceScreen
+        details = SettingsDetails(settingsRoot, preferenceManager, ::onNavigateToScreen)
+        details.organize()
+        savedInstanceState?.getString("settingsDetail")?.let { key ->
+            settingsRoot.findPreference<PreferenceScreen>(key)?.let { preferenceScreen = it }
+        }
+    }
+
+    override fun onNavigateToScreen(preferenceScreen: PreferenceScreen) {
+        this.preferenceScreen = preferenceScreen
+        if (::detailBack.isInitialized) detailBack.isEnabled = preferenceScreen !== settingsRoot
+        details.refresh()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        if (preferenceScreen !== settingsRoot) outState.putString("settingsDetail", preferenceScreen.key)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onResume() {
@@ -121,7 +157,7 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
                 !config.enabled || config.validate(InstalledAppAccess.read(context).packages?.keys,
                     context.packageName) == null
             }
-            findPreference<Preference>("uiEditApps")?.summary = when {
+            settingsRoot.findPreference<Preference>("uiEditApps")?.summary = when {
                 !config.enabled -> getString(R.string.app_routing_off_summary)
                 !valid -> getString(R.string.app_routing_needs_attention)
                 else -> getString(if (config.bypass) R.string.app_routing_bypass_summary

@@ -57,7 +57,7 @@ class BaseService {
         val receiver = broadcastReceiver { ctx, intent ->
             when (intent.action) {
                 Intent.ACTION_SHUTDOWN -> service.persistStats()
-                Action.RELOAD -> service.reload()
+                Action.RELOAD -> service.reload(intent.getBooleanExtra("forceRestart", false))
                 // Action.SWITCH_WAKE_LOCK -> runOnDefaultDispatcher { service.switchWakeLock() }
                 PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED -> {
                     if (SagerNet.power.isDeviceIdleMode) {
@@ -206,13 +206,18 @@ class BaseService {
         fun onBind(intent: Intent): IBinder? =
             if (intent.action == Action.SERVICE) data.binder else null
 
-        fun reload() {
+        fun reload(forceRestart: Boolean = false) {
             if (DataStore.selectedProxy == 0L) {
                 stopRunner(false, (this as Context).getString(R.string.profile_empty))
                 return
             }
             val reusable = try {
-                canReloadSelector()
+                if (forceRestart) {
+                    val candidate = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
+                        ?: error("Missing selected profile")
+                    ProxyInstance(candidate).buildConfigTmp()
+                    false
+                } else canReloadSelector()
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 // A candidate must compile before the live instance is touched. Do not log
@@ -309,6 +314,9 @@ class BaseService {
         fun stopError(): String? = null
 
         fun stopRunner(restart: Boolean = false, msg: String? = null) {
+            val switchService = data.proxy?.platformConfig?.serviceMode?.let {
+                it != DataStore.serviceMode
+            } == true
             DataStore.baseService = null
             DataStore.vpnService = null
 
@@ -349,7 +357,15 @@ class BaseService {
                     attempt { data.changeState(State.Stopped, message()) }
                     var restarted = false
                     if (restart && stopIssue == null && cleanupFailure == null && failure == null) {
-                        attempt { startRunner(); restarted = true }
+                        attempt {
+                            if (switchService) {
+                                // A mode change must start the selected service, not the old class.
+                                // startService also handles missing Android VPN consent.
+                                stopSelf()
+                                SagerNet.startService()
+                            } else startRunner()
+                            restarted = true
+                        }
                     }
                     if (!restarted) attempt { stopSelf() }
                     if (failure != null) {

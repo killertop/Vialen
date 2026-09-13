@@ -1,0 +1,18 @@
+<resources>
+    <string name="settings_compatibility">连接兼容性</string>
+    <string name="settings_routing_details">路由与解析详情</string>
+    <string name="settings_domain_details">域名解析策略</string>
+    <string name="settings_follow_ipv6">跟随 IPv6 策略</string>
+    <string name="settings_force_metered">强制按流量计费</string>
+    <string name="settings_metered_system">跟随底层网络的计费属性</string>
+    <string name="settings_metered_forced">始终将此 VPN 标记为按流量计费</string>
+    <string name="settings_metered_unsupported">需要 Android 10；旧覆盖值保留，但当前系统不生效</string>
+    <string name="settings_next_connection">已保存，连接设置将在下次连接生效。</string>
+    <string name="settings_reconnect">立即重连</string>
+    <string name="settings_invalid_mtu">已保存的 MTU %1$s 无效，请在连接前改为 1280～65535。</string>
+    <string name="settings_resolve_help">在路由匹配前解析目标域名。FakeDNS 单独还原映射域名，两项并非互斥。</string>
+    <string name="settings_retained_vpn">仅 VPN 使用的旧值已保留，在本地代理模式不生效。</string>
+    <string name="settings_subscription_effect">下次订阅请求生效，不改变节点证书校验。</string>
+    <string name="settings_back_main">返回设置</string>
+    <string name="settings_metered_pending">当前连接：%1$s。保存的覆盖值在重连后生效。</string>
+</resources>

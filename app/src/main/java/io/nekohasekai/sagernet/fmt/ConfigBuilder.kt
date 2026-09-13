@@ -22,6 +22,7 @@ class ConfigBuildResult(
     var profileTagMap: Map<Long, String>,
     val selectorGroupId: Long,
 ) {
+    internal var tunMtu: Int? = null
     data class IndexEntity(var chain: LinkedHashMap<Int, ProxyEntity>)
 }
 
@@ -40,5 +41,5 @@ fun buildConfig(proxy: ProxyEntity, forTest: Boolean = false, forExport: Boolean
         }
         Toast.makeText(SagerNet.application, message, Toast.LENGTH_LONG).show()
     }
-    return output.result
+    return output.result.also { it.tunMtu = snapshot.tunMtu }
 }

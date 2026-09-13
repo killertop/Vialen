@@ -210,8 +210,9 @@ class SagerNet : Application(),
             )
         }
 
-        fun reloadService() =
-            application.sendBroadcast(Intent(Action.RELOAD).setPackage(application.packageName))
+        fun reloadService(forceRestart: Boolean = false) =
+            application.sendBroadcast(Intent(Action.RELOAD).setPackage(application.packageName)
+                .putExtra("forceRestart", forceRestart))
 
         fun stopService() =
             application.sendBroadcast(Intent(Action.CLOSE).setPackage(application.packageName))

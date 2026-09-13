@@ -193,8 +193,8 @@ class MainUiRecoveryNativeTest {
                         val settings = it.supportFragmentManager.findFragmentById(R.id.settings)
                             as io.nekohasekai.sagernet.ui.SettingsPreferenceFragment
                         val adapter = settings.listView.adapter as androidx.preference.PreferenceGroupAdapter
-                        for (key in listOf("uiEditApps", "remoteDns", "mixedPort",
-                            "globalAllowInsecure", "tunImplementation", "acquireWakeLock")) {
+                        for (key in listOf("uiEditApps", "remoteDns", "uiProxyDetails",
+                            "globalAllowInsecure", "uiConnectionDetails", "uiDomainDetails", "uiRoutingDetails")) {
                             assertTrue("Setting must be exposed without expansion: $key",
                                 adapter.getPreferenceAdapterPosition(key) >= 0)
                         }
@@ -208,6 +208,63 @@ class MainUiRecoveryNativeTest {
         } } finally {
             SagerDatabase.proxyDao.deleteById(proxy)
             SagerDatabase.groupDao.deleteById(group)
+        }
+    }
+
+    @Test fun settingsDetailsRetainOverridesAcrossModesAndRecreation() {
+        DataStore.serviceMode = Key.MODE_VPN
+        DataStore.meteredNetwork = true
+        DataStore.mtu = 1000
+        DataStore.enableFakeDns = true
+        DataStore.appendHttpProxy = true
+        DataStore.configurationStore.putString("domain_strategy_for_remote", "ipv4_only")
+        DataStore.configurationStore.putString("domain_strategy_for_direct", "auto")
+        DataStore.configurationStore.putString("domain_strategy_for_server", "prefer_ipv6")
+        withMain { scenario ->
+            scenario.onActivity { activity ->
+                activity.displayFragmentWithId(R.id.nav_settings)
+                activity.supportFragmentManager.executePendingTransactions()
+            }
+            instrumentation.waitForIdleSync()
+            scenario.onActivity { activity ->
+                val settings = activity.supportFragmentManager.findFragmentById(R.id.settings)
+                    as io.nekohasekai.sagernet.ui.SettingsPreferenceFragment
+                val root = settings.preferenceScreen
+                assertNull(settings.findPreference<androidx.preference.Preference>("showDirectSpeed"))
+                assertTrue(root.findPreference<androidx.preference.Preference>("uiDomainDetails")!!.summary.toString().contains("prefer_ipv6"))
+                settings.onNavigateToScreen(root.findPreference("uiConnectionDetails")!!)
+                val mtu = settings.findPreference<androidx.preference.ListPreference>(Key.MTU)!!
+                assertTrue(mtu.summary.toString().contains("1280"))
+                assertFalse(mtu.callChangeListener("1000"))
+                assertTrue(mtu.callChangeListener("1280"))
+                assertEquals(1000, DataStore.mtu) // validation never silently persists a repair
+                assertTrue(settings.findPreference<androidx.preference.SwitchPreference>(Key.METERED_NETWORK)!!.isChecked)
+                settings.onNavigateToScreen(root)
+                settings.onNavigateToScreen(root.findPreference("uiProxyDetails")!!)
+                val mode = settings.findPreference<androidx.preference.ListPreference>(Key.SERVICE_MODE)!!
+                assertTrue(mode.callChangeListener(Key.MODE_PROXY))
+                mode.value = Key.MODE_PROXY
+            }
+            instrumentation.waitForIdleSync()
+            scenario.onActivity { activity ->
+                val settings = activity.supportFragmentManager.findFragmentById(R.id.settings)
+                    as io.nekohasekai.sagernet.ui.SettingsPreferenceFragment
+                assertFalse(settings.findPreference<androidx.preference.Preference>(Key.APPEND_HTTP_PROXY)!!.isVisible)
+                assertTrue(DataStore.appendHttpProxy)
+                assertTrue(DataStore.meteredNetwork)
+                assertEquals(1000, DataStore.mtu)
+                assertEquals("prefer_ipv6", DataStore.configurationStore.getString("domain_strategy_for_server"))
+            }
+            scenario.recreate()
+            isolate(scenario)
+            instrumentation.waitForIdleSync()
+            scenario.onActivity { activity ->
+                val settings = activity.supportFragmentManager.findFragmentById(R.id.settings)
+                    as io.nekohasekai.sagernet.ui.SettingsPreferenceFragment
+                assertEquals("uiProxyDetails", settings.preferenceScreen.key)
+                activity.onBackPressedDispatcher.onBackPressed()
+                assertNotNull(settings.findPreference<androidx.preference.Preference>("uiDomainDetails"))
+            }
         }
     }
 

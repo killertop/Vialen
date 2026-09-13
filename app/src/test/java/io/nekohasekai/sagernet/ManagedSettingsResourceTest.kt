@@ -80,7 +80,7 @@ class ManagedSettingsResourceTest {
     @Test fun settingsRemainGroupedByUserPurpose() {
         assertEquals(linkedMapOf(
             "uiDisplayStatistics" to listOf(
-                "alwaysShowAddress", "profileTrafficStatistics", "showDirectSpeed"),
+                "alwaysShowAddress", "profileTrafficStatistics"),
             "uiTrafficRouting" to listOf(
                 "uiEditApps", "bypassLan", "bypassLanInCore", "trafficSniffing",
                 "resolveDestination", "ipv6Mode"),

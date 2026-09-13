@@ -150,7 +150,10 @@ class SagerConnection(
         connectionActive = true
         check(this.callback == null)
         this.callback = callback
-        val intent = Intent(context, serviceClass).setAction(Action.SERVICE)
+        // A saved service mode is not yet the running mode. Recreation and shortcuts
+        // must still bind to the live service until the user stops/reconnects it.
+        val target = DataStore.baseService?.takeIf { it.data.state.started }?.javaClass ?: serviceClass
+        val intent = Intent(context, target).setAction(Action.SERVICE)
         context.bindService(intent, this, Context.BIND_AUTO_CREATE)
     }
 

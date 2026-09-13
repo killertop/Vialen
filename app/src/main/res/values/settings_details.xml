@@ -1,0 +1,18 @@
+<resources>
+    <string name="settings_compatibility">Connection compatibility</string>
+    <string name="settings_routing_details">Routing and resolution details</string>
+    <string name="settings_domain_details">Domain resolution strategies</string>
+    <string name="settings_follow_ipv6">Follow IPv6 policy</string>
+    <string name="settings_force_metered">Force metered connection</string>
+    <string name="settings_metered_system">Follow the underlying network’s metered status</string>
+    <string name="settings_metered_forced">Always report this VPN as metered</string>
+    <string name="settings_metered_unsupported">Requires Android 10; saved override is retained but not applied</string>
+    <string name="settings_next_connection">Saved. Connection settings apply on the next connection.</string>
+    <string name="settings_reconnect">Reconnect now</string>
+    <string name="settings_invalid_mtu">Invalid saved MTU: %1$s. Choose 1280–65535 before connecting.</string>
+    <string name="settings_resolve_help">Resolve destination domains before routing. FakeDNS restores mapped domains separately; these options are not mutually exclusive.</string>
+    <string name="settings_retained_vpn">VPN-only values are retained; not applied in local proxy mode.</string>
+    <string name="settings_subscription_effect">Applies to the next subscription request; does not change node certificate verification.</string>
+    <string name="settings_back_main">Back to settings</string>
+    <string name="settings_metered_pending">Current connection: %1$s. Saved override applies after reconnection.</string>
+</resources>

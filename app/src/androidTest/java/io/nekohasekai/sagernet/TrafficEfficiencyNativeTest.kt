@@ -64,7 +64,7 @@ class TrafficEfficiencyNativeTest {
         val db=SagerDatabase.instance
         val preferences=PublicDatabase.instance
         val dao=preferences.keyValuePairDao()
-        val extraKeys=listOf(Key.SPEED_INTERVAL,Key.PROFILE_TRAFFIC_STATISTICS,Key.SHOW_DIRECT_SPEED)
+        val extraKeys=listOf(Key.SPEED_INTERVAL,Key.PROFILE_TRAFFIC_STATISTICS)
         val before=linkedMapOf<String,KeyValuePair?>()
         preferences.runInTransaction {
             extraKeys.forEach { key -> before[key]=dao[key]?.let { row ->
@@ -81,7 +81,7 @@ class TrafficEfficiencyNativeTest {
             DataStore.serviceMode=Key.MODE_PROXY
             DataStore.directDns="local";DataStore.remoteDns="local"
             // A legacy disabled display preference must no longer disable native accounting.
-            DataStore.speedInterval=0;DataStore.profileTrafficStatistics=true;DataStore.showDirectSpeed=false
+            DataStore.speedInterval=0;DataStore.profileTrafficStatistics=true
             val nonce="traffic-${System.nanoTime()}"
             LoopbackSocksFixture(nonce).use { fixture ->
                 val row=ProxyEntity(groupId=group.id,tx=11,rx=37).apply {

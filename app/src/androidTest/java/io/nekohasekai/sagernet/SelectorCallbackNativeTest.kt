@@ -67,7 +67,7 @@ class SelectorCallbackNativeTest {
         val dao = preferences.keyValuePairDao()
         val before = linkedMapOf<String, KeyValuePair?>()
         preferences.runInTransaction {
-            listOf(Key.PROFILE_TRAFFIC_STATISTICS, Key.SHOW_DIRECT_SPEED).forEach { key ->
+            listOf(Key.PROFILE_TRAFFIC_STATISTICS).forEach { key ->
                 before[key] = dao[key]?.let { row -> KeyValuePair(row.key).also {
                     it.valueType = row.valueType; it.value = row.value.copyOf()
                 } }
@@ -82,7 +82,6 @@ class SelectorCallbackNativeTest {
         profileState.preservingFailure({
             check(previousService == null) { "Refuse to replace an active service" }
             DataStore.profileTrafficStatistics = true
-            DataStore.showDirectSpeed = false
             val group = ProxyGroup(name = "selector-callback-${System.nanoTime()}", isSelector = true)
             group.id = db.groupDao().createGroup(group)
             groupId = group.id

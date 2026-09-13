@@ -219,7 +219,7 @@ class VpnService : BaseVpnService(),
 //        val tunOptions = JSONObject(tunOptionsJson)
 
         // address & route & MTU ...... use NB4A GUI config
-        val platform = PlatformConfigSnapshot.capture()
+        val platform = checkNotNull(data.proxy!!.platformConfig)
         val mtu = platform.mtu
         val builder = Builder().setConfigureIntent(SagerNet.configureIntent(this))
             .setSession(getString(R.string.app_name))
@@ -264,7 +264,6 @@ class VpnService : BaseVpnService(),
         }
 
         updateUnderlyingNetwork(builder)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) builder.setMetered(metered)
 
         // app route
         val packageName = packageName

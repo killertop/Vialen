@@ -3,7 +3,6 @@
     <PreferenceCategory app:layout="@layout/preference_settings_category" app:key="uiDisplayStatistics" app:title="@string/ui_display_statistics">
         <SwitchPreference app:singleLineTitle="false" app:icon="@drawable/ic_settings_location_on_outline" app:layout="@layout/preference_settings_row" app:key="alwaysShowAddress" app:summary="@string/always_show_address_sum" app:title="@string/always_show_address" />
         <SwitchPreference app:defaultValue="true" app:singleLineTitle="false" app:icon="@drawable/ic_settings_monitoring_outline" app:layout="@layout/preference_settings_row" app:key="profileTrafficStatistics" app:summary="@string/profile_traffic_statistics_summary" app:title="@string/profile_traffic_statistics" />
-        <SwitchPreference app:defaultValue="true" app:singleLineTitle="false" app:icon="@drawable/ic_settings_speed_outline" app:layout="@layout/preference_settings_row" app:key="showDirectSpeed" app:summary="@string/show_direct_speed_sum" app:title="@string/show_direct_speed" app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
     <PreferenceCategory app:layout="@layout/preference_settings_category" app:key="uiTrafficRouting" app:title="@string/ui_traffic_routing">
         <Preference app:singleLineTitle="false" app:icon="@drawable/ic_settings_apps_outline" app:layout="@layout/preference_settings_row" app:key="uiEditApps" app:title="@string/proxied_apps" app:summary="@string/app_routing_off_summary" />

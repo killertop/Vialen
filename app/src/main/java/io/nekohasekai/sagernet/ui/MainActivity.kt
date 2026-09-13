@@ -351,8 +351,10 @@ class MainActivity : ThemedActivity(),
 
     override fun stateChanged(state: BaseService.State, profileName: String?, msg: String?) {
         changeState(state, msg, true)
+        if (state == BaseService.State.Stopped && connectedMode != DataStore.serviceMode) onBinderDied()
     }
 
+    private var connectedMode = DataStore.baseService?.data?.proxy?.platformConfig?.serviceMode ?: DataStore.serviceMode
     val connection = SagerConnection(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_BACKGROUND, true)
     override fun onServiceConnected(service: ISagerNetService) = changeState(
         try {
@@ -365,6 +367,7 @@ class MainActivity : ThemedActivity(),
     override fun onServiceDisconnected() = changeState(BaseService.State.Idle)
     override fun onBinderDied() {
         connection.disconnect(this)
+        connectedMode = DataStore.baseService?.data?.proxy?.platformConfig?.serviceMode ?: DataStore.serviceMode
         connection.connect(this, this)
     }
 
@@ -397,7 +400,7 @@ class MainActivity : ThemedActivity(),
 
     override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {
         when (key) {
-            Key.SERVICE_MODE -> onBinderDied()
+            Key.SERVICE_MODE -> if (!DataStore.serviceState.started) onBinderDied()
             Key.PROXY_APPS, Key.BYPASS_MODE, Key.INDIVIDUAL -> {
                 if (DataStore.serviceState.canStop) {
                     snackbar(getString(R.string.need_reload)).setAction(R.string.apply) {

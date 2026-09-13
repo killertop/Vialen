@@ -15,7 +15,8 @@ class MTUPreference
 
     init {
         setSummaryProvider {
-            value.toString()
+            if (value?.toIntOrNull() in io.nekohasekai.sagernet.utils.TunMtu.range) value.toString()
+            else context.getString(R.string.settings_invalid_mtu, value.orEmpty())
         }
         dialogLayoutResource = R.layout.layout_mtu_help
     }
@@ -38,7 +39,7 @@ class MTUPreference
     }
 
     internal fun showCustomDialog() =
-        context.showIntegerFormDialog("MTU", value.orEmpty(), 1000..10000) { mtu ->
+        context.showIntegerFormDialog("MTU", value.orEmpty(), io.nekohasekai.sagernet.utils.TunMtu.range) { mtu ->
             val proposed = mtu.toString()
             if (callChangeListener(proposed)) {
                 value = proposed

@@ -24,6 +24,7 @@ internal class ConfigSnapshot private constructor(
     private val selectorGroup: Long,
     private val rawConfig: String? = null,
 ) {
+    val tunMtu: Int? get() = request?.getAsJsonObject("platform")?.get("mtu")?.asInt
     data class Output(val result: ConfigBuildResult, val warnings: List<Pair<Long, String>>)
 
     fun generate(): Output {
@@ -228,7 +229,9 @@ internal class ConfigSnapshot private constructor(
                     "bypass_lan" to DataStore.bypassLanInCore)
                 val addresses = mutableListOf("${VpnService.PRIVATE_VLAN4_CLIENT}/30")
                 if (DataStore.ipv6Mode != IPv6Mode.DISABLE) addresses += "${VpnService.PRIVATE_VLAN6_CLIENT}/126"
-                platform = obj("vpn" to vpn, "tun_addresses" to addresses, "mtu" to DataStore.mtu,
+                platform = obj("vpn" to vpn, "tun_addresses" to addresses, "mtu" to
+                    (if (vpn) io.nekohasekai.sagernet.utils.TunMtu.requireValid(DataStore.mtu)
+                    else io.nekohasekai.sagernet.utils.TunMtu.DEFAULT),
                     "stack" to when (DataStore.tunImplementation) { TunImplementation.GVISOR -> "gvisor"; TunImplementation.SYSTEM -> "system"; TunImplementation.MIXED -> "mixed"; else -> error("Invalid TUN stack") },
                     "mixed_port" to if (forTest) 0 else DataStore.mixedPort, "allow_lan" to DataStore.allowAccess, "supports_uid_rules" to vpn)
                 insecure = DataStore.globalAllowInsecure

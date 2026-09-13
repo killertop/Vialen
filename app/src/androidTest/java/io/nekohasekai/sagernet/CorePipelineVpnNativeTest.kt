@@ -60,6 +60,8 @@ class CorePipelineVpnNativeTest {
         val oldHttp = DataStore.appendHttpProxy
         val oldIndividual = DataStore.individual; val oldBypassMode = DataStore.bypass
         val kv = io.nekohasekai.sagernet.database.preference.PublicDatabase.kvPairDao
+        val oldMtuSetting = kv[Key.MTU]
+        val oldMeteredSetting = kv[Key.METERED_NETWORK]
         val hadIndividual = kv[Key.INDIVIDUAL] != null
         val hadBypassMode = kv[Key.BYPASS_MODE] != null
         val db = SagerDatabase.instance
@@ -242,17 +244,25 @@ class CorePipelineVpnNativeTest {
                     assertEquals("RUST_VPN_E2E_$nonce", requestThroughTun(11))
                     assertEquals(1, second.requests.get())
                     DataStore.appendHttpProxy = true
-                    SagerNet.reloadService()
+                    DataStore.mtu = 1280
+                    DataStore.meteredNetwork = true
+                    delay(250)
+                    assertEquals("Saving settings must not stop the VPN", originalHandle, vpnHandle())
+                    SagerNet.reloadService(forceRestart = true)
                     val rebuildDeadline = System.nanoTime() + 15_000_000_000L
                     while ((vpnHandle() == null || vpnHandle() == originalHandle || connection.service?.state != BaseService.State.Connected.ordinal) && System.nanoTime() < rebuildDeadline) delay(50)
                     assertEquals(BaseService.State.Connected.ordinal, connection.service?.state)
                     val rebuiltHandle = checkNotNull(vpnHandle())
                     assertNotEquals(originalHandle, rebuiltHandle)
+                    val rebuiltNetwork = SagerNet.connectivity.allNetworks.first { it.networkHandle == rebuiltHandle }
+                    assertEquals(1280, SagerNet.connectivity.getLinkProperties(rebuiltNetwork)!!.mtu)
+                    assertFalse(SagerNet.connectivity.getNetworkCapabilities(rebuiltNetwork)!!
+                        .hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED))
                     assertEquals("RUST_VPN_E2E_$nonce", requestThroughTun(12))
                     val stored = checkNotNull(db.rulesDao().getById(ruleId))
                     stored.domains = "regexp:["
                     db.rulesDao().updateRule(stored)
-                    SagerNet.reloadService()
+                    SagerNet.reloadService(forceRestart = true)
                     delay(1_000)
                     assertEquals(BaseService.State.Connected.ordinal, connection.service?.state)
                     assertEquals(rebuiltHandle, vpnHandle())
@@ -287,6 +297,8 @@ class CorePipelineVpnNativeTest {
                 DataStore.bypassLan = oldBypass; DataStore.bypassLanInCore = oldCoreBypass
                 DataStore.proxyApps = oldApps; DataStore.enableFakeDns = oldFake; DataStore.appendHttpProxy = oldHttp
                 DataStore.individual = oldIndividual; DataStore.bypass = oldBypassMode
+                if (oldMtuSetting == null) kv.delete(Key.MTU) else kv.put(oldMtuSetting)
+                if (oldMeteredSetting == null) kv.delete(Key.METERED_NETWORK) else kv.put(oldMeteredSetting)
                 if (!hadIndividual) kv.delete(Key.INDIVIDUAL)
                 if (!hadBypassMode) kv.delete(Key.BYPASS_MODE)
                 db.runInTransaction {

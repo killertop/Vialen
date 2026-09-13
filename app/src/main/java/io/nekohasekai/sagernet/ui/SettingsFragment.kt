@@ -14,9 +14,11 @@ class SettingsFragment : ToolbarFragment(R.layout.layout_config_settings) {
         ViewCompat.setOnApplyWindowInsetsListener(view, ListListener)
         toolbar.setTitle(R.string.settings)
 
-        parentFragmentManager.beginTransaction()
-            .replace(R.id.settings, SettingsPreferenceFragment())
-            .commitAllowingStateLoss()
+        if (savedInstanceState == null || parentFragmentManager.findFragmentById(R.id.settings) == null) {
+            parentFragmentManager.beginTransaction()
+                .replace(R.id.settings, SettingsPreferenceFragment())
+                .commitAllowingStateLoss()
+        }
     }
 
 }

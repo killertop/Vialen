@@ -36,7 +36,6 @@ class TrafficLooper internal constructor(
     private val owners = linkedMapOf<String, Set<Long>>()
     private val sampled = mutableMapOf<String, TrafficData>()
     private val statistics = DataStore.profileTrafficStatistics
-    private val showDirect = DataStore.showDirectSpeed
 
     /** Install counters before launch returns and before a selector can change. */
     fun start() {
@@ -209,8 +208,7 @@ class TrafficLooper internal constructor(
             }
         }
         val bypass = checkNotNull(tagMap[TAG_BYPASS])
-        val speed = SpeedDisplayData(txRate, rxRate, if (showDirect) bypass.txRate else 0,
-            if (showDirect) bypass.rxRate else 0, tx, rx)
+        val speed = SpeedDisplayData(txRate, rxRate, bypass.txRate, bypass.rxRate, tx, rx)
         return speed to if (statistics) idMap.map { (id, item) -> TrafficData(id = id, rx = item.rx, tx = item.tx) } else emptyList()
     }
 }
