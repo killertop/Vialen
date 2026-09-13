@@ -55,7 +55,13 @@ class SelectorCallbackNativeTest {
         while (!predicate()) delay(10)
     }
 
-    @Test fun liveSelectionDrainsOldNodeAndUpdatesBinderTitleWithoutOverwritingEdits() = runBlocking {
+    @Test fun liveSelectionDrainsOldNodeAndUpdatesBinderTitleWithoutOverwritingEdits() =
+        runSelectionScenario(resetBeforeStop = false)
+
+    @Test fun clearingLiveTrafficDoesNotRestorePreResetBytesOnStop() =
+        runSelectionScenario(resetBeforeStop = true)
+
+    private fun runSelectionScenario(resetBeforeStop: Boolean) = runBlocking {
         val db = SagerDatabase.instance
         val preferences = PublicDatabase.instance
         val dao = preferences.keyValuePairDao()
@@ -144,15 +150,28 @@ class SelectorCallbackNativeTest {
                     awaitCondition { fixtureB.diagnosticSnapshot().first().contains("active=0 ") }
                     assertEquals(2, fixtureA.requests.get())
                     assertEquals(2, fixtureB.requests.get())
+                    if (resetBeforeStop) {
+                        assertTrue("Live service refused reset", loop.clearTraffic(group.id))
+                        for (id in listOf(a.id, b.id)) {
+                            val reset = checkNotNull(db.proxyDao().getById(id))
+                            assertEquals(0L, reset.tx)
+                            assertEquals(0L, reset.rx)
+                        }
+                    }
                     proxy.close(); instance = null
                     val finalA = checkNotNull(db.proxyDao().getById(a.id))
                     val finalB = checkNotNull(db.proxyDao().getById(b.id))
-                    assertEquals(savedA.tx, finalA.tx); assertEquals(savedA.rx, finalA.rx)
-                    assertTrue(finalB.tx > b.tx); assertTrue(finalB.rx > b.rx)
+                    if (resetBeforeStop) {
+                        assertEquals(0L, finalA.tx); assertEquals(0L, finalA.rx)
+                        assertEquals(0L, finalB.tx); assertEquals(0L, finalB.rx)
+                    } else {
+                        assertEquals(savedA.tx, finalA.tx); assertEquals(savedA.rx, finalA.rx)
+                        assertTrue(finalB.tx > b.tx); assertTrue(finalB.rx > b.rx)
+                    }
                     assertEquals(79L, finalB.userOrder)
                     assertEquals("$nonceB-edited", finalB.requireBean().name)
                     assertEquals("edited.example.com", finalB.requireBean().serverAddress)
-                    println("SELECTOR_CALLBACK native=true requests_a=2 requests_b=2 binder_id=${b.id} title_updated=true separate_traffic=true edit_preserved=true")
+                    println("SELECTOR_CALLBACK native=true requests_a=2 requests_b=2 binder_id=${b.id} title_updated=true separate_traffic=true edit_preserved=true reset_before_stop=$resetBeforeStop")
                 }
             }
         }, {

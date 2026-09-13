@@ -630,8 +630,13 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             R.id.action_clear_traffic_statistics -> {
+                val service = (requireActivity() as MainActivity).connection.service
+                val groupId = DataStore.currentGroupId()
                 runOnDefaultDispatcher {
-                    ProfileManager.clearTraffic(DataStore.currentGroupId())
+                    val cleared = runCatching { service?.clearTraffic(groupId) == true }.getOrDefault(false)
+                    if (!cleared) runOnMainDispatcher {
+                        snackbar(R.string.traffic_reset_unavailable).show()
+                    }
                 }
             }
 

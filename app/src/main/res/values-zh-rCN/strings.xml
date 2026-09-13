@@ -461,4 +461,10 @@
     <string name="vialen_releases">Vialen 版本发布</string>
     <string name="close">关闭</string>
     <string name="ui_app_routing">应用分流</string>
+    <string name="reload_invalid_config">无法应用此配置，请检查节点和路由规则。当前连接已保留。</string>
+    <string name="shortcut_confirm">允许此快捷方式更改 VPN 连接吗？</string>
+    <string name="shortcut_stop_confirm">停止当前 VPN 连接吗？</string>
+    <string name="shortcut_start_confirm">使用当前所选节点启动 VPN 吗？</string>
+    <string name="shortcut_profile_confirm">启动 VPN 或切换到节点“%1$s”吗？</string>
+    <string name="traffic_reset_unavailable">暂时无法清零流量统计，请等待连接启动或停止完成后重试。</string>
 </resources>

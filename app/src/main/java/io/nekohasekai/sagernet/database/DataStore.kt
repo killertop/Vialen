@@ -38,6 +38,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var currentProfile by configurationStore.long(Key.PROFILE_CURRENT)
 
     var selectedProxy by configurationStore.long(Key.PROFILE_ID)
+    var pendingSelectionGroup by configurationStore.long("pendingSelectionGroup")
 
     /** Candidate lookup must happen before this short transaction. SQLite serializes this
      * conditional write with ordinary selectedProxy writes, including other processes.

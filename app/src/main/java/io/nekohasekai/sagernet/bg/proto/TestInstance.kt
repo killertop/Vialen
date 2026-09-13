@@ -1,9 +1,7 @@
 package io.nekohasekai.sagernet.bg.proto
 
-import io.nekohasekai.sagernet.BuildConfig
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.fmt.buildConfig
-import io.nekohasekai.sagernet.ktx.Logs
 import libcore.Libcore
 import moe.matsuri.nb4a.net.LocalResolverImpl
 
@@ -27,7 +25,6 @@ class TestInstance(profile: ProxyEntity, val link: String, private val timeout: 
 
     override suspend fun loadConfig() {
         // don't call destroyAllJsi here
-        if (BuildConfig.DEBUG) Logs.d(config.config)
         box = Libcore.newSingBoxInstance(config.config, LocalResolverImpl)
     }
 

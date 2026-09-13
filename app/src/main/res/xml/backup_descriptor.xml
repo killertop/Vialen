@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content xmlns:tools="http://schemas.android.com/tools"
                      tools:ignore="FullBackupContent">
-    <include domain="database" path="sager_net.db"/>
     <include domain="file" path="rule-sets/"/>
-    <!-- No device storage yet in Android 6.0 -->
-    <include domain="database" path="configuration.db"/>
-    <include domain="device_database" path="configuration.db"/>
+    <!-- API 24-27 cannot require client-side encryption. Credentials stay on device. -->
 </full-backup-content>

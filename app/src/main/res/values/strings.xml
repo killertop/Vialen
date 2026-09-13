@@ -186,6 +186,12 @@
     <string name="forward_success">Proxy started.</string>
     <string name="invalid_server">Invalid server name</string>
     <string name="service_failed">Failed: </string>
+    <string name="reload_invalid_config">Cannot apply this configuration. Check the profile and routing rules. The current connection has been kept.</string>
+    <string name="shortcut_confirm">Allow this shortcut to change the VPN connection?</string>
+    <string name="shortcut_stop_confirm">Stop the current VPN connection?</string>
+    <string name="shortcut_start_confirm">Start the VPN with the selected profile?</string>
+    <string name="shortcut_profile_confirm">Start or switch the VPN to profile “%1$s”?</string>
+    <string name="traffic_reset_unavailable">Traffic statistics could not be reset. Wait for the connection to finish starting or stopping, then try again.</string>
     <string name="stop">Stop</string>
     <string name="stopping">Shutting down…</string>
     <string name="vpn_error">%s</string>

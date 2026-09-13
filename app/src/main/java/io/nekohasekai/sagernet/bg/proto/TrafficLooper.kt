@@ -10,6 +10,9 @@ import io.nekohasekai.sagernet.fmt.TAG_BYPASS
 import io.nekohasekai.sagernet.fmt.TAG_PROXY
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import io.nekohasekai.sagernet.database.SagerDatabase
 
 class TrafficLooper internal constructor(
     val data: BaseService.Data,
@@ -28,6 +31,7 @@ class TrafficLooper internal constructor(
     private val idMap = mutableMapOf<Long, TrafficUpdater.TrafficLooperData>()
     private val tagMap = mutableMapOf<String, TrafficUpdater.TrafficLooperData>()
     private val persisted = mutableMapOf<Long, TrafficData>()
+    private val persistenceMutex = Mutex()
     private var selectedId = Long.MIN_VALUE // -1 is the bypass counter, never a selection sentinel.
     private val owners = linkedMapOf<String, Set<Long>>()
     private val sampled = mutableMapOf<String, TrafficData>()
@@ -105,10 +109,10 @@ class TrafficLooper internal constructor(
         }
     }
 
-    private suspend fun persistTraffic(id: Long): TrafficData? {
+    private suspend fun persistTraffic(id: Long): TrafficData? = persistenceMutex.withLock {
         val total = synchronized(lock) {
-            val item = idMap[id] ?: return null
-            if (id !in persisted) return null
+            val item = idMap[id] ?: return@withLock null
+            if (id !in persisted) return@withLock null
             TrafficData(id, item.tx, item.rx)
         }
         val previous = checkNotNull(persisted[id])
@@ -118,7 +122,34 @@ class TrafficLooper internal constructor(
         persisted[id] = total
         // The database commit is checkpointed even if notification delivery fails.
         if (saved != null) ProfileManager.postUpdate(saved)
-        return saved
+        saved
+    }
+
+    /** Drain pre-reset native bytes and reset database/checkpoints together. Queued writes
+     * read fresh totals only after this transaction, so they cannot resurrect old bytes. */
+    suspend fun clearTraffic(groupId: Long): Boolean = persistenceMutex.withLock {
+        val ids = synchronized(lock) {
+            if (stopped || data.proxy?.looper !== this || data.state != BaseService.State.Connected)
+                return@withLock false
+            sampleLocked()
+            val ids = SagerDatabase.instance.runInTransaction<List<Long>> {
+                val ids = SagerDatabase.proxyDao.getIdsByGroup(groupId)
+                if (ids.isNotEmpty()) SagerDatabase.proxyDao.clearTraffic(ids)
+                ids
+            }
+            ids.forEach { id ->
+                idMap[id]?.let { row ->
+                    row.tx = 0; row.rx = 0; row.txBase = 0; row.rxBase = 0
+                    row.txRate = 0; row.rxRate = 0
+                }
+                if (id in persisted) persisted[id] = TrafficData(id)
+            }
+            ids
+        }
+        ids.forEach { ProfileManager.postUpdate(TrafficData(it)) }
+        data.binder.broadcast { callback -> ids.forEach { callback.cbTrafficUpdate(TrafficData(it)) } }
+        wake.trySend(Unit)
+        true
     }
 
     /** Core counters remain readable after close and include final socket bytes. */
@@ -150,15 +181,17 @@ class TrafficLooper internal constructor(
     private suspend fun loop() {
         while (currentCoroutineContext().isActive) {
             val foreground = hasConsumer()
-            val display = synchronized(lock) {
-                if (stopped) return
-                if (foreground || statistics) sampleLocked()
-                if (foreground) displaySnapshot() else null
-            }
-            if (display != null) data.binder.broadcast { callback ->
-                if (data.binder.callbackIdMap[callback] == SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND) {
-                    callback.cbSpeedUpdate(display.first)
-                    display.second.forEach { callback.cbTrafficUpdate(it) }
+            persistenceMutex.withLock {
+                val display = synchronized(lock) {
+                    if (stopped) return
+                    if (foreground || statistics) sampleLocked()
+                    if (foreground) displaySnapshot() else null
+                }
+                if (display != null) data.binder.broadcast { callback ->
+                    if (data.binder.callbackIdMap[callback] == SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND) {
+                        callback.cbSpeedUpdate(display.first)
+                        display.second.forEach { callback.cbTrafficUpdate(it) }
+                    }
                 }
             }
             val delay = TrafficSampling.interval(foreground, statistics)

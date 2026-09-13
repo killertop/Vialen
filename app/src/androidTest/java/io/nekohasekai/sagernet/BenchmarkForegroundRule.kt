@@ -36,7 +36,16 @@ class BenchmarkForegroundRule(private val requireRetainedHost: Boolean = true) :
                     .bufferedReader().use { it.readText() }
                 check(!output.contains("Error:") && !output.contains("Exception")) { output }
                 instrumentation.waitForIdleSync()
-                resumed()
+                // am start can return before the lifecycle monitor observes RESUMED.
+                val deadline = android.os.SystemClock.elapsedRealtime() + 10_000
+                while (true) {
+                    val observed = runCatching { resumed() }
+                    if (observed.isSuccess) break
+                    if (android.os.SystemClock.elapsedRealtime() >= deadline) {
+                        throw checkNotNull(observed.exceptionOrNull())
+                    }
+                    Thread.sleep(50)
+                }
                 Log.i("BenchmarkForeground", "case=${description.methodName} stage=before state=RESUMED")
                 base.evaluate()
                 if (requireRetainedHost) {

@@ -62,6 +62,24 @@ class QuickToggleShortcut : Activity(), SagerConnection.Callback {
 
     override fun onServiceConnected(service: ISagerNetService) {
         val state = BaseService.State.values()[service.state]
+        val selected = DataStore.selectedProxy
+        val target = if (profileId == -1L) null else
+            io.nekohasekai.sagernet.database.SagerDatabase.proxyDao.getById(profileId)
+        if (profileId != -1L && target == null) { finish(); return }
+        val message = when {
+            state.canStop && (profileId == selected || profileId == -1L) -> getString(R.string.shortcut_stop_confirm)
+            target != null -> getString(R.string.shortcut_profile_confirm, target.displayName())
+            state == BaseService.State.Stopped -> getString(R.string.shortcut_start_confirm)
+            else -> { finish(); return }
+        }
+        confirmShortcut(R.string.quick_toggle, message) {
+            // Do not execute a different action if service/selection changed while the dialog was open.
+            if (service.state == state.ordinal && DataStore.selectedProxy == selected) applyShortcut(state)
+            else finish()
+        }
+    }
+
+    private fun applyShortcut(state: BaseService.State) {
         when {
             state.canStop -> {
                 if (profileId == DataStore.selectedProxy || profileId == -1L) {

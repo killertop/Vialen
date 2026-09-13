@@ -2,6 +2,7 @@ package io.nekohasekai.sagernet.bg.proto
 
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.ServiceNotification
+import io.nekohasekai.sagernet.bg.PlatformConfigSnapshot
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.ktx.Logs
 import kotlinx.coroutines.CancellationException
@@ -13,6 +14,7 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
     var notTmp = true
 
     var lastSelectorGroupId = -1L
+    internal var platformConfig: PlatformConfigSnapshot? = null
     var displayProfileName = ServiceNotification.genTitle(profile)
 
     // for TrafficLooper
@@ -20,6 +22,7 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
 
     override fun buildConfig() {
         super.buildConfig()
+        platformConfig = PlatformConfigSnapshot.capture()
         lastSelectorGroupId = super.config.selectorGroupId
         //
         if (notTmp) Logs.d("Runtime configuration built")

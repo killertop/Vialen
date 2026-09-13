@@ -138,6 +138,22 @@ class TrafficEfficiencyLifecycleTest {
         assertEquals(17L,row.tx);assertEquals(111L,row.rx)
     }
 
+    @Test fun resetDrainsOldCountersAndQueuedWritesCannotRestoreThem() = runBlocking {
+        val loop = start(selector = true)
+        add(TAG_PROXY, 7, 11)
+        loop.selectMain(2) // Queue old-selection persistence before resetting the group.
+        add(TAG_PROXY, 13, 17)
+        assertTrue(loop.clearTraffic(0))
+        assertEquals(0L, database.proxyDao().getById(1)!!.tx)
+        assertEquals(0L, database.proxyDao().getById(2)!!.rx)
+        add(TAG_PROXY, 3, 5)
+        stop()
+        assertEquals(0L, database.proxyDao().getById(1)!!.tx)
+        assertEquals(0L, database.proxyDao().getById(1)!!.rx)
+        assertEquals(3L, database.proxyDao().getById(2)!!.tx)
+        assertEquals(5L, database.proxyDao().getById(2)!!.rx)
+    }
+
     @Test fun noStatisticsBackgroundSleepsAndForegroundRegistrationWakesWithoutTimer() = runBlocking {
         every { DataStore.profileTrafficStatistics } returns false
         every { DataStore.speedInterval } returns 10_000
@@ -322,6 +338,30 @@ class TrafficEfficiencyLifecycleTest {
         assertEquals(0L, database.proxyDao().getById(1)!!.rx)
         assertEquals(13L, database.proxyDao().getById(2)!!.tx)
         assertEquals(17L, database.proxyDao().getById(2)!!.rx)
+    }
+
+    @Test fun stoppedClearReportsOnlyRowsClearedByItsTransaction() = runBlocking {
+        start()
+        stop()
+        val insertedAfterCommit = mockk<ProfileManager.Listener>(relaxed = true)
+        coEvery { insertedAfterCommit.onUpdated(any<TrafficData>()) } coAnswers {
+            if (database.proxyDao().getById(99L) == null) {
+                database.proxyDao().insert(listOf(ProxyEntity(id = 99L, tx = 77L).apply {
+                    putBean(SOCKSBean().applyDefaultValues())
+                }))
+            }
+            Unit
+        }
+        ProfileManager.addListener(insertedAfterCommit)
+        try {
+            val clearedIds = ProfileManager.clearTraffic(0)
+            assertEquals(setOf(1L, 2L), clearedIds.toSet())
+            assertEquals(0L, database.proxyDao().getById(1L)!!.tx)
+            assertEquals(0L, database.proxyDao().getById(2L)!!.rx)
+            assertEquals(77L, database.proxyDao().getById(99L)!!.tx)
+        } finally {
+            ProfileManager.removeListener(insertedAfterCommit)
+        }
     }
 
     @Test fun listenerFailureCannotDuplicateCommittedBytesOrAbortQueuedWrites() = runBlocking {

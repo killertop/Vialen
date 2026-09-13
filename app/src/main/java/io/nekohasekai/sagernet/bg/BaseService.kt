@@ -16,6 +16,7 @@ import io.nekohasekai.sagernet.bg.proto.ProxyInstance
 import io.nekohasekai.sagernet.bg.proto.runCancellableUrlTest
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.SagerDatabase
+import io.nekohasekai.sagernet.database.ProfileManager
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.utils.DefaultNetworkListener
 import kotlinx.coroutines.*
@@ -116,6 +117,23 @@ class BaseService {
         override fun setDiagnosticMode(enabled: Boolean) = Libcore.setDiagnosticMode(enabled)
         override fun getDiagnosticRemainingMillis(): Long = Libcore.diagnosticRemainingMillis()
 
+        override fun clearTraffic(groupId: Long): Boolean = runBlocking {
+            withContext(Dispatchers.Main.immediate) {
+                val current = data ?: return@withContext false
+                when (current.state) {
+                    State.Stopped, State.Idle -> {
+                        val ids = ProfileManager.clearTraffic(groupId)
+                        current.binder.broadcast { callback ->
+                            ids.forEach { callback.cbTrafficUpdate(io.nekohasekai.sagernet.aidl.TrafficData(it)) }
+                        }
+                        true
+                    }
+                    State.Connected -> current.proxy?.looper?.clearTraffic(groupId) ?: false
+                    else -> false // Do not race a launch or final accounting flush.
+                }
+            }
+        }
+
         override fun registerCallback(cb: ISagerNetServiceCallback, id: Int) {
             if (id == SagerConnection.CONNECTION_ID_RESTART_BG) {
                 Runtime.getRuntime().exit(0)
@@ -193,7 +211,16 @@ class BaseService {
                 stopRunner(false, (this as Context).getString(R.string.profile_empty))
                 return
             }
-            if (canReloadSelector()) {
+            val reusable = try {
+                canReloadSelector()
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                // A candidate must compile before the live instance is touched. Do not log
+                // compiler messages, which may contain user configuration or credentials.
+                Toast.makeText(this as Context, R.string.reload_invalid_config, Toast.LENGTH_LONG).show()
+                return
+            }
+            if (reusable) {
                 val ent = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
                 val tag = data.proxy!!.config.profileTagMap[ent?.id] ?: ""
                 if (tag.isNotBlank() && ent != null) {
@@ -217,6 +244,7 @@ class BaseService {
             val ent = SagerDatabase.proxyDao.getById(DataStore.selectedProxy) ?: return false
             val tmpBox = ProxyInstance(ent)
             tmpBox.buildConfigTmp()
+            if (running.platformConfig != tmpBox.platformConfig) return false
             return SelectorReloadPolicy.canReuse(
                 running.lastSelectorGroupId, tmpBox.lastSelectorGroupId,
                 running.config.config, tmpBox.config.config,
@@ -427,6 +455,8 @@ class BaseService {
                 stopRunner(false, message)
                 return Service.START_NOT_STICKY
             }
+            ProfileManager.selectFirstIfNeeded(DataStore.pendingSelectionGroup.takeIf { it > 0 }
+                ?: DataStore.selectedGroup)
             val profile = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
             this as Context
             if (profile == null) { // gracefully shutdown: https://stackoverflow.com/q/47337857/2245107

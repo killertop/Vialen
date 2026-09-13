@@ -131,12 +131,18 @@ object ProfileManager {
     /** Use only the persisted import target; never borrow a node from another group. */
     @Synchronized
     fun selectFirstIfNeeded(groupId: Long) {
-        if (DataStore.serviceState != io.nekohasekai.sagernet.bg.BaseService.State.Idle &&
-            DataStore.serviceState != io.nekohasekai.sagernet.bg.BaseService.State.Stopped) return
         val selected = DataStore.selectedProxy
-        if (selected != 0L && SagerDatabase.proxyDao.getById(selected) != null) return
+        if (selected != 0L && SagerDatabase.proxyDao.getById(selected) != null) {
+            DataStore.pendingSelectionGroup = 0
+            return
+        }
+        if (DataStore.serviceState != io.nekohasekai.sagernet.bg.BaseService.State.Idle &&
+            DataStore.serviceState != io.nekohasekai.sagernet.bg.BaseService.State.Stopped) {
+            DataStore.pendingSelectionGroup = groupId
+            return
+        }
         val first = SagerDatabase.proxyDao.getIdsByGroup(groupId).firstOrNull() ?: return
-        DataStore.selectProxyIfUnchanged(selected, first)
+        if (DataStore.selectProxyIfUnchanged(selected, first)) DataStore.pendingSelectionGroup = 0
     }
 
     /** Commit only new bytes. The caller must checkpoint success before notifying listeners. */
@@ -149,13 +155,14 @@ object ProfileManager {
         return total
     }
 
-    suspend fun clearTraffic(groupId: Long) {
+    suspend fun clearTraffic(groupId: Long): List<Long> {
         val ids = SagerDatabase.instance.runInTransaction<List<Long>> {
             val ids = SagerDatabase.proxyDao.getIdsByGroup(groupId)
             if (ids.isNotEmpty()) SagerDatabase.proxyDao.clearTraffic(ids)
             ids
         }
         ids.forEach { postUpdate(TrafficData(id = it)) }
+        return ids
     }
 
     suspend fun updateProfile(profile: ProxyEntity) {

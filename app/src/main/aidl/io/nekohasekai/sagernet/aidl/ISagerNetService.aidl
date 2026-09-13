@@ -12,4 +12,5 @@ interface ISagerNetService {
   int urlTest();
   void setDiagnosticMode(boolean enabled);
   long getDiagnosticRemainingMillis();
+  boolean clearTraffic(long groupId);
 }

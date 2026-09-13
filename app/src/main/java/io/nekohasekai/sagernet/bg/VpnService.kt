@@ -95,8 +95,7 @@ class VpnService : BaseVpnService(),
 
     private class AppRoutingException(message: String) : IllegalStateException(message), BaseService.ExpectedException
 
-    private fun validateAppRouting(): Pair<AppRoutingConfig, InstalledAppAccess.Snapshot?> {
-        val config = AppRoutingStore.read()
+    private fun validateAppRouting(config: AppRoutingConfig = AppRoutingStore.read()): Pair<AppRoutingConfig, InstalledAppAccess.Snapshot?> {
         val access = if (config.enabled) InstalledAppAccess.read(this) else null
         config.validate(access?.packages?.keys, packageName)?.let {
             throw AppRoutingException(getString(InstalledAppAccess.problemMessage(it)))
@@ -220,7 +219,8 @@ class VpnService : BaseVpnService(),
 //        val tunOptions = JSONObject(tunOptionsJson)
 
         // address & route & MTU ...... use NB4A GUI config
-        val mtu = DataStore.mtu
+        val platform = PlatformConfigSnapshot.capture()
+        val mtu = platform.mtu
         val builder = Builder().setConfigureIntent(SagerNet.configureIntent(this))
             .setSession(getString(R.string.app_name))
             .setMtu(mtu)
@@ -234,7 +234,7 @@ class VpnService : BaseVpnService(),
             builder.addRoute(address, prefix)
             expectedRoutes.add(InetAddress.getByName(address) to prefix)
         }
-        val ipv6Mode = DataStore.ipv6Mode
+        val ipv6Mode = platform.ipv6Mode
 
         // address
         addAddress(PRIVATE_VLAN4_CLIENT, 30)
@@ -244,7 +244,7 @@ class VpnService : BaseVpnService(),
         builder.addDnsServer(PRIVATE_VLAN4_ROUTER)
 
         // route
-        if (DataStore.bypassLan) {
+        if (platform.bypassLan) {
             resources.getStringArray(R.array.bypass_private_route).forEach {
                 val subnet = Subnet.fromString(it)!!
                 addRoute(subnet.address.hostAddress!!, subnet.prefixSize)
@@ -254,6 +254,7 @@ class VpnService : BaseVpnService(),
             // https://issuetracker.google.com/issues/149636790
             if (ipv6Mode != IPv6Mode.DISABLE) {
                 addRoute("2000::", 3)
+                addRoute("fc00::", 18) // Core FakeDNS IPv6 allocation must enter the VPN.
             }
         } else {
             addRoute("0.0.0.0", 0)
@@ -267,7 +268,7 @@ class VpnService : BaseVpnService(),
 
         // app route
         val packageName = packageName
-        val (appRouting, appAccess) = validateAppRouting()
+        val (appRouting, appAccess) = validateAppRouting(platform.appRouting)
         val proxyApps = appRouting.enabled
         var bypass = appRouting.bypass
         val workaroundSYSTEM = false /* DataStore.tunImplementation == TunImplementation.SYSTEM */
@@ -329,15 +330,16 @@ class VpnService : BaseVpnService(),
             }
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && DataStore.appendHttpProxy) {
-            builder.setHttpProxy(ProxyInfo.buildDirectProxy(LOCALHOST, DataStore.mixedPort))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && platform.appendHttpProxy) {
+            builder.setHttpProxy(ProxyInfo.buildDirectProxy(LOCALHOST, platform.mixedPort))
         }
 
-        metered = DataStore.meteredNetwork
+        metered = platform.metered
         if (Build.VERSION.SDK_INT >= 29) builder.setMetered(metered)
         linkExpectation = LinkExpectation(mtu, expectedAddresses.toSet(), expectedRoutes.toSet(),
             InetAddress.getByName(PRIVATE_VLAN4_ROUTER))
         conn = builder.establish() ?: throw NullConnectionException()
+        data.proxy!!.platformConfig = platform
         checkNotNull(networkLifecycle) { "VPN lifecycle was not registered" }.markEstablished()
 
         return conn!!.fd

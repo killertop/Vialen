@@ -38,6 +38,11 @@ class ServiceStopFailureTest {
         var starts = 0
         var notifications = 0
         var extraStopError: String? = null
+        var candidateFailure: Exception? = null
+        override fun canReloadSelector(): Boolean {
+            candidateFailure?.let { throw it }
+            return super.canReloadSelector()
+        }
         override fun createNotification(profileName: String): ServiceNotification {
             notifications++
             return mockk(relaxed = true)
@@ -81,6 +86,22 @@ class ServiceStopFailureTest {
         it.data.state = BaseService.State.Connected
         it.data.notification = mockk(relaxed = true)
         it.data.closeReceiverRegistered = true
+    }
+
+    @Test fun invalidReloadCandidateKeepsTheLiveInstanceAndReportsControlledMessage() {
+        val service = service()
+        val running = mockk<io.nekohasekai.sagernet.bg.proto.ProxyInstance>(relaxed = true)
+        service.data.proxy = running
+        every { DataStore.selectedProxy } returns 1L
+        service.candidateFailure = IllegalArgumentException("invalid regexp:[ synthetic-private-data")
+        service.reload()
+        assertSame(running, service.data.proxy)
+        assertEquals(BaseService.State.Connected, service.data.state)
+        assertEquals(0, service.killCalls)
+        assertEquals(0, service.starts)
+        assertEquals(service.getString(R.string.reload_invalid_config),
+            org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
+        verify(exactly = 0) { running.close() }
     }
 
     @After fun cleanup() {

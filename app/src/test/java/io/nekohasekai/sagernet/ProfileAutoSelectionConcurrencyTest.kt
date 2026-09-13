@@ -101,6 +101,31 @@ class ProfileAutoSelectionConcurrencyTest {
         assertEquals(0L, DataStore.selectedProxy)
     }
 
+    @Test fun deletedRunningSelectionIsDeferredUntilStopped() {
+        DataStore.selectedProxy = 999L
+        every { profiles.getById(999L) } returns null
+        DataStore.serviceState = BaseService.State.Connected
+        ProfileManager.selectFirstIfNeeded(TARGET)
+        assertEquals(999L, DataStore.selectedProxy)
+        assertEquals(TARGET, DataStore.pendingSelectionGroup)
+        verify(exactly = 0) { profiles.getIdsByGroup(any()) }
+        DataStore.serviceState = BaseService.State.Stopped
+        ProfileManager.selectFirstIfNeeded(DataStore.pendingSelectionGroup)
+        assertEquals(FIRST, DataStore.selectedProxy)
+        assertEquals(0L, DataStore.pendingSelectionGroup)
+    }
+
+    @Test fun validManualSelectionDiscardsAnOlderDeferredGroup() {
+        DataStore.pendingSelectionGroup = TARGET
+        DataStore.selectedProxy = MANUAL
+        every { profiles.getById(MANUAL) } returns ProxyEntity(id = MANUAL)
+        DataStore.serviceState = BaseService.State.Connected
+        ProfileManager.selectFirstIfNeeded(TARGET)
+        assertEquals(MANUAL, DataStore.selectedProxy)
+        assertEquals(0L, DataStore.pendingSelectionGroup)
+        verify(exactly = 0) { profiles.getIdsByGroup(any()) }
+    }
+
     private fun whileCandidateLookupIsBlocked(action: () -> Unit) {
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
