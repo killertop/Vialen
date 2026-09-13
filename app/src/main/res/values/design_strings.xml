@@ -34,7 +34,7 @@
     <string name="ui_auto_select_help">Add exact package recommendations without clearing your current choices. Shared-UID apps stay together.</string>
     <string name="ui_auto_select_added">Added %1$d apps from %2$d exact recommendations. Existing choices were kept.</string>
     <string name="ui_auto_select_removed">Removed %1$d recommended proxy apps from the bypass list. Other choices were kept.</string>
-    <string name="ui_auto_select_no_changes">No changes. %2$d installed apps match the current recommendations.</string>
+    <string name="ui_auto_select_no_changes">No changes. %1$d selections changed; %2$d installed apps match the current recommendations.</string>
     <string name="ui_auto_select_applied_offline">Applied cached recommendations to %2$d installed apps; %1$d choices changed. The online update was unavailable.</string>
     <string name="ui_node_count">%1$d nodes</string>
     <string name="ui_use_selector">Switch nodes without reloading</string>

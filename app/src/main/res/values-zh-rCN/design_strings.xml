@@ -34,7 +34,7 @@
     <string name="ui_auto_select_help">按完整包名推荐应用，不清空现有选择；共享 UID 的应用保持一致。</string>
     <string name="ui_auto_select_added">按 %2$d 个精确匹配新增 %1$d 个应用，原有选择已保留。</string>
     <string name="ui_auto_select_removed">从绕过名单移除 %1$d 个推荐代理应用，其他选择已保留。</string>
-    <string name="ui_auto_select_no_changes">无需调整，当前有 %2$d 个已安装应用命中推荐规则。</string>
+    <string name="ui_auto_select_no_changes">无需调整：改动 %1$d 项，当前有 %2$d 个已安装应用命中推荐规则。</string>
     <string name="ui_auto_select_applied_offline">在线更新失败，已用缓存规则匹配 %2$d 个应用并调整 %1$d 项。</string>
     <string name="ui_node_count">%1$d 个节点</string>
     <string name="ui_use_selector">免重载切换节点</string>
