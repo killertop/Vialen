@@ -36,7 +36,7 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
-/** Explicit destructive-to-connectivity emulator test. Never invoked by the ordinary lifecycle class. */
+/** Explicit destructive-to-connectivity test. Never invoked by the ordinary lifecycle class. */
 @RunWith(AndroidJUnit4::class)
 class ControlledNetworkHandoverNativeTest {
     @get:org.junit.Rule val profileState = ProfileSelectionStateRule()
@@ -53,7 +53,12 @@ class ControlledNetworkHandoverNativeTest {
 
     private suspend fun runCase(reset: Boolean) {
         check(InstrumentationRegistry.getArguments().getString("allow_network_toggle") == "true") { "Requires explicit allow_network_toggle=true" }
-        check(Build.FINGERPRINT.let { it.contains("generic") || it.contains("emulator") || it.contains("sdk_gphone") }) { "Emulator fingerprint required: ${Build.FINGERPRINT}" }
+        val emulator = Build.FINGERPRINT.let {
+            it.contains("generic") || it.contains("emulator") || it.contains("sdk_gphone")
+        }
+        val physicalOptIn = InstrumentationRegistry.getArguments()
+            .getString("allow_physical_network_toggle") == "true"
+        check(emulator || physicalOptIn) { "Physical-device opt-in required: ${Build.FINGERPRINT}" }
         val app = ApplicationProvider.getApplicationContext<SagerNet>()
         assertNull("Pre-grant VPN consent", VpnService.prepare(app))
         check(!DataStore.serviceState.started) { "Existing service must be stopped" }

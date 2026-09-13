@@ -32,6 +32,12 @@ class RemoteSubscriptionVpnNativeTest {
     @Test fun importedRemoteNodeCarriesHttpsAcrossReconnect() = runBlocking {
         val args = InstrumentationRegistry.getArguments()
         assumeTrue("Explicit remote VPN opt-in required", args.getString("vialenRemoteVpn") == "true")
+        val endpointName = args.getString("remoteEndpoint") ?: "cloudflare"
+        val endpoint = URL(when (endpointName) {
+            "cloudflare" -> "https://cp.cloudflare.com/generate_204"
+            "gstatic" -> "https://www.gstatic.com/generate_204"
+            else -> error("Unsupported remote endpoint")
+        })
         val app = ApplicationProvider.getApplicationContext<SagerNet>()
         check(!DataStore.serviceState.started) { "Existing service must be idle" }
         check(SagerNet.connectivity.allNetworks.none { network ->
@@ -98,7 +104,7 @@ class RemoteSubscriptionVpnNativeTest {
             }
             val importedCount = if (useRemoteUrl) db.proxyDao().getByGroup(groupId).size else beans!!.size
             ruleId = db.rulesDao().createRule(RuleEntity(name = "remote-acceptance", enabled = true,
-                userOrder = Long.MIN_VALUE, domains = "full:cp.cloudflare.com", outbound = profile.id))
+                userOrder = Long.MIN_VALUE, domains = "full:${endpoint.host}", outbound = profile.id))
             DataStore.serviceMode = Key.MODE_VPN
             DataStore.selectedProxy = profile.id
             DataStore.directDns = "local"; DataStore.remoteDns = "local"
@@ -147,13 +153,13 @@ class RemoteSubscriptionVpnNativeTest {
                         refreshCounts += count
                     }
                 }
-                val request = URL("https://cp.cloudflare.com/generate_204").openConnection(Proxy.NO_PROXY) as HttpURLConnection
+                val request = endpoint.openConnection(Proxy.NO_PROXY) as HttpURLConnection
                 val requestStart = System.nanoTime()
                 var requestMs = 0L
                 try {
                     request.connectTimeout = 15000; request.readTimeout = 15000
                     request.instanceFollowRedirects = false
-                    assertEquals("HTTPS through explicit proxy rule", 204, request.responseCode)
+                    assertEquals("HTTPS through explicit proxy rule via $endpointName", 204, request.responseCode)
                     requestMs = (System.nanoTime() - requestStart) / 1_000_000
                     requestTimes += requestMs
                 } finally { request.disconnect() }
@@ -165,7 +171,7 @@ class RemoteSubscriptionVpnNativeTest {
                 }
                 while (hasVpn() && System.nanoTime() < stopDeadline) delay(100)
                 assertFalse("VPN network must disappear after stop", hasVpn())
-                println("REMOTE_VPN round=$round imported=$importedCount binder_connected=true active_vpn=true https_204=true binder_stopped=true request_ms=$requestMs")
+                println("REMOTE_VPN round=$round imported=$importedCount endpoint=$endpointName binder_connected=true active_vpn=true https_204=true binder_stopped=true request_ms=$requestMs")
             }
         }, {
             state.cleanupSteps({ VpnConsentTestUi.cleanup() }, { state.stopAndAwait(connection) }, { connection.disconnect(app) }, {
