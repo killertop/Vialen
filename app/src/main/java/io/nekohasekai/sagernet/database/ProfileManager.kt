@@ -283,53 +283,14 @@ object ProfileManager {
     suspend fun getRules(): List<RuleEntity> {
         var rules = SagerDatabase.rulesDao.allRules()
         if (rules.isEmpty() && !DataStore.rulesFirstCreate) {
+            // Insert the complete ordered preset atomically. Never replace an existing list:
+            // old presets have no stable identity distinguishing them from user-authored rules.
+            SagerDatabase.instance.runInTransaction {
+                if (SagerDatabase.rulesDao.allRules().isEmpty()) {
+                    SagerDatabase.rulesDao.insert(DefaultRouteRules.create { app.getString(it) })
+                }
+            }
             DataStore.rulesFirstCreate = true
-            createRule(
-                RuleEntity(
-                    name = app.getString(R.string.route_opt_block_quic),
-                    port = "443",
-                    network = "udp",
-                    outbound = -2
-                )
-            )
-            createRule(
-                RuleEntity(
-                    name = app.getString(R.string.route_opt_block_ads),
-                    ruleSets = RouteRuleSet.encode(listOf(RouteRuleSet.official("geosite", "category-ads-all", app.getString(R.string.route_set_ads)))),
-                    outbound = -2
-                )
-            )
-            val fuckedCountry = mutableListOf("cn:中国")
-            if (Locale.getDefault().country != Locale.CHINA.country) {
-                // 非中文用户
-                fuckedCountry += "ir:Iran"
-                fuckedCountry += "ru:Russia"
-            }
-            for (c in fuckedCountry) {
-                val country = c.substringBefore(":")
-                val displayCountry = c.substringAfter(":")
-                //
-                if (country == "cn") createRule(
-                    RuleEntity(
-                        name = app.getString(R.string.route_play_store, displayCountry),
-                        domains = "googleapis.cn",
-                    ), false
-                )
-                createRule(
-                    RuleEntity(
-                        name = app.getString(R.string.route_bypass_domain, displayCountry),
-                        ruleSets = RouteRuleSet.encode(listOf(RouteRuleSet.official("geosite", country, displayCountry))),
-                        outbound = -1
-                    ), false
-                )
-                createRule(
-                    RuleEntity(
-                        name = app.getString(R.string.route_bypass_ip, displayCountry),
-                        ruleSets = RouteRuleSet.encode(listOf(RouteRuleSet.official("geoip", country, displayCountry))),
-                        outbound = -1
-                    ), false
-                )
-            }
             rules = SagerDatabase.rulesDao.allRules()
         }
         return rules

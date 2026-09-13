@@ -113,6 +113,35 @@ class RuleSetModernizationTest {
     }
     private fun routes(json: JsonObject) = json.getAsJsonObject("route").getAsJsonArray("rules")?.map { it.asJsonObject }.orEmpty()
 
+    @Test fun defaultPresetsCompileInPriorityOrderWithoutImplicitIpBypass() {
+        val defaults = io.nekohasekai.sagernet.database.DefaultRouteRules.create { it.toString() }
+            .onEachIndexed { index, rule -> rule.id = index + 1L }
+        assertEquals(listOf(true, true, true, false), defaults.map { it.enabled })
+        assertEquals(listOf(1L, 2L, 3L, 4L), defaults.map { it.userOrder })
+        assertTrue(defaults.all { it.port.isEmpty() && it.network.isEmpty() })
+        val json = buildConfigWithRules(defaults)
+        val declarations = json.getAsJsonObject("route").getAsJsonArray("rule_set").map { it.asJsonObject }
+        assertEquals(3, declarations.size)
+        val sourceByTag = declarations.associate { it["tag"].asString to it["url"].asString }
+        val rules = routes(json).filter { it.has("rule_set") }
+        assertEquals(3, rules.size)
+        assertEquals(listOf("reject", "route", "route"), rules.map { it["action"]?.asString ?: "route" })
+        assertEquals("selected", rules[1]["outbound"].asString)
+        assertEquals("direct", rules[2]["outbound"].asString)
+        assertEquals(listOf("geosite-category-ads-all.srs", "google.srs", "geosite-cn.srs"),
+            rules.map { rule ->
+                val tag = rule["rule_set"].let { if (it.isJsonArray) it.asJsonArray[0].asString else it.asString }
+                sourceByTag.getValue(tag).substringAfterLast('/')
+            })
+        // Existing DNS projection limitations must not be hidden by the new presets.
+        assertTrue(dnsRules(json).isEmpty())
+        assertEquals("selected", json.getAsJsonObject("route")["final"].asString)
+        defaults.last().enabled = true
+        val withIp = buildConfigWithRules(defaults)
+        assertEquals(4, withIp.getAsJsonObject("route").getAsJsonArray("rule_set").size())
+        assertEquals("direct", routes(withIp).last()["outbound"].asString)
+    }
+
     @Test fun nativeReferencesAreDeclaredAndUsedWithoutBasenameCollisions() {
         val first = ref("same")
         val second = first.copy(source = "https://another.example/same.srs")

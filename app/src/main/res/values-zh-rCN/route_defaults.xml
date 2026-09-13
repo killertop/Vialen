@@ -1,0 +1,7 @@
+<resources>
+    <string name="route_default_ads">拦截广告域名</string>
+    <string name="route_default_google">Google 服务代理</string>
+    <string name="route_default_cn_domains">中国域名直连</string>
+    <string name="route_default_cn_ip">中国 IP 直连（可选）</string>
+    <string name="route_set_google">Google 服务</string>
+</resources>

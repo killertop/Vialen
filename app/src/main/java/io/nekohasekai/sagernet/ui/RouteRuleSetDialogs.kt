@@ -2,6 +2,7 @@ package io.nekohasekai.sagernet.ui
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.database.DefaultRouteRules
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.RouteRuleSet
 import java.io.File
@@ -26,6 +27,7 @@ internal class RouteRuleSetDialogs(private val owner: RouteSettingsActivity, pri
     private fun add() {
         val presets = mutableListOf(RouteRuleSet.official("geoip", "cn", owner.getString(R.string.route_set_cn_ip), direction))
         if (direction != "source") {
+            presets += DefaultRouteRules.google(owner.getString(R.string.route_set_google), direction)
             presets += RouteRuleSet.official("geosite", "cn", owner.getString(R.string.route_set_cn_domain), direction)
             presets += RouteRuleSet.official("geosite", "category-ads-all", owner.getString(R.string.route_set_ads), direction)
         }
