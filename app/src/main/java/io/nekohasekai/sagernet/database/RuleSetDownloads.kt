@@ -69,8 +69,12 @@ class RuleSetDownloads(private val filesDir: File) {
             try {
                 connection.connectTimeout = 15_000; connection.readTimeout = 15_000
                 connection.instanceFollowRedirects = false
+                connection.setRequestProperty("User-Agent", "Vialen/Android")
                 val code = connection.responseCode
-                if (code in listOf(301, 302, 303, 307, 308)) {
+                if (code in listOf(429, 500, 502, 503, 504) && it < 2) {
+                    connection.disconnect()
+                    kotlinx.coroutines.delay((it + 1) * 500L)
+                } else if (code in listOf(301, 302, 303, 307, 308)) {
                     url = URL(url, connection.getHeaderField("Location") ?: error("Missing redirect location"))
                 } else {
                     require(code == 200) { "HTTP $code" }

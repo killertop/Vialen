@@ -54,7 +54,7 @@ class RouteRuleSetEditor : AppCompatDialogFragment() {
                 DataStore.routeRuleSets = RouteRuleSet.encode(RouteRuleSet.decode(DataStore.routeRuleSets) + ref)
                 (activity as? RouteSettingsActivity)?.updateRuleSetSummaries()
                 dismiss()
-            } catch (e: Exception) { urlInput.error = e.message }
+            } catch (e: Exception) { urlInput.error = io.nekohasekai.sagernet.utils.UserFacingError.describe(e) }
         }
     }
 

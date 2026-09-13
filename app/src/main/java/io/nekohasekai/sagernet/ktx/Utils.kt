@@ -75,7 +75,7 @@ inline fun <T> Iterable<T>.forEachTry(action: (T) -> Unit) {
 }
 
 val Throwable.readableMessage
-    get() = localizedMessage.takeIf { !it.isNullOrBlank() } ?: javaClass.simpleName
+    get() = io.nekohasekai.sagernet.utils.UserFacingError.describe(this)
 
 /**
  * https://android.googlesource.com/platform/prebuilts/runtime/+/94fec32/appcompat/hiddenapi-light-greylist.txt#9466

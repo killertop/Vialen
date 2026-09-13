@@ -36,7 +36,12 @@ data class RouteRuleSet(
     fun snapshotJson(filesDir: () -> File) = json().apply {
         if (source.startsWith("rule-sets/")) addProperty("source", File(filesDir(), source).absolutePath)
         if (source.startsWith("https://")) {
-            RuleSetDownloads.file(filesDir(), this@RouteRuleSet).takeIf { it.isFile }?.let {
+            val root = filesDir()
+            val initial = RuleSetDownloads.file(root, this@RouteRuleSet).takeIf { it.isFile }
+                ?: BundledRuleSets.prepare(root, this@RouteRuleSet) {
+                    io.nekohasekai.sagernet.SagerNet.application.assets.open(it)
+                }
+            initial?.let {
                 addProperty("initial_path", it.absolutePath)
             }
         }

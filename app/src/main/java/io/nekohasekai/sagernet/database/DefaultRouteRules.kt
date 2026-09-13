@@ -22,7 +22,7 @@ internal object DefaultRouteRules {
             ruleSets = RouteRuleSet.encode(listOf(RouteRuleSet.official(
                 "geosite", "cn", text(R.string.route_set_cn_domain))))),
         RuleEntity(
-            name = text(R.string.route_default_cn_ip), enabled = false, outbound = -1,
+            name = text(R.string.route_default_cn_ip), enabled = true, outbound = -1,
             ruleSets = RouteRuleSet.encode(listOf(RouteRuleSet.official(
                 "geoip", "cn", text(R.string.route_set_cn_ip)))))
     ).onEachIndexed { index, rule -> rule.userOrder = index + 1L }

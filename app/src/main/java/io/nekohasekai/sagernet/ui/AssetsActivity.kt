@@ -70,7 +70,7 @@ class AssetsActivity : ThemedActivity() {
             adapter.notifyDataSetChanged(); invalidateOptionsMenu()
             layout.resourceHint.text = getString(if (refs.isEmpty() && found.isEmpty()) R.string.route_set_manager_empty else R.string.route_set_update_hint)
         } catch (e: kotlinx.coroutines.CancellationException) { throw e }
-        catch (e: Exception) { snackbarInternal(e.message.orEmpty()).show() }
+        catch (e: Exception) { snackbarInternal(io.nekohasekai.sagernet.utils.UserFacingError.describe(e)).show() }
         finally { if (!updating) layout.refreshLayout.isRefreshing = false }
     }
 
@@ -88,7 +88,7 @@ class AssetsActivity : ThemedActivity() {
                         statuses[key] = result
                         if (result.error.isNotEmpty()) failures++
                     } catch (e: kotlinx.coroutines.CancellationException) { throw e }
-                    catch (e: Exception) { failures++; statuses[key] = (statuses[key] ?: RuleSetDownloads.Status()).copy(error = e.message.orEmpty()) }
+                    catch (e: Exception) { failures++; statuses[key] = (statuses[key] ?: RuleSetDownloads.Status()).copy(error = io.nekohasekai.sagernet.utils.UserFacingError.describe(e)) }
                     finally { busy.remove(key); adapter.notifyDataSetChanged() }
                 }
                 snackbarInternal(getString(R.string.route_set_update_result, refs.size - failures, failures)).show()
@@ -124,7 +124,7 @@ class AssetsActivity : ThemedActivity() {
                 }
                 reload()
             } catch (e: kotlinx.coroutines.CancellationException) { throw e }
-            catch (e: Exception) { snackbarInternal(e.message ?: getString(R.string.route_set_import_error)).show() }
+            catch (e: Exception) { snackbarInternal(io.nekohasekai.sagernet.utils.UserFacingError.describe(e)).show() }
         }
     }
 
@@ -133,13 +133,16 @@ class AssetsActivity : ThemedActivity() {
             val key = RuleSetDownloads.key(ref)
             val state = statuses[key] ?: RuleSetDownloads.Status()
             binding.assetName.text = ref.name
-            val checked = if (state.checked == 0L) getString(R.string.route_set_never_updated) else
+            val checked = if (state.checked == 0L) {
+                if (io.nekohasekai.sagernet.database.BundledRuleSets.contains(ref)) "使用内置规则"
+                else getString(R.string.route_set_never_updated)
+            } else
                 getString(R.string.route_set_last_checked, java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(state.checked)))
             binding.assetSource.isVisible = true
             binding.assetSource.text = ref.source
             binding.assetStatus.text = checked
             binding.assetError.isVisible = state.error.isNotEmpty()
-            binding.assetError.text = if (state.error.isEmpty()) "" else getString(R.string.route_set_update_failed, state.error)
+            binding.assetError.text = if (state.error.isEmpty()) "" else getString(R.string.route_set_update_failed, io.nekohasekai.sagernet.utils.UserFacingError.describe(state.error))
             binding.rulesUpdate.isInvisible = false
             binding.rulesUpdate.isEnabled = !updating
             binding.rulesUpdate.setOnClickListener { update(listOf(ref)) }
@@ -166,7 +169,7 @@ class AssetsActivity : ThemedActivity() {
                                 }
                                 reload()
                             } catch (e: kotlinx.coroutines.CancellationException) { throw e }
-                            catch (e: Exception) { snackbarInternal(e.message.orEmpty()).show() }
+                            catch (e: Exception) { snackbarInternal(io.nekohasekai.sagernet.utils.UserFacingError.describe(e)).show() }
                         }
                     }.show()
                 true

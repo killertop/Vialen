@@ -278,8 +278,6 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         }
 
         override suspend fun groupAdd(group: ProxyGroup) {
-            // Subscription updating is business work and must survive page departure.
-            if (group.type == GroupType.SUBSCRIPTION) GroupUpdater.startUpdate(group, true)
             onMainDispatcher {
                 if (!alive()) return@onMainDispatcher
                 undoManager.flush()

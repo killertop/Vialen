@@ -50,6 +50,7 @@ object RawUpdater : GroupUpdater() {
             }
         }
 
+        require(proxies.isNotEmpty()) { "订阅中没有可用节点" }
         currentCoroutineContext().ensureActive()
         if (subscription.forceResolve) proxies = forceResolve(proxies, proxyGroup.id)
 

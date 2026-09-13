@@ -184,7 +184,7 @@ class MainActivity : ThemedActivity(),
             subscription.link = url
             group.name = uri.getQueryParameter("name")
         } else {
-            onMainDispatcher { alert("A subscription URL is required").show() }
+            onMainDispatcher { alert("请提供有效的订阅链接").show() }
             return
         }
 
@@ -215,7 +215,6 @@ class MainActivity : ThemedActivity(),
 
     private suspend fun finishImportSubscription(subscription: ProxyGroup) {
         GroupManager.createGroup(subscription)
-        GroupUpdater.startUpdate(subscription, true)
     }
 
     suspend fun importProfile(uri: Uri) {
@@ -338,7 +337,7 @@ class MainActivity : ThemedActivity(),
         binding.fab.changeState(state, previousState, animate)
         binding.stats.changeState(state)
         syncPageControls(supportFragmentManager.findFragmentById(R.id.fragment_holder))
-        if (msg != null) snackbar(getString(R.string.vpn_error, msg)).show()
+        if (msg != null) snackbar(getString(R.string.vpn_error, io.nekohasekai.sagernet.utils.UserFacingError.describe(msg))).show()
     }
 
     override fun snackbarInternal(text: CharSequence): Snackbar {

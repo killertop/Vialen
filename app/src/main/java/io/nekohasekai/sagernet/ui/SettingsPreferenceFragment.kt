@@ -27,7 +27,6 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
     private var appRoutingSummaryJob: Job? = null
     private lateinit var settingsRoot: PreferenceScreen
     private lateinit var details: SettingsDetails
-    private lateinit var detailBack: androidx.activity.OnBackPressedCallback
 
 
 
@@ -40,10 +39,6 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
         setDivider(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
         setDividerHeight(resources.displayMetrics.density.toInt().coerceAtLeast(1))
         listView.addItemDecoration(io.nekohasekai.sagernet.widget.PreferenceSurfaceDecoration(requireContext()))
-        detailBack = object : androidx.activity.OnBackPressedCallback(preferenceScreen !== settingsRoot) {
-            override fun handleOnBackPressed() { onNavigateToScreen(settingsRoot) }
-        }
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, detailBack)
         details.refresh()
     }
 
@@ -128,22 +123,8 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
             findPreference<Preference>(it)!!.onPreferenceChangeListener = reloadListener
         }
         settingsRoot = preferenceScreen
-        details = SettingsDetails(settingsRoot, preferenceManager, ::onNavigateToScreen)
+        details = SettingsDetails(settingsRoot)
         details.organize()
-        savedInstanceState?.getString("settingsDetail")?.let { key ->
-            settingsRoot.findPreference<PreferenceScreen>(key)?.let { preferenceScreen = it }
-        }
-    }
-
-    override fun onNavigateToScreen(preferenceScreen: PreferenceScreen) {
-        this.preferenceScreen = preferenceScreen
-        if (::detailBack.isInitialized) detailBack.isEnabled = preferenceScreen !== settingsRoot
-        details.refresh()
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        if (preferenceScreen !== settingsRoot) outState.putString("settingsDetail", preferenceScreen.key)
-        super.onSaveInstanceState(outState)
     }
 
     override fun onResume() {

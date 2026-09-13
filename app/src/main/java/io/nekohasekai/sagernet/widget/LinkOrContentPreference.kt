@@ -49,7 +49,7 @@ constructor(
                         linkLayout.isErrorEnabled = false
                     }
                     if (link.contains("\n")) {
-                        linkLayout.error = "Unexpected new line"
+                        linkLayout.error = "链接不能换行"
                     }
                 } catch (e: Exception) {
                     linkLayout.error = e.readableMessage

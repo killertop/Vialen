@@ -25,7 +25,7 @@
     <string name="route_set_no_remote">没有可更新的远程规则集</string>
     <string name="route_set_never_updated">尚未手动下载</string>
     <string name="route_set_last_checked">上次更新（手动）：\n%1$s</string>
-    <string name="route_set_update_failed">更新失败（原文件保留）：%1$s</string>
+    <string name="route_set_update_failed">更新失败：%1$s</string>
     <string name="route_set_update_result">下载成功 %1$d 项，失败 %2$d 项。新文件将在下次连接使用。</string>
     <string name="route_set_update_named">更新 %1$s</string>
 </resources>

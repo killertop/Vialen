@@ -4,4 +4,5 @@
     <string name="ui_import_subscription_description">使用機場訂閱連結</string>
     <string name="ui_import_scan_description">掃描節點或訂閱 QR 碼</string>
     <string name="ui_import_manual_description">自行填寫節點參數</string>
+    <string name="group_default">預設分組</string>
 </resources>

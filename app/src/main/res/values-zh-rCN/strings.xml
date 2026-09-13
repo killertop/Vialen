@@ -9,7 +9,7 @@
     <string name="menu_configuration">节点</string>
     <string name="menu_group">分组</string>
     <string name="menu_about">关于</string>
-    <string name="group_default">未分组</string>
+    <string name="group_default">默认分组</string>
     <string name="quick_toggle">切换</string>
     <string name="quick_enable">启用</string>
     <string name="quick_disable">禁用</string>

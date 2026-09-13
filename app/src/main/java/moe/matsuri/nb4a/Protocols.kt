@@ -57,7 +57,7 @@ object Protocols {
                 app.getString(R.string.connection_test_refused)
             }
 
-            else -> msg
+            else -> io.nekohasekai.sagernet.utils.UserFacingError.describe(msg)
         }
     }
 

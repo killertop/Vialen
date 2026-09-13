@@ -2,6 +2,6 @@
     <string name="route_default_ads">Block advertising domains</string>
     <string name="route_default_google">Google services via proxy</string>
     <string name="route_default_cn_domains">Chinese domains direct</string>
-    <string name="route_default_cn_ip">Chinese IPs direct (optional)</string>
+    <string name="route_default_cn_ip">Chinese IPs direct</string>
     <string name="route_set_google">Google services</string>
 </resources>

@@ -85,6 +85,7 @@ object GroupManager {
         iterator { groupAdd(group) }
         if (group.type == GroupType.SUBSCRIPTION) {
             SubscriptionUpdater.reconfigureUpdater()
+            io.nekohasekai.sagernet.group.GroupUpdater.startUpdate(group, true)
         }
         return group
     }

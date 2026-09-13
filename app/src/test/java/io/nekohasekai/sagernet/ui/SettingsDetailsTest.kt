@@ -64,7 +64,7 @@ class SettingsDetailsTest {
         val store = Store()
         val manager = PreferenceManager(context).apply { preferenceDataStore = store }
         val root = manager.inflateFromResource(context, R.xml.global_preferences, null)
-        val details = SettingsDetails(root, manager) {}
+        val details = SettingsDetails(root)
         details.organize()
         return Triple(root, details, store)
     }
@@ -72,11 +72,13 @@ class SettingsDetailsTest {
     @Test fun movedPreferencesRetainOverridesAndRemainDiscoverable() {
         val (root, details, store) = settings()
         val before = store.values.toMap()
+        assertNull(root.findPreference<Preference>("uiConnectionDetails"))
+        assertNull(root.findPreference<Preference>("uiRoutingDetails"))
         assertNull(root.findPreference<Preference>("showDirectSpeed"))
-        assertEquals("uiConnectionDetails", root.findPreference<Preference>("mtu")!!.parent!!.key)
-        assertEquals("uiDomainDetails", root.findPreference<Preference>("domain_strategy_for_remote")!!.parent!!.key)
-        assertTrue(root.findPreference<Preference>("uiDomainDetails")!!.summary.toString().contains("ipv4_only"))
-        assertTrue(root.findPreference<Preference>("uiDomainDetails")!!.summary.toString().contains("prefer_ipv6"))
+        assertEquals("uiConnectionRuntime", root.findPreference<Preference>("mtu")!!.parent!!.key)
+        assertEquals("uiDnsResolution", root.findPreference<Preference>("domain_strategy_for_remote")!!.parent!!.key)
+        assertTrue(root.findPreference<Preference>("domain_strategy_for_remote")!!.summary.toString().contains("ipv4_only"))
+        assertTrue(root.findPreference<Preference>("domain_strategy_for_server")!!.summary.toString().contains("prefer_ipv6"))
         assertTrue(root.findPreference<Preference>("mtu")!!.summary.toString().contains("1280"))
         mode = Key.MODE_PROXY
         details.refresh()

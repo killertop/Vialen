@@ -36,6 +36,7 @@ class RuleSetModernizationTest {
             every { android.widget.Toast.makeText(any(), any<CharSequence>(), any()) } returns mockk(relaxed = true)
             val mockApp = mockk<SagerNet>(relaxed = true)
             every { mockApp.getDatabasePath(any()) } returns File("/tmp/test_mock_db")
+            every { mockApp.assets.open(any()) } answers { File("src/main/assets", firstArg<String>()).inputStream() }
             every { mockApp.filesDir } returns File(System.getProperty("java.io.tmpdir"), "vialen-rules-no-downloads")
             SagerNet.application = mockApp
 
@@ -115,22 +116,22 @@ class RuleSetModernizationTest {
     }
     private fun routes(json: JsonObject) = json.getAsJsonObject("route").getAsJsonArray("rules")?.map { it.asJsonObject }.orEmpty()
 
-    @Test fun defaultPresetsCompileInPriorityOrderWithoutImplicitIpBypass() {
+    @Test fun defaultPresetsCompileAllEnabledInPriorityOrder() {
         val defaults = io.nekohasekai.sagernet.database.DefaultRouteRules.create { it.toString() }
             .onEachIndexed { index, rule -> rule.id = index + 1L }
-        assertEquals(listOf(true, true, true, false), defaults.map { it.enabled })
+        assertEquals(listOf(true, true, true, true), defaults.map { it.enabled })
         assertEquals(listOf(1L, 2L, 3L, 4L), defaults.map { it.userOrder })
         assertTrue(defaults.all { it.port.isEmpty() && it.network.isEmpty() })
         val json = buildConfigWithRules(defaults)
         val declarations = json.getAsJsonObject("route").getAsJsonArray("rule_set").map { it.asJsonObject }
-        assertEquals(3, declarations.size)
+        assertEquals(4, declarations.size)
         val sourceByTag = declarations.associate { it["tag"].asString to it["url"].asString }
         val rules = routes(json).filter { it.has("rule_set") }
-        assertEquals(3, rules.size)
-        assertEquals(listOf("reject", "route", "route"), rules.map { it["action"]?.asString ?: "route" })
+        assertEquals(4, rules.size)
+        assertEquals(listOf("reject", "route", "route", "route"), rules.map { it["action"]?.asString ?: "route" })
         assertEquals("selected", rules[1]["outbound"].asString)
         assertEquals("direct", rules[2]["outbound"].asString)
-        assertEquals(listOf("geosite-category-ads-all.srs", "google.srs", "geosite-cn.srs"),
+        assertEquals(listOf("geosite-category-ads-all.srs", "google.srs", "geosite-cn.srs", "geoip-cn.srs"),
             rules.map { rule ->
                 val tag = rule["rule_set"].let { if (it.isJsonArray) it.asJsonArray[0].asString else it.asString }
                 sourceByTag.getValue(tag).substringAfterLast('/')
@@ -138,9 +139,9 @@ class RuleSetModernizationTest {
         // Existing DNS projection limitations must not be hidden by the new presets.
         assertTrue(dnsRules(json).isEmpty())
         assertEquals("selected", json.getAsJsonObject("route")["final"].asString)
-        defaults.last().enabled = true
+        defaults.last().enabled = false
         val withIp = buildConfigWithRules(defaults)
-        assertEquals(4, withIp.getAsJsonObject("route").getAsJsonArray("rule_set").size())
+        assertEquals(3, withIp.getAsJsonObject("route").getAsJsonArray("rule_set").size())
         assertEquals("direct", routes(withIp).last()["outbound"].asString)
     }
 
