@@ -15,7 +15,7 @@ class ProxyAppRecommendationsTest {
 
     @Test fun proxyModeAddsExactMatchesAndSharedUidWithoutClearingManualChoices() {
         val plan = ProxyAppRecommendations.plan(installed, setOf("manual.app"),
-            setOf("recommended.app"), bypass = false)
+            setOf("recommended.app"), enabled = true, bypass = false)
         assertEquals(setOf("recommended.app", "shared.helper", "manual.app"), plan.packages)
         assertEquals(2, plan.matched)
         assertEquals(2, plan.changed)
@@ -23,14 +23,23 @@ class ProxyAppRecommendationsTest {
 
     @Test fun bypassModeRemovesRecommendedUidAndKeepsOtherChoices() {
         val plan = ProxyAppRecommendations.plan(installed,
-            setOf("recommended.app", "shared.helper", "manual.app"), setOf("recommended.app"), bypass = true)
+            setOf("recommended.app", "shared.helper", "manual.app"), setOf("recommended.app"),
+            enabled = true, bypass = true)
         assertEquals(setOf("manual.app"), plan.packages)
         assertEquals(2, plan.changed)
     }
 
     @Test fun systemUidIsNotSelectedWithoutAnExactRule() {
-        val plan = ProxyAppRecommendations.plan(installed, emptySet(), setOf("recommended.app"), bypass = false)
+        val plan = ProxyAppRecommendations.plan(installed, emptySet(), setOf("recommended.app"),
+            enabled = true, bypass = false)
         assertTrue("android" !in plan.packages)
+    }
+
+    @Test fun disabledModeDoesNotApplyRememberedBypassSemantics() {
+        val plan = ProxyAppRecommendations.plan(installed, emptySet(), setOf("recommended.app"),
+            enabled = false, bypass = true)
+        assertEquals(setOf("recommended.app", "shared.helper"), plan.packages)
+        assertEquals(2, plan.changed)
     }
 
     @Test fun parserAcceptsCommentsAndRejectsMalformedRows() {

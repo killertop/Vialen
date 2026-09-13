@@ -25,10 +25,16 @@ object ProxyAppRecommendations {
         .onEach { require(PACKAGE_NAME.matches(it)) { "Invalid package name" } }
         .toSet().also { require(it.size >= MIN_RULES) { "Rule list is unexpectedly small" } }
 
-    fun plan(installed: Collection<App>, current: Set<String>, recommended: Set<String>, bypass: Boolean): Plan {
+    fun plan(
+        installed: Collection<App>,
+        current: Set<String>,
+        recommended: Set<String>,
+        enabled: Boolean,
+        bypass: Boolean,
+    ): Plan {
         val recommendedUids = installed.asSequence().filter { it.packageName in recommended }.map { it.uid }.toSet()
         val matched = installed.asSequence().filter { it.uid in recommendedUids }.map { it.packageName }.toSet()
-        val packages = if (bypass) current - matched else current + matched
+        val packages = if (enabled && bypass) current - matched else current + matched
         return Plan(packages, matched.size, (current union packages).count { (it in current) != (it in packages) })
     }
 

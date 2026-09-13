@@ -310,7 +310,7 @@ class AppManagerActivity : ThemedActivity() {
                         }
                         val plan = ProxyAppRecommendations.plan(apps.map {
                             ProxyAppRecommendations.App(it.packageName, it.uid)
-                        }, draft.packages, rules.packages, draft.bypass)
+                        }, draft.packages, rules.packages, draft.enabled, draft.bypass)
                         draft = draft.copy(packages = plan.packages)
                         filterApps()
                         message(when {
