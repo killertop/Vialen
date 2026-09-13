@@ -12,10 +12,17 @@ class SubscriptionInputTest {
         assertEquals("content://provider/id", SubscriptionLink.normalize("content://provider/id", "content://provider/id"))
     }
 
+    @Test fun internationalHostsPreserveTokensAndExistingLinksRemainEditable() {
+        val raw = "https://例子.中国:8443/sub?token=a%2fb%2B&x=1#label"
+        assertEquals("https://xn--fsqu00a.xn--fiqs8s:8443/sub?token=a%2fb%2B&x=1#label", SubscriptionLink.normalize(raw, raw))
+        assertEquals("https://[::1]:8443/sub?token=a%2Fb", SubscriptionLink.normalize("https://[::1]:8443/sub?token=a%2Fb"))
+        assertEquals("http://example.com/sub", SubscriptionLink.normalize("HTTP://example.com/sub"))
+    }
+
     @Test fun rejectsEmptyMalformedAndNonSubscriptionLinksBeforeSaving() {
         for (value in listOf("", "  ", "vless://user@example.com", "file:///etc/passwd",
-            "content://provider/new", "https://", "https://user:password@example.com/",
-            "https://example.com:99999", "https://example.com/a b")) {
+            "content://provider/new", "https://", "https:///example.com/sub", "https://user:password@example.com/",
+            "https://example.com:99999", "https://example.com:0", "https://example.com/a b")) {
             assertThrows(value, IllegalArgumentException::class.java) { SubscriptionLink.normalize(value) }
         }
     }

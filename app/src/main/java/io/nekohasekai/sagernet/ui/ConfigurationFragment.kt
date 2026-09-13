@@ -925,34 +925,13 @@ class ConfigurationFragment @JvmOverloads constructor(
                             }
                         } catch (e: Exception) {
                             if (!isActive) break
-                            val message = e.readableMessage
-
-                            if (icmpPing) {
-                                profile.status = 2
-                                profile.error = getString(R.string.connection_test_unreachable)
-                            } else {
-                                profile.status = 2
-                                when {
-                                    !message.contains("failed:") -> profile.error =
-                                        getString(R.string.connection_test_timeout)
-
-                                    else -> when {
-                                        message.contains("ECONNREFUSED") -> {
-                                            profile.error =
-                                                getString(R.string.connection_test_refused)
-                                        }
-
-                                        message.contains("ENETUNREACH") -> {
-                                            profile.error =
-                                                getString(R.string.connection_test_unreachable)
-                                        }
-
-                                        else -> {
-                                            profile.status = 3
-                                            profile.error = message
-                                        }
-                                    }
-                                }
+                            val failure = io.nekohasekai.sagernet.utils.TcpConnectionFailure.classify(e)
+                            profile.status = if (failure == io.nekohasekai.sagernet.utils.TcpConnectionFailure.OTHER) 3 else 2
+                            profile.error = when (failure) {
+                                io.nekohasekai.sagernet.utils.TcpConnectionFailure.TIMEOUT -> getString(R.string.connection_test_timeout)
+                                io.nekohasekai.sagernet.utils.TcpConnectionFailure.REFUSED -> getString(R.string.connection_test_refused)
+                                io.nekohasekai.sagernet.utils.TcpConnectionFailure.UNREACHABLE -> getString(R.string.connection_test_unreachable)
+                                else -> e.readableMessage
                             }
                             test.update(profile)
                         }

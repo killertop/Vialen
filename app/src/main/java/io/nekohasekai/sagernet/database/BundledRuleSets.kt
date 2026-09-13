@@ -20,11 +20,14 @@ internal object BundledRuleSets {
         val name = names[ref.source] ?: return null
         // Keep bootstrap separate from the downloaded cache and its last-success metadata.
         val target = File(root, "bundled-rule-sets/$name")
-        if (target.isFile) return target
+        // Compare against the current APK, including after upgrades or damaged local copies.
+        val bundled = open("rule-sets/$name").use { it.readBytes() }
+        check(bundled.isNotEmpty()) { "内置规则为空，请重新安装应用" }
+        if (target.isFile && runCatching { target.readBytes().contentEquals(bundled) }.getOrDefault(false)) return target
         check(target.parentFile!!.isDirectory || target.parentFile!!.mkdirs())
         val stage = File.createTempFile("seed-", ".tmp", target.parentFile)
         try {
-            open("rule-sets/$name").use { input -> stage.outputStream().use { input.copyTo(it) } }
+            stage.writeBytes(bundled)
             check(stage.length() > 0 && stage.renameTo(target)) { "无法保存内置规则，请检查存储空间" }
         } finally { stage.delete() }
         return target
