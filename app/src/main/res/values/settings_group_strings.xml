@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_display_statistics">Display and statistics</string>
+    <string name="ui_traffic_routing">Traffic routing</string>
+    <string name="ui_connection_runtime">Connection and runtime</string>
+    <string name="ui_dns_resolution">DNS and resolution</string>
+    <string name="ui_local_proxy">Local proxy</string>
+    <string name="ui_security_short">Security</string>
+    <string name="ui_diagnostics_maintenance">Diagnostics and maintenance</string>
+</resources>

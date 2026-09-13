@@ -13,6 +13,31 @@ import org.xmlpull.v1.XmlPullParser
 @RunWith(CoreBridgeRobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class ManagedSettingsResourceTest {
+    private fun categories(): Map<String, List<String>> {
+        val result = linkedMapOf<String, MutableList<String>>()
+        var category: String? = null
+        ApplicationProvider.getApplicationContext<Application>().resources
+            .getXml(R.xml.global_preferences).use { parser ->
+                while (parser.eventType != XmlPullParser.END_DOCUMENT) {
+                    if (parser.eventType == XmlPullParser.START_TAG) {
+                        val key = parser.getAttributeValue(
+                            "http://schemas.android.com/apk/res-auto", "key")
+                        if (parser.name == "PreferenceCategory") {
+                            category = requireNotNull(key)
+                            result[category!!] = mutableListOf()
+                        } else if (parser.depth == 3 && key != null) {
+                            result.getValue(requireNotNull(category)).add(key)
+                        }
+                    } else if (parser.eventType == XmlPullParser.END_TAG &&
+                        parser.name == "PreferenceCategory") {
+                        category = null
+                    }
+                    parser.next()
+                }
+            }
+        return result
+    }
+
     private fun keys(): Set<String> {
         val result = mutableSetOf<String>()
         ApplicationProvider.getApplicationContext<Application>().resources
@@ -52,5 +77,27 @@ class ManagedSettingsResourceTest {
             "tunImplementation", "acquireWakeLock", "networkChangeResetConnections", "wakeResetConnections")) {
             assertTrue("Missing retained setting: $retained", retained in keys)
         }
+    }
+
+    @Test fun settingsAreGroupedByUserPurposeWithoutSingletonCards() {
+        assertEquals(linkedMapOf(
+            "uiDisplayStatistics" to listOf(
+                "alwaysShowAddress", "profileTrafficStatistics", "showDirectSpeed"),
+            "uiTrafficRouting" to listOf(
+                "uiEditApps", "bypassLan", "bypassLanInCore", "trafficSniffing",
+                "resolveDestination", "ipv6Mode"),
+            "uiConnectionRuntime" to listOf(
+                "isAutoConnect", "serviceMode", "meteredNetwork",
+                "networkChangeResetConnections", "wakeResetConnections", "acquireWakeLock",
+                "tunImplementation", "mtu"),
+            "uiDnsResolution" to listOf(
+                "remoteDns", "domain_strategy_for_remote", "directDns",
+                "domain_strategy_for_direct", "domain_strategy_for_server", "enableDnsRouting",
+                "enableFakeDns"),
+            "uiLocalProxy" to listOf("mixedPort", "appendHttpProxy", "allowAccess"),
+            "uiSecurity" to listOf("globalAllowInsecure", "allowInsecureOnRequest"),
+            "uiDiagnosticsMaintenance" to listOf(
+                "connectionTestURL", "uiDetailedDiagnostics", "uiManagedSettings"),
+        ), categories())
     }
 }
