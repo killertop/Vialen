@@ -124,8 +124,11 @@ class ListenerStopFailureTest {
                     any<NetworkRequest>(), any<ConnectivityManager.NetworkCallback>(), any<Handler>()
                 )
             } throws denied
+            val active = mockk<Network>()
+            every { connectivity.activeNetwork } returns active
             val failedKey = key()
             DefaultNetworkListener.start(failedKey) {}
+            assertSame("Fallback get must observe the active platform network", active, DefaultNetworkListener.get())
             assertTrue(DefaultNetworkListener.stop(failedKey))
             assertFalse(DefaultNetworkListener.stop(failedKey))
             verify(exactly = 0) { connectivity.unregisterNetworkCallback(any<ConnectivityManager.NetworkCallback>()) }
@@ -184,6 +187,49 @@ class ListenerStopFailureTest {
             callbacks.last().onAvailable(currentNetwork)
             assertSame(currentNetwork, nextPending.await())
             assertTrue(pending.isCancelled)
+        }
+    }
+
+    @Test
+    fun listenerFailureIsLoggedWithoutBreakingOtherListenersOrActor() = runBlocking {
+        withTimeout(5_000) {
+            val callbacks = mutableListOf<ConnectivityManager.NetworkCallback>()
+            every {
+                connectivity.registerBestMatchingNetworkCallback(
+                    any<NetworkRequest>(), any<ConnectivityManager.NetworkCallback>(), any<Handler>()
+                )
+            } answers { callbacks += secondArg<ConnectivityManager.NetworkCallback>(); Unit }
+            val failure = IllegalStateException("consumer callback failed")
+            val broken = key()
+            val healthy = key()
+            var observed: Network? = null
+            DefaultNetworkListener.start(broken) { throw failure }
+            DefaultNetworkListener.start(healthy) { observed = it }
+
+            val current = mockk<Network>()
+            callbacks.single().onAvailable(current)
+
+            assertSame("A failed listener must not suppress later listeners", current, observed)
+            assertTrue("The callback failure must remain observable", warnings.any { it === failure })
+            assertTrue(DefaultNetworkListener.stop(broken))
+            assertTrue("The actor must remain usable after callback failure", DefaultNetworkListener.stop(healthy))
+        }
+    }
+
+    @Test
+    fun getWithoutListenerFailsWithoutBreakingActor() = runBlocking {
+        withTimeout(5_000) {
+            val failure = try {
+                DefaultNetworkListener.get()
+                null
+            } catch (error: Throwable) {
+                error
+            }
+            assertTrue("Unsupported get must fail at its caller", failure is IllegalStateException)
+
+            val subsequent = key()
+            DefaultNetworkListener.start(subsequent) {}
+            assertTrue("The actor must remain usable after rejected get", DefaultNetworkListener.stop(subsequent))
         }
     }
 

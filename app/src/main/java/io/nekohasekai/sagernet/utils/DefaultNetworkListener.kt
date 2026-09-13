@@ -12,9 +12,11 @@ import android.os.Looper
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.ktx.Logs
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.channels.actor
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.net.UnknownHostException
 
@@ -34,51 +36,75 @@ object DefaultNetworkListener {
         class Lost(val network: Network, val source: Callback) : NetworkMessage()
     }
 
-    private val networkActor = GlobalScope.actor<NetworkMessage>(Dispatchers.Unconfined) {
-        val listeners = mutableMapOf<Any, (Network?) -> Unit>()
-        var network: Network? = null
-        val pendingRequests = arrayListOf<NetworkMessage.Get>()
-        for (message in channel) when (message) {
-            is NetworkMessage.Start -> {
-                if (listeners.isEmpty()) register()
-                listeners[message.key] = message.listener
-                if (network != null) message.listener(network)
-            }
-            is NetworkMessage.Get -> {
-                check(listeners.isNotEmpty()) { "Getting network without any listeners is not supported" }
-                if (network == null) pendingRequests += message else message.response.complete(
-                    network
-                )
-            }
-            is NetworkMessage.Stop -> {
+    private val networkScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+    private val networkActor = Channel<NetworkMessage>(Channel.RENDEZVOUS)
+
+    init {
+        networkScope.launch {
+            val listeners = mutableMapOf<Any, (Network?) -> Unit>()
+            var network: Network? = null
+            val pendingRequests = arrayListOf<NetworkMessage.Get>()
+            fun notifyListener(listener: (Network?) -> Unit, current: Network?) {
                 try {
-                    val removed = listeners.remove(message.key) != null
-                    if (removed && listeners.isEmpty()) {
-                        network = null
-                        pendingRequests.forEach { it.response.cancel() }
-                        pendingRequests.clear()
-                        unregister()
-                    }
-                    message.response.complete(removed)
+                    listener(current)
                 } catch (error: Throwable) {
-                    message.response.completeExceptionally(error)
+                    // A consumer callback must not terminate the process-wide actor and
+                    // permanently strand later start/get/stop calls.
+                    Logs.w("Default network listener callback failed", error)
                 }
             }
+            for (message in networkActor) when (message) {
+                is NetworkMessage.Start -> {
+                    if (listeners.isEmpty()) register()
+                    listeners[message.key] = message.listener
+                    if (network != null) notifyListener(message.listener, network)
+                }
+                is NetworkMessage.Get -> {
+                    if (listeners.isEmpty()) {
+                        message.response.completeExceptionally(
+                            IllegalStateException("Getting network without any listeners is not supported")
+                        )
+                    } else if (fallback) {
+                        val active = SagerNet.connectivity.activeNetwork
+                        if (active == null) {
+                            message.response.completeExceptionally(UnknownHostException())
+                        } else {
+                            message.response.complete(active)
+                        }
+                    } else if (network == null) {
+                        pendingRequests += message
+                    } else {
+                        message.response.complete(network)
+                    }
+                }
+                is NetworkMessage.Stop -> {
+                    try {
+                        val removed = listeners.remove(message.key) != null
+                        if (removed && listeners.isEmpty()) {
+                            network = null
+                            pendingRequests.forEach { it.response.cancel() }
+                            pendingRequests.clear()
+                            unregister()
+                        }
+                        message.response.complete(removed)
+                    } catch (error: Throwable) {
+                        message.response.completeExceptionally(error)
+                    }
+                }
 
-            is NetworkMessage.Put -> if (message.source === registeredCallback && listeners.isNotEmpty()) {
-                network = message.network
-                pendingRequests.forEach { it.response.complete(message.network) }
-                pendingRequests.clear()
-                listeners.values.forEach { it(network) }
-            }
-            is NetworkMessage.Update -> if (message.source === registeredCallback && network == message.network) listeners.values.forEach {
-                it(
-                    network
-                )
-            }
-            is NetworkMessage.Lost -> if (message.source === registeredCallback && network == message.network) {
-                network = null
-                listeners.values.forEach { it(null) }
+                is NetworkMessage.Put -> if (message.source === registeredCallback && listeners.isNotEmpty()) {
+                    network = message.network
+                    pendingRequests.forEach { it.response.complete(message.network) }
+                    pendingRequests.clear()
+                    listeners.values.forEach { notifyListener(it, network) }
+                }
+                is NetworkMessage.Update -> if (message.source === registeredCallback && network == message.network) {
+                    listeners.values.forEach { notifyListener(it, network) }
+                }
+                is NetworkMessage.Lost -> if (message.source === registeredCallback && network == message.network) {
+                    network = null
+                    listeners.values.forEach { notifyListener(it, null) }
+                }
             }
         }
     }
@@ -86,10 +112,7 @@ object DefaultNetworkListener {
     suspend fun start(key: Any, listener: (Network?) -> Unit) =
         networkActor.send(NetworkMessage.Start(key, listener))
 
-    suspend fun get() = if (fallback) {
-        SagerNet.connectivity.activeNetwork
-            ?: throw UnknownHostException() // failed to listen, return current if available
-    } else NetworkMessage.Get().run {
+    suspend fun get() = NetworkMessage.Get().run {
         networkActor.send(this)
         response.await()
     }
