@@ -29,6 +29,8 @@ class RuleSetModernizationTest {
         @BeforeClass
         @JvmStatic
         fun setUp() {
+            mockkObject(io.nekohasekai.sagernet.ktx.Logs)
+            every { io.nekohasekai.sagernet.ktx.Logs.i(any<String>()) } returns Unit
             io.mockk.mockkStatic(android.widget.Toast::class)
             every { android.widget.Toast.makeText(any(), any<Int>(), any()) } returns mockk(relaxed = true)
             every { android.widget.Toast.makeText(any(), any<CharSequence>(), any()) } returns mockk(relaxed = true)
@@ -188,6 +190,12 @@ class RuleSetModernizationTest {
         val later = nativeRule().apply { id = 101 }.apply { domains = "example.com"; outbound = -2 }
         val json = buildConfigWithRules(listOf(first, later))
         assertFalse(dnsRules(json).any { it["action"]?.asString == "reject" })
+        io.mockk.verify(atLeast = 1) {
+            io.nekohasekai.sagernet.ktx.Logs.i(match { it.startsWith("DNS_RULE_NOT_PROJECTED:") })
+        }
+        io.mockk.verify(exactly = 0) {
+            android.widget.Toast.makeText(any(), io.nekohasekai.sagernet.R.string.route_dns_not_projected, any())
+        }
     }
 
     @Test fun pureDomainDnsStillWorksButAddressSetsUseConnectionRouting() {

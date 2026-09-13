@@ -189,6 +189,7 @@ class MainUiRecoveryNativeTest {
                 awaitView(scenario, ::matches)
                 scenario.onActivity {
                     assertEquals(show, it.binding.stats.allowShow)
+                    if (show) assertSummaryClear(it)
                     if (page == R.id.nav_settings) {
                         val settings = it.supportFragmentManager.findFragmentById(R.id.settings)
                             as io.nekohasekai.sagernet.ui.SettingsPreferenceFragment
@@ -204,11 +205,31 @@ class MainUiRecoveryNativeTest {
                         }
                     }
                 }
+                if (show) {
+                    scenario.onActivity { it.stateChanged(State.Connected, null, null) }
+                    android.os.SystemClock.sleep(300)
+                    scenario.onActivity { it.stateChanged(State.Stopped, null, null) }
+                    android.os.SystemClock.sleep(400)
+                    instrumentation.waitForIdleSync()
+                    scenario.onActivity { assertSummaryClear(it) }
+                }
             }
         } } finally {
             SagerDatabase.proxyDao.deleteById(proxy)
             SagerDatabase.groupDao.deleteById(group)
         }
+    }
+
+    private fun assertSummaryClear(activity: MainActivity) {
+        val button = android.graphics.Rect()
+        val label = android.graphics.Rect()
+        val root = android.graphics.Rect()
+        assertTrue(activity.binding.fab.getGlobalVisibleRect(button))
+        assertTrue(activity.binding.connectionSummary.getGlobalVisibleRect(label))
+        assertTrue(activity.binding.root.getGlobalVisibleRect(root))
+        assertTrue("Disconnected label overlaps button: $button / $label", label.bottom <= button.top)
+        assertTrue("Disconnected label leaves viewport", root.contains(label))
+        assertEquals(activity.binding.connectionSummary.height, label.height())
     }
 
     @Test fun settingsDetailsRetainOverridesAcrossModesAndRecreation() {
