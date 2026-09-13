@@ -285,7 +285,7 @@ class MainUiRecoveryNativeTest {
     @Test fun settingsDetailsRetainOverridesAcrossModesAndRecreation() {
         DataStore.serviceMode = Key.MODE_VPN
         DataStore.meteredNetwork = true
-        DataStore.mtu = 1000
+        DataStore.configurationStore.putString(Key.MTU, "1000")
         DataStore.enableFakeDns = true
         DataStore.appendHttpProxy = true
         DataStore.configurationStore.putString("domain_strategy_for_remote", "ipv4_only")
@@ -303,11 +303,9 @@ class MainUiRecoveryNativeTest {
                 val root = settings.preferenceScreen
                 assertNull(settings.findPreference<androidx.preference.Preference>("showDirectSpeed"))
                 assertTrue(root.findPreference<androidx.preference.Preference>("domain_strategy_for_server")!!.summary.toString().contains("prefer_ipv6"))
-                val mtu = settings.findPreference<androidx.preference.ListPreference>(Key.MTU)!!
-                assertTrue(mtu.summary.toString().contains("1280"))
-                assertFalse(mtu.callChangeListener("1000"))
-                assertTrue(mtu.callChangeListener("1280"))
-                assertEquals(1000, DataStore.mtu) // validation never silently persists a repair
+                assertNull(settings.findPreference<androidx.preference.Preference>(Key.MTU))
+                assertEquals(1500, DataStore.mtu)
+                assertEquals("1000", DataStore.configurationStore.getString(Key.MTU))
                 assertTrue(settings.findPreference<androidx.preference.SwitchPreference>(Key.METERED_NETWORK)!!.isChecked)
                 val mode = settings.findPreference<androidx.preference.ListPreference>(Key.SERVICE_MODE)!!
                 assertTrue(mode.callChangeListener(Key.MODE_PROXY))
@@ -320,7 +318,7 @@ class MainUiRecoveryNativeTest {
                 assertFalse(settings.findPreference<androidx.preference.Preference>(Key.APPEND_HTTP_PROXY)!!.isVisible)
                 assertTrue(DataStore.appendHttpProxy)
                 assertTrue(DataStore.meteredNetwork)
-                assertEquals(1000, DataStore.mtu)
+                assertEquals(1500, DataStore.mtu)
                 assertEquals("prefer_ipv6", DataStore.configurationStore.getString("domain_strategy_for_server"))
             }
             scenario.recreate()

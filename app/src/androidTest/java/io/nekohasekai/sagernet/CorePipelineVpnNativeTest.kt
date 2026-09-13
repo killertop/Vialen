@@ -270,7 +270,7 @@ class CorePipelineVpnNativeTest {
                         DataStore.mixedPort = checkNotNull(live.mixedPort)
                     }
                     DataStore.appendHttpProxy = true
-                    DataStore.mtu = 1280
+                    DataStore.configurationStore.putString(Key.MTU, "1280")
                     DataStore.meteredNetwork = true
                     delay(250)
                     assertEquals("Saving settings must not stop the VPN", originalHandle, vpnHandle())
@@ -281,7 +281,7 @@ class CorePipelineVpnNativeTest {
                     val rebuiltHandle = checkNotNull(vpnHandle())
                     assertNotEquals(originalHandle, rebuiltHandle)
                     val rebuiltNetwork = SagerNet.connectivity.allNetworks.first { it.networkHandle == rebuiltHandle }
-                    assertEquals(1280, SagerNet.connectivity.getLinkProperties(rebuiltNetwork)!!.mtu)
+                    assertEquals(1500, SagerNet.connectivity.getLinkProperties(rebuiltNetwork)!!.mtu)
                     assertFalse(SagerNet.connectivity.getNetworkCapabilities(rebuiltNetwork)!!
                         .hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED))
                     assertEquals("RUST_VPN_E2E_$nonce", requestThroughTun(12))

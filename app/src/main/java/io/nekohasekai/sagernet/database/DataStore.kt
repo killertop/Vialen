@@ -122,11 +122,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var trafficSniffing by configurationStore.stringToInt(Key.TRAFFIC_SNIFFING) { 1 }
     var resolveDestination by configurationStore.boolean(Key.RESOLVE_DESTINATION)
 
-    var mtu: Int
-        get() = configurationStore.getString(Key.MTU)?.let {
-            it.toIntOrNull() ?: throw IllegalArgumentException("Invalid saved MTU: choose 1280–65535 in Connection compatibility.")
-        } ?: io.nekohasekai.sagernet.utils.TunMtu.DEFAULT
-        set(value) { configurationStore.putString(Key.MTU, value.toString()) }
+    // Keep legacy stored values for backup compatibility, but never apply them.
+    val mtu: Int get() = io.nekohasekai.sagernet.utils.TunMtu.DEFAULT
 
     var bypassLan by configurationStore.boolean(Key.BYPASS_LAN)
     var bypassLanInCore by configurationStore.boolean(Key.BYPASS_LAN_IN_CORE)

@@ -20,7 +20,6 @@ import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.database.preference.PublicDatabase
 import io.nekohasekai.sagernet.database.preference.KeyValuePair
 import io.nekohasekai.sagernet.ui.profile.SocksSettingsActivity
-import moe.matsuri.nb4a.ui.MTUPreference
 import moe.matsuri.nb4a.proxy.config.ConfigSettingActivity
 import com.google.gson.JsonParser
 import io.nekohasekai.sagernet.ui.GroupSettingsActivity
@@ -407,34 +406,6 @@ class FormLifecycleNativeTest {
                 input.setText("1500")
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
                 assertEquals(1, commits)
-                assertFalse(dialog.isShowing)
-            }
-        }
-    }
-
-    @Test fun mtuCustomCommitRunsChangeListenerOnceAndHonorsVeto() {
-        ActivityScenario.launch<ConfigEditActivity>(Intent(context, ConfigEditActivity::class.java)).useWithCleanup { scenario ->
-            lateinit var dialog: AlertDialog
-            var calls = 0
-            var accept = false
-            scenario.onActivity { activity ->
-                val preference = MTUPreference(activity).apply { value = "1500" }
-                preference.setOnPreferenceChangeListener { _, proposed ->
-                    calls++
-                    assertEquals("1500", proposed)
-                    accept
-                }
-                dialog = preference.showCustomDialog()
-            }
-            // Wait for OnShow before simulating the user's positive-button click.
-            instrumentation.waitForIdleSync()
-            scenario.onActivity {
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
-                assertEquals(1, calls)
-                assertTrue(dialog.isShowing)
-                accept = true
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
-                assertEquals(2, calls)
                 assertFalse(dialog.isShowing)
             }
         }

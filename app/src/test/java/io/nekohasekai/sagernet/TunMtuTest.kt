@@ -6,7 +6,7 @@ import org.junit.Test
 
 class TunMtuTest {
     @Test fun retainsDefaultAndAcceptsBoundaryValues() {
-        assertEquals(9000, TunMtu.DEFAULT)
+        assertEquals(1500, TunMtu.DEFAULT)
         listOf(1280, 1500, 9000, 10000, 65535).forEach { assertEquals(it, TunMtu.requireValid(it)) }
     }
     @Test fun rejectsLegacyInvalidValuesWithoutSubstitution() {

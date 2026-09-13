@@ -76,7 +76,6 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
         val enableDnsRouting = findPreference<SwitchPreference>(Key.ENABLE_DNS_ROUTING)!!
         val enableFakeDns = findPreference<SwitchPreference>(Key.ENABLE_FAKEDNS)!!
 
-        val mtu = findPreference<MTUPreference>(Key.MTU)!!
 
         mixedPort.setOnBindEditTextListener(EditTextPreferenceModifiers.Port)
 
@@ -102,10 +101,6 @@ class SettingsPreferenceFragment : io.nekohasekai.sagernet.ui.VialenPreferenceFr
         trafficSniffing.onPreferenceChangeListener = reloadListener
         bypassLan.onPreferenceChangeListener = reloadListener
         bypassLanInCore.onPreferenceChangeListener = reloadListener
-        mtu.setOnPreferenceChangeListener { preference, value ->
-            value.toString().toIntOrNull()?.let { it in io.nekohasekai.sagernet.utils.TunMtu.range } == true &&
-                reloadListener.onPreferenceChange(preference, value)
-        }
 
         enableFakeDns.onPreferenceChangeListener = reloadListener
         remoteDns.onPreferenceChangeListener = reloadListener

@@ -30,7 +30,7 @@ internal class SettingsDetails(private val root: PreferenceScreen) {
 
     fun refresh() {
         val vpn = DataStore.serviceMode == Key.MODE_VPN
-        listOf(Key.TUN_IMPLEMENTATION, Key.MTU, Key.BYPASS_LAN, Key.ENABLE_FAKEDNS).forEach {
+        listOf(Key.TUN_IMPLEMENTATION, Key.BYPASS_LAN, Key.ENABLE_FAKEDNS).forEach {
             pref(it).isVisible = vpn
         }
         pref(Key.APPEND_HTTP_PROXY).isVisible = vpn && Build.VERSION.SDK_INT >= 29

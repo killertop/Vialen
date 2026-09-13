@@ -71,7 +71,7 @@ class ManagedSettingsResourceTest {
         assertFalse("Per-app routing must have only one editor entry", "proxyApps" in keys)
         for (retained in listOf("isAutoConnect", "uiEditApps", "remoteDns", "directDns",
             "enableDnsRouting", "enableFakeDns", "bypassLan", "bypassLanInCore", "allowAccess",
-            "profileTrafficStatistics", "mtu", "ipv6Mode",
+            "profileTrafficStatistics", "ipv6Mode",
             "tunImplementation", "acquireWakeLock", "networkChangeResetConnections", "wakeResetConnections")) {
             assertTrue("Missing retained setting: $retained", retained in keys)
         }
@@ -87,7 +87,7 @@ class ManagedSettingsResourceTest {
             "uiConnectionRuntime" to listOf(
                 "isAutoConnect", "serviceMode", "meteredNetwork",
                 "networkChangeResetConnections", "wakeResetConnections", "acquireWakeLock",
-                "tunImplementation", "mtu"),
+                "tunImplementation"),
             "uiDnsResolution" to listOf(
                 "remoteDns", "domain_strategy_for_remote", "directDns",
                 "domain_strategy_for_direct", "domain_strategy_for_server", "enableDnsRouting",

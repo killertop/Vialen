@@ -75,21 +75,21 @@ class SettingsDetailsTest {
         assertNull(root.findPreference<Preference>("uiConnectionDetails"))
         assertNull(root.findPreference<Preference>("uiRoutingDetails"))
         assertNull(root.findPreference<Preference>("showDirectSpeed"))
-        assertEquals("uiConnectionRuntime", root.findPreference<Preference>("mtu")!!.parent!!.key)
+        assertNull(root.findPreference<Preference>("mtu"))
         assertEquals("uiDnsResolution", root.findPreference<Preference>("domain_strategy_for_remote")!!.parent!!.key)
         assertTrue(root.findPreference<Preference>("domain_strategy_for_remote")!!.summary.toString().contains("ipv4_only"))
         assertTrue(root.findPreference<Preference>("domain_strategy_for_server")!!.summary.toString().contains("prefer_ipv6"))
-        assertTrue(root.findPreference<Preference>("mtu")!!.summary.toString().contains("1280"))
+        assertNull(root.findPreference<Preference>("mtu"))
         mode = Key.MODE_PROXY
         details.refresh()
-        assertFalse(root.findPreference<Preference>("mtu")!!.isVisible)
+        assertNull(root.findPreference<Preference>("mtu"))
         assertFalse(root.findPreference<Preference>("appendHttpProxy")!!.isVisible)
         assertFalse(root.findPreference<Preference>("enableFakeDns")!!.isVisible)
         assertEquals(before, store.values)
         mode = Key.MODE_VPN
         details.refresh()
         assertTrue(root.findPreference<SwitchPreference>("meteredNetwork")!!.isChecked)
-        assertTrue(root.findPreference<Preference>("mtu")!!.isVisible)
+        assertNull(root.findPreference<Preference>("mtu"))
         assertEquals(before, store.values)
     }
 
