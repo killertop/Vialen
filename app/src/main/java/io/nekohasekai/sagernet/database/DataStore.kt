@@ -62,7 +62,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     // only in bg process
     var vpnService: VpnService? = null
-    var baseService: BaseService.Interface? = null
+    @Volatile var baseService: BaseService.Interface? = null
 
     // main
 

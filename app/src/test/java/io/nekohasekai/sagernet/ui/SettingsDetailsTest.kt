@@ -7,6 +7,7 @@ import io.mockk.*
 import io.nekohasekai.sagernet.*
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.bg.RunningServiceSnapshot
 import io.nekohasekai.sagernet.database.preference.KeyValuePair
 import io.nekohasekai.sagernet.database.preference.PublicDatabase
 import moe.matsuri.nb4a.TempDatabase
@@ -40,6 +41,23 @@ class SettingsDetailsTest {
         every { DataStore.baseService } returns null
     }
     @After fun cleanup() { unmockkAll() }
+
+    @Test fun meteredSummaryDistinguishesRunningSnapshotFromSavedOverride() {
+        mockkObject(RunningServiceSnapshot.Companion)
+        every { RunningServiceSnapshot.read(any()) } returns RunningServiceSnapshot(Key.MODE_VPN, 2080, false)
+        val (root, details, store) = settings()
+        val before = store.values.toMap()
+        val row = root.findPreference<Preference>(Key.METERED_NETWORK)!!
+        val pending = row.summary.toString()
+        every { RunningServiceSnapshot.read(any()) } returns RunningServiceSnapshot(Key.MODE_VPN, 2080, true)
+        details.refresh()
+        assertNotEquals(pending, row.summary.toString())
+        assertTrue(pending.startsWith(row.summary.toString()))
+        every { RunningServiceSnapshot.read(any()) } returns null
+        details.refresh()
+        assertFalse(row.summary.toString().contains('\n'))
+        assertEquals(before, store.values)
+    }
 
     private fun settings(): Triple<PreferenceScreen, SettingsDetails, Store> {
         val context = ContextThemeWrapper(ApplicationProvider.getApplicationContext<android.content.Context>(), R.style.Theme_SagerNet)

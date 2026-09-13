@@ -1,6 +1,8 @@
 package io.nekohasekai.sagernet.group
 
 import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.SagerNet
+import io.nekohasekai.sagernet.bg.RunningServiceSnapshot
 import io.nekohasekai.sagernet.ktx.USER_AGENT
 import kotlinx.coroutines.*
 import libcore.Libcore
@@ -17,7 +19,7 @@ internal object SubscriptionFetch {
         val client = Libcore.newHttpClient().apply {
             // A newly saved port applies to the next connection. Until then use the
             // live listener, not a port at which nothing is listening yet.
-            trySocks5(DataStore.baseService?.data?.proxy?.platformConfig?.mixedPort ?: DataStore.mixedPort)
+            trySocks5(RunningServiceSnapshot.read(SagerNet.application)?.mixedPort ?: DataStore.mixedPort)
             tryH3Direct()
             modernTLS()
         }

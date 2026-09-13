@@ -62,6 +62,7 @@ class CorePipelineVpnNativeTest {
         val kv = io.nekohasekai.sagernet.database.preference.PublicDatabase.kvPairDao
         val oldMtuSetting = kv[Key.MTU]
         val oldMeteredSetting = kv[Key.METERED_NETWORK]
+        val oldPortSetting = kv[Key.MIXED_PORT]
         val hadIndividual = kv[Key.INDIVIDUAL] != null
         val hadBypassMode = kv[Key.BYPASS_MODE] != null
         val db = SagerDatabase.instance
@@ -243,6 +244,31 @@ class CorePipelineVpnNativeTest {
                     assertEquals(originalHandle, vpnHandle())
                     assertEquals("RUST_VPN_E2E_$nonce", requestThroughTun(11))
                     assertEquals(1, second.requests.get())
+                    // This instrumentation process has no background Service object.
+                    // Exercise the same IPC used by UI recreation and subscription requests.
+                    assertNull(DataStore.baseService)
+                    val live = checkNotNull(io.nekohasekai.sagernet.bg.RunningServiceSnapshot.read(app))
+                    assertEquals(Key.MODE_VPN, live.serviceMode)
+                    assertEquals(DataStore.mixedPort, live.mixedPort)
+                    DataStore.serviceMode = Key.MODE_PROXY
+                    DataStore.mixedPort = if (live.mixedPort == 65534) 65533 else 65534
+                    assertNotEquals(live.mixedPort, DataStore.mixedPort)
+                    DataStore.meteredNetwork = !checkNotNull(live.metered)
+                    assertEquals(live, io.nekohasekai.sagernet.bg.RunningServiceSnapshot.read(app))
+                    val rebound = SagerConnection(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_BACKGROUND)
+                    try {
+                        rebound.connect(app, null)
+                        val deadline = System.nanoTime() + 5_000_000_000L
+                        while (rebound.service == null && System.nanoTime() < deadline) delay(50)
+                        assertEquals(Key.MODE_VPN, rebound.boundServiceMode)
+                        assertEquals(BaseService.State.Connected.ordinal, rebound.service?.state)
+                        val response = io.nekohasekai.sagernet.group.SubscriptionFetch.fetch("http://198.18.0.254/$nonce", "Vialen regression")
+                        assertEquals("RUST_VPN_E2E_$nonce", response.text)
+                    } finally {
+                        rebound.disconnect(app)
+                        DataStore.serviceMode = Key.MODE_VPN
+                        DataStore.mixedPort = checkNotNull(live.mixedPort)
+                    }
                     DataStore.appendHttpProxy = true
                     DataStore.mtu = 1280
                     DataStore.meteredNetwork = true
@@ -268,6 +294,7 @@ class CorePipelineVpnNativeTest {
                     assertEquals(rebuiltHandle, vpnHandle())
                     assertEquals("RUST_VPN_E2E_$nonce", requestThroughTun(13))
                     SagerNet.stopService(); awaitState(BaseService.State.Stopped)
+                    assertNull(io.nekohasekai.sagernet.bg.RunningServiceSnapshot.read(app))
                     println("TUN_RELOAD selection_same_tun=true platform_new_tun=true invalid_candidate_kept_tun=true http_payloads=4 stopped=true")
                 } else repeat(3) { stage ->
                     DataStore.selectedProxy = profiles[if (stage == 2) 1 else 0].id
@@ -299,6 +326,7 @@ class CorePipelineVpnNativeTest {
                 DataStore.individual = oldIndividual; DataStore.bypass = oldBypassMode
                 if (oldMtuSetting == null) kv.delete(Key.MTU) else kv.put(oldMtuSetting)
                 if (oldMeteredSetting == null) kv.delete(Key.METERED_NETWORK) else kv.put(oldMeteredSetting)
+                if (oldPortSetting == null) kv.delete(Key.MIXED_PORT) else kv.put(oldPortSetting)
                 if (!hadIndividual) kv.delete(Key.INDIVIDUAL)
                 if (!hadBypassMode) kv.delete(Key.BYPASS_MODE)
                 db.runInTransaction {

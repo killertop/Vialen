@@ -5,6 +5,7 @@ import androidx.preference.*
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.bg.RunningServiceSnapshot
 
 /** Reparent existing preference objects: keys, values, defaults and listeners are unchanged. */
 internal class SettingsDetails(
@@ -86,9 +87,9 @@ internal class SettingsDetails(
                 DataStore.meteredNetwork -> R.string.settings_metered_forced
                 else -> R.string.settings_metered_system
             })
-            val running = DataStore.baseService?.data?.proxy?.platformConfig
+            val running = RunningServiceSnapshot.read(context)
             if (Build.VERSION.SDK_INT >= 29 && running?.serviceMode == Key.MODE_VPN &&
-                running.metered != DataStore.meteredNetwork) {
+                running.metered != null && running.metered != DataStore.meteredNetwork) {
                 summary = "$summary\n${context.getString(R.string.settings_metered_pending,
                     context.getString(if (running.metered) R.string.settings_metered_forced else R.string.settings_metered_system))}"
             }

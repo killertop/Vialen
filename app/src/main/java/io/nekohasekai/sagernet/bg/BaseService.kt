@@ -49,8 +49,8 @@ class BaseService {
     interface ExpectedException
 
     class Data internal constructor(private val service: Interface) {
-        var state = State.Stopped
-        var proxy: ProxyInstance? = null
+        @Volatile var state = State.Stopped
+        @Volatile var proxy: ProxyInstance? = null
         var notification: ServiceNotification? = null
         internal var recovery: ConnectionRecovery? = null
 

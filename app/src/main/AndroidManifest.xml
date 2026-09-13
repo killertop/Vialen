@@ -152,6 +152,11 @@
             android:name="io.nekohasekai.sagernet.ui.profile.TuicSettingsActivity" />
         <activity
             android:name="io.nekohasekai.sagernet.ui.profile.ChainSettingsActivity" />
+        <provider
+            android:name="io.nekohasekai.sagernet.bg.RunningServiceProvider"
+            android:authorities="${applicationId}.running-service"
+            android:exported="false"
+            android:process=":bg" />
         <activity
             android:name="moe.matsuri.nb4a.proxy.shadowtls.ShadowTLSSettingsActivity" />
         <activity

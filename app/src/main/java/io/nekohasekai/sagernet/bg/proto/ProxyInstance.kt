@@ -14,7 +14,7 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
     var notTmp = true
 
     var lastSelectorGroupId = -1L
-    internal var platformConfig: PlatformConfigSnapshot? = null
+    @Volatile internal var platformConfig: PlatformConfigSnapshot? = null
     var displayProfileName = ServiceNotification.genTitle(profile)
 
     // for TrafficLooper

@@ -97,6 +97,9 @@ class SagerConnection(
 
     var service: ISagerNetService? = null
 
+    var boundServiceMode: String? = null
+        private set
+
     fun updateConnectionId(id: Int) {
         connectionId = id
         try {
@@ -152,7 +155,8 @@ class SagerConnection(
         this.callback = callback
         // A saved service mode is not yet the running mode. Recreation and shortcuts
         // must still bind to the live service until the user stops/reconnects it.
-        val target = DataStore.baseService?.takeIf { it.data.state.started }?.javaClass ?: serviceClass
+        boundServiceMode = RunningServiceSnapshot.read(context)?.serviceMode ?: DataStore.serviceMode
+        val target = if (boundServiceMode == Key.MODE_VPN) VpnService::class.java else ProxyService::class.java
         val intent = Intent(context, target).setAction(Action.SERVICE)
         context.bindService(intent, this, Context.BIND_AUTO_CREATE)
     }
@@ -164,6 +168,7 @@ class SagerConnection(
         } catch (_: IllegalArgumentException) {
         }   // ignore
         connectionActive = false
+        boundServiceMode = null
         if (listenForDeath) try {
             binder?.unlinkToDeath(this, 0)
         } catch (_: NoSuchElementException) {
