@@ -77,11 +77,14 @@ func ValidateProfiles(input []byte) error {
 }
 
 func ValidateRuleMatch(input []byte) error {
-	var match compiler.Match
-	if err := decode(input, &match); err != nil {
+	var request struct {
+		Match    *compiler.Match    `json:"match"`
+		RuleSets []compiler.RuleSet `json:"rule_sets"`
+	}
+	if err := decode(input, &request); err != nil {
 		return err
 	}
-	return compiler.ValidateRuleMatch(match)
+	return compiler.ValidateRuleWithSets(request.Match, request.RuleSets)
 }
 
 func ExportProfile(input []byte) ([]byte, error) {

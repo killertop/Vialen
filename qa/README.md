@@ -118,3 +118,14 @@ git diff --check
 - APK SHA-256：`bd8cf1b860e18f6de9cc205c730644b460f89eb7e425dd065dd031897429a7fc`。
 - 本次发布不增加真机验收结论，沿用上述明确列出的未验证范围；安装包未预置个人节点、账号或订阅。
 - 首次远端 Android CI 在工具链准备阶段因 sdkmanager 不在 PATH 失败，未执行测试。后续仅修正共享准备脚本，从既有 ANDROID_HOME 定位命令行工具；未修改 SDK/NDK/Java/Go 版本或正式 APK。
+
+## 规则集元数据校验与 CI 准备阶段复核
+
+复核基线为 `69827f0`。规则保存原先仅向核心提交 Match，遗漏规则集元数据；新增 JVM 用例在修复前实际失败（编辑器接受 JSON 链接搭配 binary）。本次仅补齐此缺口，不重做已成立的另外六项修复。
+
+- 编辑器、规则创建、修改、重新启用都向核心提交规则集 URL/路径/格式；核心校验直接复用运行编译的 `prepareRuleSets`，不下载文件或启动实例。
+- 四类异常（JSON+binary、端口 65536、端口 0、无路径）均拒绝；SRS+binary、JSON+source 均接受。新增测试同时检查保存失败原记录不变、旧无效记录不能重新启用。
+- core 普通与 race 全包测试通过。重建原生 AAR 后，Android 全部 311 项 JVM 测试通过，0 failures/errors/skipped；Lint 0 errors、0 warnings、11 hints；Debug 和 instrumentation APK 编译通过。
+- 工具链准备脚本改为逐项输出检查名称、期望和实际值，报告从准备开始即保留。锁定 SDK 平台属性为 `37.0`，原断言误要求 `37`，已修正，未升级工具链。
+- 三项脚本回归覆盖成功、版本不匹配和安装失败。远端 Linux Bash 另暴露函数内 ERR trap 未继承的问题，已使用 errtrace 修正，未放宽失败断言。
+- 本轮没有新增真机验收结论；此前设备相关未验证项仍保留。正式发布版本递增至 2.1 / VERSION_CODE=98（APK versionCode=490）。

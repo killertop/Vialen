@@ -22,6 +22,18 @@ data class RouteRuleSet(
         require(uri.scheme == "https" && !uri.host.isNullOrBlank() && uri.userInfo == null && uri.fragment == null ||
             source.startsWith("/") || imported) { "Use an HTTPS rule-set URL or an imported local file" }
         require(!uri.path.orEmpty().endsWith(".db", true)) { "GeoIP databases are not supported; use .srs" }
+        io.nekohasekai.sagernet.core.CoreClient.validateRuleMatch(null, listOf(validationMetadata("editor")))
+    }
+
+    /** Metadata-only projection: no asset extraction, download or rule-file opening. */
+    private fun validationMetadata(id: String) = JsonObject().apply {
+        addProperty("id", id)
+        addProperty("format", format)
+        val remote = source.startsWith("https://")
+        addProperty("type", if (remote) "remote" else "local")
+        val location = if (source.startsWith("rule-sets/"))
+            File(io.nekohasekai.sagernet.SagerNet.application.filesDir, source).absolutePath else source
+        addProperty(if (remote) "url" else "path", location)
     }
 
     fun json() = JsonObject().apply {
@@ -69,7 +81,8 @@ data class RouteRuleSet(
             }
             val match = io.nekohasekai.sagernet.fmt.ConfigSnapshot.match(row, uids)
             match.add("rule_set_ids", com.google.gson.Gson().toJsonTree(refs.indices.map { "set-$it" }))
-            io.nekohasekai.sagernet.core.CoreClient.validateRuleMatch(match)
+            io.nekohasekai.sagernet.core.CoreClient.validateRuleMatch(match,
+                refs.mapIndexed { index, ref -> ref.validationMetadata("set-$index") })
         }
         fun decode(raw: String): List<RouteRuleSet> {
             if (raw.isBlank()) return emptyList()

@@ -14,6 +14,24 @@ import (
 	"unicode"
 )
 
+// ValidateRuleWithSets uses the runtime metadata and reference checks without
+// loading rule files, downloading resources or constructing a running instance.
+// A nil match supports metadata-only validation in the rule-set editor.
+func ValidateRuleWithSets(match *Match, sets []RuleSet) error {
+	if match == nil && len(sets) == 0 {
+		return fmt.Errorf("rule validation input is empty")
+	}
+	r := Request{Purpose: Probe, RuleSets: sets}
+	if match != nil {
+		if err := ValidateRuleMatch(*match); err != nil {
+			return err
+		}
+		r.Policy.Rules = []Rule{{Match: *match}}
+	}
+	p := planner{}
+	return p.prepareRuleSets(r)
+}
+
 func (p *planner) prepareRuleSets(r Request) error {
 	p.ruleSets = map[string]string{}
 	for _, s := range r.RuleSets {

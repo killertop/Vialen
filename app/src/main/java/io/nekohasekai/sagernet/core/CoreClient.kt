@@ -59,7 +59,7 @@ internal object CoreClient {
     fun compile(request: JsonObject): JsonObject =
         gson.fromJson(CoreTransport.execute("compile", bytes(request)).decodeToString(throwOnInvalidSequence = true), JsonObject::class.java)
 
-    fun validateRuleMatch(match: JsonObject) {
-        CoreTransport.execute("validate_rule", bytes(match))
+    fun validateRuleMatch(match: JsonObject?, ruleSets: List<JsonObject> = emptyList()) {
+        CoreTransport.execute("validate_rule", bytes(mapOf("match" to match, "rule_sets" to ruleSets)))
     }
 }

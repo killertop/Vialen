@@ -22,6 +22,28 @@ class RuleSaveValidationTest {
         every { SagerDatabase.proxyDao } returns db.proxyDao()
     }
     @After fun cleanup() { db.close(); unmockkAll() }
+    @Test fun ruleSetMetadataCannotEnterSavedOrEnabledRules() = runBlocking {
+        val saved = RuleEntity(name = "saved", domains = "example.test", enabled = true)
+        saved.id = db.rulesDao().createRule(saved)
+        for (url in listOf("https://example.invalid/rules.json", "https://example.invalid:65536/rules.srs",
+            "https://example.invalid:0/rules.srs", "https://example.invalid")) {
+            val ref = RouteRuleSet("test", url, "binary")
+            assertTrue("Editor accepted $url", runCatching { ref.validate() }.isFailure)
+            val raw = "[${ref.json()}]" // Legacy stored content must also be checked on enable.
+            assertTrue(runCatching { ProfileManager.updateRule(saved.copy(ruleSets = raw)) }.isFailure)
+            assertEquals(saved, db.rulesDao().getById(saved.id))
+            assertTrue(runCatching { ProfileManager.createRule(saved.copy(id = 0, ruleSets = raw), post = false) }.isFailure)
+            val legacy = saved.copy(id = 0, enabled = false, ruleSets = raw)
+            legacy.id = db.rulesDao().createRule(legacy)
+            assertTrue(runCatching { ProfileManager.setRuleEnabled(legacy.id, true) }.isFailure)
+            assertFalse(db.rulesDao().getById(legacy.id)!!.enabled)
+        }
+        for ((url, format) in listOf("https://example.invalid/rules.srs" to "binary", "https://example.invalid/rules.json" to "source")) {
+            val ref = RouteRuleSet("test", url, format).validate()
+            ProfileManager.updateRule(saved.copy(ruleSets = RouteRuleSet.encode(listOf(ref))))
+            assertEquals(url, RouteRuleSet.decode(db.rulesDao().getById(saved.id)!!.ruleSets).single().source)
+        }
+    }
     @Test fun invalidRuleNeverReplacesOrEnablesSavedRule() = runBlocking {
         val saved = RuleEntity(name = "old", enabled = true, domains = "example.test")
         saved.id = db.rulesDao().createRule(saved)
