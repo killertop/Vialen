@@ -371,7 +371,7 @@ class VisualSurfaceCaptureTest {
             }
             shot("$mode/typography-nodes", activity)
             onMain { check(activity.findViewById<View>(R.id.action_add).performClick()) }
-            shot("$mode/typography-add-sheet", activity)
+            shot("$mode/typography-add-menu", activity)
             val label = context.getString(R.string.ui_manual_config)
             await("manual configuration action visible") {
                 instrumentation.uiAutomation.rootInActiveWindow?.findAccessibilityNodeInfosByText(label)

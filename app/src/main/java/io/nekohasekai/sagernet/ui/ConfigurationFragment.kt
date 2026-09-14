@@ -151,6 +151,15 @@ class ConfigurationFragment @JvmOverloads constructor(
     private var pendingExportProfileId: Long? = null
     private var urlTestDialog: UrlTestDialog? = null
     private var backgroundUrlTest: (() -> Unit)? = null
+    private var compactMenuPopup: android.widget.PopupWindow? = null
+
+    private data class CompactMenuAction(
+        val title: CharSequence,
+        @androidx.annotation.DrawableRes val icon: Int,
+        val hasSubmenu: Boolean = false,
+        val dividerBefore: Boolean = false,
+        val onClick: () -> Unit,
+    )
 
     val alwaysShowAddress by lazy { DataStore.alwaysShowAddress }
 
@@ -203,6 +212,15 @@ class ConfigurationFragment @JvmOverloads constructor(
                 androidx.core.view.MenuCompat.setGroupDividerEnabled(it, true)
             }
             toolbar.menu.findItem(R.id.action_misc)?.isVisible = false
+            toolbar.menu.findItem(R.id.action_misc)?.setOnMenuItemClickListener {
+                showGroupActionsMenu(toolbar.findViewById(R.id.action_misc) ?: toolbar)
+                true
+            }
+            toolbar.post {
+                toolbar.findViewById<View>(R.id.action_misc)?.setOnClickListener {
+                    showGroupActionsMenu(it)
+                }
+            }
         } else {
             if (titleRes != 0) {
                 toolbar.setTitle(titleRes)
@@ -215,7 +233,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         if (arguments?.getBoolean("openAddNode") == true) {
             arguments?.remove("openAddNode")
-            view.post { if (isAdded && this.view != null) showAddNodeSheet() }
+            view.post { if (isAdded && this.view != null) showAddNodeMenu() }
         }
         groupPager = view.findViewById(R.id.group_pager)
         tabLayout = view.findViewById(R.id.group_tab)
@@ -292,6 +310,8 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     override fun onDestroyView() {
+        compactMenuPopup?.dismiss()
+        compactMenuPopup = null
         tabMediator?.detach()
         tabMediator = null
         groupPager.unregisterOnPageChangeCallback(updateSelectedCallback)
@@ -344,101 +364,211 @@ class ConfigurationFragment @JvmOverloads constructor(
         adapter.groupFragments.values.flatMap { it.adapter?.pendingRemovalIds().orEmpty() }
     } else emptyList()
 
-    fun showAddNodeSheet() {
+    /** Opens the compact import card from the same toolbar control used in the final visual. */
+    fun showAddNodeMenu() {
+        val anchor = toolbar.findViewById<View>(R.id.action_add) ?: toolbar
+        val actions = PopupMenu(requireContext(), anchor).menu.apply {
+            requireActivity().menuInflater.inflate(R.menu.node_creation_menu, this)
+        }
+        showCompactMenu(anchor, listOf(
+            CompactMenuAction(getString(R.string.ui_import_clipboard_menu), R.drawable.ic_import_clipboard) {
+                actions.findItem(R.id.action_import_clipboard)?.let(::onMenuItemClick)
+            },
+            CompactMenuAction(
+                getString(R.string.ui_add_subscription),
+                R.drawable.ic_settings_link_outline,
+                dividerBefore = true,
+            ) {
+                startActivity(Intent(requireContext(), GroupSettingsActivity::class.java).putExtra("newSubscription", true))
+            },
+            CompactMenuAction(
+                getString(R.string.add_profile_methods_scan_qr_code),
+                R.drawable.ic_import_scan,
+                dividerBefore = true,
+            ) {
+                actions.findItem(R.id.action_scan_qr_code)?.let(::onMenuItemClick)
+            },
+            CompactMenuAction(
+                getString(R.string.ui_manual_config),
+                R.drawable.ic_menu_tune,
+                hasSubmenu = true,
+                dividerBefore = true,
+            ) {
+                showProtocolPicker(actions)
+            },
+        ))
+    }
+
+    private fun showGroupActionsMenu(anchor: View) {
+        fun visible(id: Int) = toolbar.menu.findItem(id)?.isVisible == true
+        val actions = mutableListOf<CompactMenuAction>()
+        if (visible(R.id.action_update_subscription)) {
+            actions += CompactMenuAction(
+                getString(R.string.ui_update_subscription_menu), R.drawable.ic_baseline_update_24,
+            ) { performToolbarAction(R.id.action_update_subscription) }
+        }
+        if (visible(R.id.action_connection_tcp_ping)) {
+            actions += CompactMenuAction(
+                getString(R.string.ui_tcp_test_menu), R.drawable.ic_baseline_multiline_chart_24,
+            ) { performToolbarAction(R.id.action_connection_tcp_ping) }
+        }
+        if (visible(R.id.action_connection_url_test)) {
+            actions += CompactMenuAction(
+                getString(R.string.ui_url_test_menu), R.drawable.baseline_public_24,
+            ) { performToolbarAction(R.id.action_connection_url_test) }
+        }
+        if (visible(R.id.action_order)) {
+            actions += CompactMenuAction(
+                getString(R.string.ui_sort_menu), R.drawable.ic_baseline_compare_arrows_24, hasSubmenu = true,
+            ) { showOrderMenu(anchor) }
+        }
+        val cleanupIds = intArrayOf(
+            R.id.action_clear_traffic_statistics,
+            R.id.action_connection_test_clear_results,
+            R.id.action_remove_duplicate,
+            R.id.action_connection_test_delete_unavailable,
+        ).filter(::visible)
+        if (cleanupIds.isNotEmpty()) {
+            actions += CompactMenuAction(
+                getString(R.string.ui_cleanup_and_reset), R.drawable.ic_action_delete,
+                hasSubmenu = true, dividerBefore = actions.isNotEmpty(),
+            ) { showCleanupMenu(anchor, cleanupIds) }
+        }
+        showCompactMenu(anchor, actions)
+    }
+
+    private fun showOrderMenu(anchor: View) {
+        val ids = intArrayOf(
+            R.id.action_order_origin,
+            R.id.action_order_by_name,
+            R.id.action_order_by_delay,
+        )
+        anchor.post {
+            if (!isAdded || !anchor.isAttachedToWindow) return@post
+            showCompactMenu(anchor, ids.toList().mapNotNull { id ->
+                toolbar.menu.findItem(id)?.takeIf { it.isVisible }?.let { item ->
+                    CompactMenuAction(item.title ?: "", R.drawable.ic_baseline_compare_arrows_24) {
+                        performToolbarAction(id)
+                    }
+                }
+            }, widthDp = 240)
+        }
+    }
+
+    private fun showCleanupMenu(anchor: View, ids: List<Int>) {
+        anchor.post {
+            if (!isAdded || !anchor.isAttachedToWindow) return@post
+            showCompactMenu(anchor, ids.mapNotNull { id ->
+                toolbar.menu.findItem(id)?.takeIf { it.isVisible }?.let { item ->
+                    val icon = when (id) {
+                        R.id.action_clear_traffic_statistics -> R.drawable.ic_baseline_multiline_chart_24
+                        else -> R.drawable.ic_action_delete
+                    }
+                    CompactMenuAction(item.title ?: "", icon) { performToolbarAction(id) }
+                }
+            }, widthDp = 240)
+        }
+    }
+
+    private fun performToolbarAction(itemId: Int) {
+        toolbar.menu.performIdentifierAction(itemId, 0)
+    }
+
+    private fun showCompactMenu(anchor: View, actions: List<CompactMenuAction>, widthDp: Int = 232) {
+        if (actions.isEmpty() || !isAdded) return
+        compactMenuPopup?.dismiss()
+
         val context = requireContext()
-        val sheet = com.google.android.material.bottomsheet.BottomSheetDialog(context)
-        val content = android.widget.LinearLayout(context).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(dp2px(18), dp2px(12), dp2px(18), dp2px(12))
+        val content = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp2px(8), 0, dp2px(8))
         }
-        fun color(id: Int) = androidx.core.content.ContextCompat.getColor(context, id)
-        fun label(text: Int, size: Float, secondary: Boolean = false) = android.widget.TextView(context).apply {
-            setText(text)
-            textSize = size
-            setTextColor(color(if (secondary) R.color.vialen_text_secondary else R.color.vialen_text_primary))
+        val card = com.google.android.material.card.MaterialCardView(context).apply {
+            setCardBackgroundColor(androidx.core.content.ContextCompat.getColor(context, R.color.vialen_surface))
+            radius = dp2px(16).toFloat()
+            cardElevation = dp2px(6).toFloat()
+            useCompatPadding = true
+            preventCornerOverlap = false
+            addView(content, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
-        content.addView(View(context).apply {
-            background = android.graphics.drawable.GradientDrawable().apply {
-                setColor(color(R.color.vialen_text_secondary))
-                alpha = 90
-                cornerRadius = dp2px(3).toFloat()
-            }
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-        }, android.widget.LinearLayout.LayoutParams(dp2px(42), dp2px(5)).apply {
-            gravity = android.view.Gravity.CENTER_HORIZONTAL
-            bottomMargin = dp2px(16)
-        })
-        content.addView(label(R.string.ui_add_node, 24f).apply {
-            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
-            setPadding(dp2px(10), 0, dp2px(10), dp2px(6))
-        })
-        content.addView(label(R.string.ui_import_choose, 14f, true).apply {
-            setPadding(dp2px(10), 0, dp2px(10), dp2px(10))
-        })
-        val actions = PopupMenu(context, toolbar).menu.apply { requireActivity().menuInflater.inflate(R.menu.node_creation_menu, this) }
-        fun action(title: Int, description: Int, icon: Int, primary: Boolean = false, last: Boolean = false, run: () -> Unit) {
-            val row = android.widget.LinearLayout(context).apply {
-                orientation = android.widget.LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.CENTER_VERTICAL
-                minimumHeight = dp2px(68)
-                setPadding(dp2px(10), dp2px(10), dp2px(10), dp2px(10))
-                val value = android.util.TypedValue()
-                context.theme.resolveAttribute(android.R.attr.selectableItemBackground, value, true)
-                setBackgroundResource(value.resourceId)
-                isFocusable = true
-                contentDescription = getString(title) + ", " + getString(description)
-                setOnClickListener { sheet.dismiss(); run() }
-            }
-            row.addView(androidx.appcompat.widget.AppCompatImageView(context).apply {
-                setImageResource(icon)
-                imageTintList = android.content.res.ColorStateList.valueOf(color(
-                    if (primary) R.color.vialen_accent else R.color.vialen_text_secondary))
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            }, android.widget.LinearLayout.LayoutParams(dp2px(30), dp2px(30)).apply { marginEnd = dp2px(26) })
-            row.addView(android.widget.LinearLayout(context).apply {
-                orientation = android.widget.LinearLayout.VERTICAL
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
-                addView(label(title, 17f).apply {
-                    typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+        lateinit var popup: android.widget.PopupWindow
+        actions.forEach { action ->
+            if (action.dividerBefore) {
+                content.addView(View(context).apply {
+                    setBackgroundColor(androidx.core.content.ContextCompat.getColor(context, R.color.vialen_outline))
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp2px(1)).apply {
+                    marginStart = dp2px(16)
+                    marginEnd = dp2px(16)
                 })
-                addView(label(description, 13f, true).apply { setPadding(0, dp2px(5), 0, 0) })
-            }, android.widget.LinearLayout.LayoutParams(0, -2, 1f))
-            row.addView(androidx.appcompat.widget.AppCompatImageView(context).apply {
-                setImageResource(R.drawable.ic_import_chevron)
-                imageTintList = android.content.res.ColorStateList.valueOf(color(R.color.vialen_text_secondary))
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            }, android.widget.LinearLayout.LayoutParams(dp2px(24), dp2px(24)))
-            content.addView(row, android.widget.LinearLayout.LayoutParams(-1, -2))
-            if (!last) content.addView(View(context).apply {
-                setBackgroundColor(color(R.color.vialen_text_secondary))
-                alpha = 0.15f
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            }, android.widget.LinearLayout.LayoutParams(-1, dp2px(1)))
+            }
+            content.addView(compactMenuRow(context, action) {
+                popup.dismiss()
+                action.onClick()
+            })
         }
-        action(R.string.action_import, R.string.ui_import_clipboard_description, R.drawable.ic_import_clipboard, primary = true) {
-            onMenuItemClick(actions.findItem(R.id.action_import_clipboard))
+
+        val originalBackground = anchor.background
+        anchor.setBackgroundResource(R.drawable.bg_toolbar_popup_active)
+        popup = android.widget.PopupWindow(
+            card,
+            dp2px(widthDp),
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            true,
+        ).apply {
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            isOutsideTouchable = true
+            inputMethodMode = android.widget.PopupWindow.INPUT_METHOD_NOT_NEEDED
+            animationStyle = R.style.Animation_Vialen_Surface
         }
-        action(R.string.ui_add_subscription, R.string.ui_import_subscription_description, R.drawable.ic_settings_link_outline) {
-            startActivity(Intent(context, GroupSettingsActivity::class.java).putExtra("newSubscription", true))
+        popup.setOnDismissListener {
+            if (compactMenuPopup === popup) compactMenuPopup = null
+            if (anchor.isAttachedToWindow) anchor.background = originalBackground
         }
-        action(R.string.add_profile_methods_scan_qr_code, R.string.ui_import_scan_description, R.drawable.ic_import_scan) {
-            onMenuItemClick(actions.findItem(R.id.action_scan_qr_code))
+        compactMenuPopup = popup
+        popup.showAsDropDown(anchor, 0, dp2px(4), android.view.Gravity.END)
+    }
+
+    private fun compactMenuRow(
+        context: android.content.Context,
+        action: CompactMenuAction,
+        onClick: () -> Unit,
+    ): View = LinearLayout(context).apply {
+        gravity = android.view.Gravity.CENTER_VERTICAL
+        minimumHeight = dp2px(48)
+        setPadding(dp2px(16), 0, dp2px(16), 0)
+        isClickable = true
+        isFocusable = true
+        contentDescription = action.title
+        val selectable = android.util.TypedValue()
+        context.theme.resolveAttribute(android.R.attr.selectableItemBackground, selectable, true)
+        if (selectable.resourceId != 0) setBackgroundResource(selectable.resourceId)
+        setOnClickListener { onClick() }
+
+        fun icon(resource: Int) = androidx.appcompat.widget.AppCompatImageView(context).apply {
+            setImageResource(resource)
+            imageTintList = android.content.res.ColorStateList.valueOf(
+                androidx.core.content.ContextCompat.getColor(context, R.color.vialen_text_secondary),
+            )
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
-        action(R.string.ui_manual_config, R.string.ui_import_manual_description, R.drawable.ic_settings_settings_outline, last = true) {
-            showProtocolPicker(actions)
+
+        addView(icon(action.icon), LinearLayout.LayoutParams(dp2px(20), dp2px(20)).apply {
+            marginEnd = dp2px(14)
+        })
+        addView(TextView(context).apply {
+            text = action.title
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15f)
+            setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.vialen_text_primary))
+            typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL)
+            isSingleLine = true
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        if (action.hasSubmenu) {
+            addView(icon(R.drawable.ic_import_chevron), LinearLayout.LayoutParams(dp2px(20), dp2px(20)).apply {
+                marginStart = dp2px(12)
+            })
         }
-        val scroll = androidx.core.widget.NestedScrollView(context).apply { addView(content) }
-        sheet.setContentView(scroll)
-        sheet.setOnShowListener {
-            val panel = sheet.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
-            panel?.background = com.google.android.material.shape.MaterialShapeDrawable(
-                com.google.android.material.shape.ShapeAppearanceModel.builder()
-                    .setTopLeftCorner(com.google.android.material.shape.CornerFamily.ROUNDED, dp2px(24).toFloat())
-                    .setTopRightCorner(com.google.android.material.shape.CornerFamily.ROUNDED, dp2px(24).toFloat())
-                    .build()).apply { fillColor = android.content.res.ColorStateList.valueOf(color(R.color.vialen_surface)) }
-            sheet.behavior.state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
-        }
-        sheet.show()
     }
 
     private fun showProtocolPicker(menu: android.view.Menu) {
@@ -510,7 +640,8 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     override fun onMenuItemClick(item: MenuItem): Boolean {
         when (item.itemId) {
-            R.id.action_add -> showAddNodeSheet()
+            R.id.action_add -> showAddNodeMenu()
+            R.id.action_misc -> showGroupActionsMenu(toolbar.findViewById(R.id.action_misc) ?: toolbar)
             R.id.action_scan_qr_code -> {
                 startActivity(Intent(context, ScannerActivity::class.java))
             }
@@ -1461,7 +1592,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 if (firstGroup || select) R.string.ui_empty_body else R.string.ui_empty_group_body)
             root.findViewById<View>(R.id.empty_add).apply {
                 isVisible = !select
-                setOnClickListener { owner.showAddNodeSheet() }
+                setOnClickListener { owner.showAddNodeMenu() }
             }
             owner.updateGroupActions(proxyGroup, !empty)
             if (lastEmpty != empty) {

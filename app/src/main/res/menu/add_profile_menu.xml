@@ -1,5 +1,5 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
-    <item android:id="@+id/action_add" android:icon="@drawable/ic_action_note_add" android:title="@string/ui_add_node" app:showAsAction="ifRoom">
+    <item android:id="@+id/action_add" android:icon="@drawable/ic_toolbar_add" android:title="@string/ui_add_node" app:showAsAction="ifRoom">
         </item>
     <item android:id="@+id/action_misc" android:icon="@drawable/ic_baseline_more_vert_24" android:title="@string/ui_more" app:showAsAction="ifRoom">
         <menu>

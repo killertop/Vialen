@@ -71,6 +71,12 @@
     <string name="ui_rule_protocol">Application protocol</string>
     <string name="ui_rule_action">Routing action</string>
     <string name="ui_more">More actions</string>
+    <string name="ui_import_clipboard_menu">Import from clipboard</string>
+    <string name="ui_update_subscription_menu">Update subscription</string>
+    <string name="ui_tcp_test_menu">TCP test</string>
+    <string name="ui_url_test_menu">URL test</string>
+    <string name="ui_sort_menu">Sort</string>
+    <string name="ui_cleanup_and_reset">Clean up &amp; reset</string>
     <string name="ui_credits_body">Vialen builds on SagerNet and Matsuri, with AndroidX, Material Components and other open-source projects. Thank you to their authors and contributors.\n\nThis project is distributed under GNU GPL version 3 or later. See the repository for source and license details.</string>
     <string name="ui_transport">Transport settings</string>
     <string name="ui_match_conditions">Match conditions</string>

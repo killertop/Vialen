@@ -118,7 +118,7 @@ class MainActivity : ThemedActivity(),
 
         binding.fab.setOnClickListener {
             if (!hasProfiles && !DataStore.serviceState.canStop) {
-                (supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ConfigurationFragment)?.showAddNodeSheet()
+                (supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ConfigurationFragment)?.showAddNodeMenu()
                 return@setOnClickListener
             }
             if (DataStore.serviceState.canStop) SagerNet.stopService() else connect.launch(
