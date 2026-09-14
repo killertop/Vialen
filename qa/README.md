@@ -136,3 +136,10 @@ git diff --check
 - 本地额外两次 libcore race 全量检查暴露既有正文超时测试的隔离问题：在响应头阶段提前超过 100 ms；单独连续十次通过。原先仅调用 GC 不足以消除全量运行影响，改为在独立的同一测试二进制进程内执行，保留 race 插桩、真实 HTTP、100 ms 期限、正文超时及服务器断开断言，子进程失败会使父测试失败。此变更仅影响测试，不改变 APK。
 - 调整后 libcore 普通及 race 全包测试均通过（race：libcore 96.989 s、procfs 2.350 s），没有数据竞争报告。上述失败记录保留，不以通过的重跑覆盖历史。
 - 正式 2.1 APK 的签名与原公开证书一致，包名 com.vialen.app、versionCode=490；源码和签名 APK 扫描均为 0 项，16 KB 对齐全部通过。SHA-256：`1e2722bc34b1e66b29e19f81563bc84ecf717bb3b09e34a5a24288df583a8d15`。
+
+最终远端闭环：
+
+- 发布源码 `e54284a611c89415e9dd32ce4825fe7cf8e768b2` 的 [Android/libcore CI 34898245206](https://github.com/killertop/Vialen/actions/runs/34898245206) 全部成功；下载报告核对 311 tests / 0 failures / 0 errors / 0 skipped。Go Core Contracts 和公开内容检查亦成功。
+- 含测试隔离调整的 `50d4599cd96b266ce176f4a2194b145a7d4e3b5f` 的 [完整 CI 34898608068](https://github.com/killertop/Vialen/actions/runs/34898608068) 成功：工具链、libcore 普通/race、原生 AAR、JVM、Lint、两个 Debug APK 和报告上传全部实际执行。
+- [Vialen 2.1](https://github.com/killertop/Vialen/releases/tag/v2.1) 已公开，标签固定在发布源码 e54284a；后续提交只调整测试和本文档。GitHub 附件摘要与上文 SHA-256 一致，唯一附件为正式 ARM64 APK。中性构建目录内 62 个生产 Go 源文件与发布源码逐文件一致。
+- 本次两个待修项已关闭；历史真机未验证项不在本结论内。测试缓存数据库已移入系统垃圾篓，仓库仅保留 main 和单一工作树。
