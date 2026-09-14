@@ -117,3 +117,4 @@ git diff --check
 - 源码及签名 APK 的公开内容扫描均为 0 项；ELF 和 APK 的 16 KB 对齐检查通过。
 - APK SHA-256：`bd8cf1b860e18f6de9cc205c730644b460f89eb7e425dd065dd031897429a7fc`。
 - 本次发布不增加真机验收结论，沿用上述明确列出的未验证范围；安装包未预置个人节点、账号或订阅。
+- 首次远端 Android CI 在工具链准备阶段因 sdkmanager 不在 PATH 失败，未执行测试。后续仅修正共享准备脚本，从既有 ANDROID_HOME 定位命令行工具；未修改 SDK/NDK/Java/Go 版本或正式 APK。

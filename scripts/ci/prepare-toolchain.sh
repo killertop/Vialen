@@ -5,7 +5,11 @@ report="${1:?toolchain report path required}"
 : "${ANDROID_HOME:?Android SDK runner path required}"
 : "${GITHUB_ENV:?GitHub Actions environment file required}"
 : "${GITHUB_PATH:?GitHub Actions path file required}"
-command -v sdkmanager >/dev/null
+if ! command -v sdkmanager >/dev/null; then
+  # GitHub's Android SDK can be installed without command-line tools on PATH.
+  export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/tools/bin:$PATH"
+fi
+command -v sdkmanager >/dev/null || { echo "Android SDK command-line tools are missing" >&2; exit 1; }
 
 sdkmanager --install "platforms;android-37.0" "build-tools;36.0.0" "ndk;28.1.13356709"
 export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.1.13356709"
