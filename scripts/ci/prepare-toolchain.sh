@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CI only. Install explicit versions, record effective tools, export SDK paths.
-set -euo pipefail
+set -Eeuo pipefail
 report="${1:?toolchain report path required}"
 mkdir -p "$(dirname "$report")"
 : > "$report"
