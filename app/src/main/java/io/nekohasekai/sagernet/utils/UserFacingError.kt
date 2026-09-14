@@ -25,7 +25,7 @@ object UserFacingError {
             listOf("no space", "disk full").any(text::contains) -> "存储空间不足，请清理后重试"
             listOf("too large", "exceeds", "size limit", "32 mib").any(text::contains) -> "内容过大，请换用较小的文件或订阅"
             listOf("no proxies", "no profiles", "empty response").any(text::contains) -> "未找到可用节点，请检查订阅内容"
-            listOf("rule-set", "rule set", "rule_set").any(text::contains) -> "规则文件无效，请重新下载"
+            listOf("rule-set", "rule set", "rule_set").any(text::contains) -> "规则集无效，请检查地址和格式"
             listOf("invalid port", "port range").any(text::contains) -> "端口无效，请填写 1～65535"
             listOf("invalid", "malformed", "parse", "decode", "unexpected", "unsupported").any(text::contains) -> "内容格式不正确或暂不支持"
             text.contains("missing selected profile") -> "请先选择一个节点"
