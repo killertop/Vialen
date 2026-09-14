@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"runtime"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -99,9 +99,19 @@ func TestSubscriptionHTTPSizeLimit(t *testing.T) {
 	}
 }
 func TestSubscriptionHTTPTimeoutIncludesBody(t *testing.T) {
-	// Keep heap cleanup from preceding native-core fixtures outside this test's
-	// deliberately short request budget; the 100 ms deadline remains unchanged.
-	runtime.GC()
+	// Native-core fixtures can leave process-wide heap/scheduler pressure behind.
+	// Run this short real-network deadline contract in a fresh copy of the same
+	// (including race-instrumented) test binary; retain every 100 ms assertion.
+	if os.Getenv("VIALEN_HTTP_DEADLINE_TEST_CHILD") != "1" {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestSubscriptionHTTPTimeoutIncludesBody$", "-test.count=1")
+		cmd.Env = append(os.Environ(), "VIALEN_HTTP_DEADLINE_TEST_CHILD=1")
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("isolated body deadline contract failed: %v\n%s", err, output)
+		}
+		return
+	}
 	disconnected := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
