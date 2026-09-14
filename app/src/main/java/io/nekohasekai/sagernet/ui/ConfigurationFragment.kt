@@ -216,11 +216,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 showGroupActionsMenu(toolbar.findViewById(R.id.action_misc) ?: toolbar)
                 true
             }
-            toolbar.post {
-                toolbar.findViewById<View>(R.id.action_misc)?.setOnClickListener {
-                    showGroupActionsMenu(it)
-                }
-            }
+            bindGroupActionsMenuClick()
         } else {
             if (titleRes != 0) {
                 toolbar.setTitle(titleRes)
@@ -437,6 +433,16 @@ class ConfigurationFragment @JvmOverloads constructor(
         showCompactMenu(anchor, actions)
     }
 
+    /** Rebind after visibility updates, because the action view is created lazily. */
+    private fun bindGroupActionsMenuClick() {
+        toolbar.post {
+            if (!isAdded || view == null) return@post
+            toolbar.findViewById<View>(R.id.action_misc)?.setOnClickListener {
+                showGroupActionsMenu(it)
+            }
+        }
+    }
+
     private fun showOrderMenu(anchor: View) {
         val ids = intArrayOf(
             R.id.action_order_origin,
@@ -464,7 +470,12 @@ class ConfigurationFragment @JvmOverloads constructor(
                         R.id.action_clear_traffic_statistics -> R.drawable.ic_baseline_multiline_chart_24
                         else -> R.drawable.ic_action_delete
                     }
-                    CompactMenuAction(item.title ?: "", icon) { performToolbarAction(id) }
+                    val title = when (id) {
+                        R.id.action_clear_traffic_statistics -> getString(R.string.ui_clear_traffic_menu)
+                        R.id.action_remove_duplicate -> getString(R.string.ui_remove_duplicates_menu)
+                        else -> item.title ?: ""
+                    }
+                    CompactMenuAction(title, icon) { performToolbarAction(id) }
                 }
             }, widthDp = 176)
         }
@@ -526,7 +537,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             if (anchor.isAttachedToWindow) anchor.background = originalBackground
         }
         compactMenuPopup = popup
-        popup.showAsDropDown(anchor, -dp2px(9), dp2px(4), android.view.Gravity.END)
+        popup.showAsDropDown(toolbar, -dp2px(9), dp2px(4), android.view.Gravity.END)
     }
 
     private fun compactMenuRow(
@@ -566,7 +577,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         if (action.hasSubmenu) {
             addView(icon(R.drawable.ic_import_chevron), LinearLayout.LayoutParams(dp2px(20), dp2px(20)).apply {
-                marginStart = dp2px(12)
+                marginStart = dp2px(8)
             })
         }
     }
@@ -630,7 +641,10 @@ class ConfigurationFragment @JvmOverloads constructor(
     private fun updateGroupActions(group: ProxyGroup, hasNodes: Boolean) {
         if (select || view == null || group.id != DataStore.selectedGroup) return
         val subscription = group.type == GroupType.SUBSCRIPTION
-        toolbar.menu.findItem(R.id.action_misc)?.isVisible = hasNodes || subscription
+        toolbar.menu.findItem(R.id.action_misc)?.let { item ->
+            item.isVisible = hasNodes || subscription
+            if (item.isVisible) bindGroupActionsMenuClick()
+        }
         toolbar.menu.findItem(R.id.action_update_subscription)?.isVisible = subscription
         for (id in intArrayOf(R.id.action_clear_traffic_statistics, R.id.action_remove_duplicate,
             R.id.action_connection_tcp_ping, R.id.action_connection_url_test,

@@ -77,6 +77,8 @@
     <string name="ui_url_test_menu">URL 测试</string>
     <string name="ui_sort_menu">排序</string>
     <string name="ui_cleanup_and_reset">清理与重置</string>
+    <string name="ui_clear_traffic_menu">清空流量</string>
+    <string name="ui_remove_duplicates_menu">删除重复项</string>
     <string name="ui_credits_body">Vialen 基于 SagerNet 和 Matsuri，并使用 AndroidX、Material Components 等开源项目。感谢原作者及所有贡献者。\n\n本项目以 GNU GPL 第 3 版或更高版本发布，源代码与许可详情请见项目仓库。</string>
     <string name="ui_transport">传输设置</string>
     <string name="ui_match_conditions">匹配条件</string>
