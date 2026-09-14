@@ -11,6 +11,7 @@
     <color name="vialen_brand">#3564E8</color>
     <color name="vialen_accent">#3564E8</color>
     <color name="vialen_selected_background">#F5F7FF</color>
+    <color name="vialen_toolbar_popup_active">#EAF0FF</color>
     <color name="vialen_outline">#E8ECF2</color>
     <color name="vialen_success">#287D3C</color>
     <color name="vialen_error">#B42318</color>
