@@ -62,6 +62,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ci-artifacts
+          python3 scripts/ci/test_prepare_toolchain.py
           bash scripts/ci/prepare-toolchain.sh ci-artifacts/toolchain.txt
           bash buildScript/lib/core/get_source.sh
       - name: Test libcore independently with production feature tags
@@ -90,6 +91,7 @@ jobs:
         with:
           name: Android-contract-reports
           path: |
+            Vialen/ci-artifacts/toolchain.txt
             Vialen/app/build/reports/tests/
             Vialen/app/build/test-results/
             Vialen/app/build/reports/lint-results-debug.*
