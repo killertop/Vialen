@@ -2,40 +2,18 @@ package moe.matsuri.nb4a
 
 import android.content.Context
 import io.nekohasekai.sagernet.R
-import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.getColorAttr
-import moe.matsuri.nb4a.proxy.config.ConfigBean
 
 // Settings for all protocols, built-in or plugin
 object Protocols {
 
-    // Deduplication
-
-    class Deduplication(
-        val bean: AbstractBean, val type: String
-    ) {
-
-        fun hash(): String {
-            if (bean is ConfigBean) {
-                return bean.config
-            }
-            return bean.serverAddress + bean.serverPort + type
+    /** Only ordinary nodes have a standalone connection identity. Keep chains/raw configs. */
+    fun deduplicationKey(entity: io.nekohasekai.sagernet.database.ProxyEntity): io.nekohasekai.sagernet.core.Profile? {
+        val document = io.nekohasekai.sagernet.database.ProfileDocument.decode(entity.document)
+        return document.profile?.takeIf { document.kind == "node" }?.let {
+            io.nekohasekai.sagernet.group.SubscriptionDedup.semanticKey(it)
         }
-
-        override fun hashCode(): Int {
-            return hash().toByteArray().contentHashCode()
-        }
-
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (javaClass != other?.javaClass) return false
-
-            other as Deduplication
-
-            return hash() == other.hash()
-        }
-
     }
 
     // Display

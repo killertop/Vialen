@@ -340,6 +340,16 @@ class ProxyEntity(
         @Delete
         fun deleteProxy(proxies: List<ProxyEntity>): Int
 
+        /** Recheck after confirmation: a changed candidate or missing keeper is never deleted. */
+        @Transaction
+        fun deleteDuplicateProxy(groupId: Long, id: Long, expectedDocument: String): Int {
+            val current = getById(id) ?: return 0
+            if (current.groupId != groupId || current.document != expectedDocument) return 0
+            val key = moe.matsuri.nb4a.Protocols.deduplicationKey(current) ?: return 0
+            if (getByGroup(groupId).none { it.id != id && moe.matsuri.nb4a.Protocols.deduplicationKey(it) == key }) return 0
+            return deleteById(id)
+        }
+
         @Query("UPDATE proxy_entities SET userOrder = :order WHERE id = :id")
         fun updateOrder(id: Long, order: Long): Int
 
@@ -358,10 +368,17 @@ class ProxyEntity(
         @Query("UPDATE proxy_entities SET status = :status, ping = :ping, error = :error WHERE id = :id")
         fun updateConnectionTestResult(id: Long, status: Int, ping: Int, error: String?): Int
 
+        @Query("UPDATE proxy_entities SET status = :status, ping = :ping, error = :error WHERE id = :id AND document = :document")
+        fun updateMatchingConnectionTestResult(id: Long, status: Int, ping: Int, error: String?, document: String): Int
+
+        @Query("UPDATE proxy_entities SET status = 0, ping = 0, error = NULL WHERE groupId = :groupId")
+        fun clearConnectionTestResults(groupId: Long): Int
+
         @Transaction
         fun updateConnectionTestResults(results: List<ConnectionTestResult>) {
             results.forEach { result ->
-                updateConnectionTestResult(result.id, result.status, result.ping, result.error)
+                if (result.expectedDocument == null) updateConnectionTestResult(result.id, result.status, result.ping, result.error)
+                else updateMatchingConnectionTestResult(result.id, result.status, result.ping, result.error, result.expectedDocument)
             }
         }
 

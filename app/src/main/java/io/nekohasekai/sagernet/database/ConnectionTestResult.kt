@@ -6,4 +6,5 @@ data class ConnectionTestResult(
     val status: Int,
     val ping: Int,
     val error: String?,
+    val expectedDocument: String? = null,
 )

@@ -773,19 +773,9 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             R.id.action_connection_test_clear_results -> {
                 runOnDefaultDispatcher {
-                    val profiles = SagerDatabase.proxyDao.getByGroup(DataStore.currentGroupId())
-                    val toClear = mutableListOf<ProxyEntity>()
-                    if (profiles.isNotEmpty()) for (profile in profiles) {
-                        if (profile.status != 0) {
-                            profile.status = 0
-                            profile.ping = 0
-                            profile.error = null
-                            toClear.add(profile)
-                        }
-                    }
-                    if (toClear.isNotEmpty()) {
-                        ProfileManager.updateProfile(toClear)
-                    }
+                    val groupId = DataStore.currentGroupId()
+                    SagerDatabase.proxyDao.clearConnectionTestResults(groupId)
+                    GroupManager.postReload(groupId)
                 }
             }
 
@@ -794,7 +784,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     val profiles = SagerDatabase.proxyDao.getByGroup(DataStore.currentGroupId())
                     val toClear = mutableListOf<ProxyEntity>()
                     if (profiles.isNotEmpty()) for (profile in profiles) {
-                        if (profile.status != 0 && profile.status != 1) {
+                        if (profile.status == 2 || profile.status == 3) {
                             toClear.add(profile)
                         }
                     }
@@ -837,9 +827,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                 runOnDefaultDispatcher {
                     val profiles = SagerDatabase.proxyDao.getByGroup(DataStore.currentGroupId())
                     val toClear = mutableListOf<ProxyEntity>()
-                    val uniqueProxies = LinkedHashSet<Protocols.Deduplication>()
+                    val uniqueProxies = LinkedHashSet<io.nekohasekai.sagernet.core.Profile>()
                     for (pf in profiles) {
-                        val proxy = Protocols.Deduplication(pf.requireBean(), pf.displayType())
+                        val proxy = Protocols.deduplicationKey(pf) ?: continue
                         if (!uniqueProxies.add(proxy)) {
                             toClear += pf
                         }
@@ -860,21 +850,12 @@ class ConfigurationFragment @JvmOverloads constructor(
                                             }.joinToString("\n")
                                 )
                                 .setPositiveButton(R.string.delete) { _, _ ->
-                                    for (profile in toClear) {
-                                        adapter.groupFragments[DataStore.selectedGroup]?.adapter?.apply {
-                                            val index = configurationIdList.indexOf(profile.id)
-                                            if (index >= 0) {
-                                                configurationIdList.removeAt(index)
-                                                configurationList.remove(profile.id)
-                                                notifyItemRemoved(index)
-                                            }
-                                        }
-                                    }
                                     runOnDefaultDispatcher {
                                         for (profile in toClear) {
-                                            ProfileManager.deleteProfile2(
-                                                profile.groupId, profile.id
-                                            )
+                                            if (SagerDatabase.proxyDao.deleteDuplicateProxy(
+                                                    profile.groupId, profile.id, profile.document) != 0) {
+                                                DataStore.clearDeletedSelection(profile.id)
+                                            }
                                         }
                                         val targetAdapter = onMainDispatcher {
                                             (activity as? MainActivity)?.refreshProfileAvailability()
@@ -918,14 +899,10 @@ class ConfigurationFragment @JvmOverloads constructor(
         val dialogStatus = AtomicInteger(0) // 1: hidden 2: cancelled
         var notification: ConnectionTestNotification? = null
 
-        val results: MutableSet<ProxyEntity> = ConcurrentHashMap.newKeySet()
         var proxyN = 0
         val finishedN = AtomicInteger(0)
 
         fun update(profile: ProxyEntity) {
-            if (dialogStatus.get() != 2) {
-                results.add(profile)
-            }
             runOnMainDispatcher {
                 val context = context ?: return@runOnMainDispatcher
                 val progress = finishedN.addAndGet(1)
@@ -996,124 +973,65 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     }
 
-    @OptIn(DelicateCoroutinesApi::class)
-    @Suppress("EXPERIMENTAL_API_USAGE")
     fun pingTest(icmpPing: Boolean) {
-        if (DataStore.runningTest) return else DataStore.runningTest = true
+        if (DataStore.runningTest) return
+        val group = DataStore.currentGroup()
         val test = TestDialog()
         val dialog = test.builder.show()
-        val testJobs = mutableListOf<Job>()
-        val group = DataStore.currentGroup()
-
-        val mainJob = runOnDefaultDispatcher {
-            val profilesList = SagerDatabase.proxyDao.getByGroup(group.id).filter {
-                if (icmpPing) {
-                    if (it.requireBean().canICMPing()) {
-                        return@filter true
-                    }
-                } else {
-                    if (it.requireBean().canTCPing()) {
-                        return@filter true
-                    }
-                }
-                return@filter false
-            }
-            test.proxyN = profilesList.size
-            val profiles = ConcurrentLinkedQueue(profilesList)
-            repeat(DataStore.connectionTestConcurrent) {
-                testJobs.add(launch(Dispatchers.IO) {
-                    while (isActive) {
-                        val profile = profiles.poll() ?: break
-
-                        profile.status = 0
-                        var address = profile.requireBean().serverAddress
-                        if (!address.isIpAddress()) {
-                            try {
-                                SagerNet.underlyingNetwork!!.getAllByName(address).apply {
-                                    if (isNotEmpty()) {
-                                        address = this[0].hostAddress
-                                    }
-                                }
-                            } catch (ignored: UnknownHostException) {
-                            }
-                        }
-                        if (!isActive) break
-                        if (!address.isIpAddress()) {
-                            profile.status = 2
-                            profile.error = app.getString(R.string.connection_test_domain_not_found)
-                            test.update(profile)
-                            continue
-                        }
-                        try {
-                            if (icmpPing) {
-                                // removed
-                            } else {
-                                val socket =
-                                    SagerNet.underlyingNetwork?.socketFactory?.createSocket()
-                                        ?: Socket()
-                                try {
-                                    socket.soTimeout = 3000
-                                    socket.bind(InetSocketAddress(0))
-                                    val start = SystemClock.elapsedRealtime()
-                                    socket.connect(
-                                        InetSocketAddress(
-                                            address, profile.requireBean().serverPort
-                                        ), 3000
-                                    )
-                                    if (!isActive) break
-                                    profile.status = 1
-                                    profile.ping = (SystemClock.elapsedRealtime() - start).toInt()
-                                    test.update(profile)
-                                } finally {
-                                    socket.closeQuietly()
-                                }
-                            }
-                        } catch (e: Exception) {
-                            if (!isActive) break
-                            val failure = io.nekohasekai.sagernet.utils.TcpConnectionFailure.classify(e)
-                            profile.status = if (failure == io.nekohasekai.sagernet.utils.TcpConnectionFailure.OTHER) 3 else 2
-                            profile.error = when (failure) {
-                                io.nekohasekai.sagernet.utils.TcpConnectionFailure.TIMEOUT -> getString(R.string.connection_test_timeout)
-                                io.nekohasekai.sagernet.utils.TcpConnectionFailure.REFUSED -> getString(R.string.connection_test_refused)
-                                io.nekohasekai.sagernet.utils.TcpConnectionFailure.UNREACHABLE -> getString(R.string.connection_test_unreachable)
-                                else -> e.readableMessage
-                            }
-                            test.update(profile)
-                        }
-                    }
-                })
-            }
-
-            testJobs.joinAll()
-
-            runOnMainDispatcher {
-                test.cancel()
-            }
-        }
+        val network = SagerNet.underlyingNetwork
+        val concurrency = DataStore.connectionTestConcurrent
+        DataStore.runningTest = true
+        var mainJob: Job? = null
         test.cancel = {
             test.dialogStatus.set(2)
             dialog.dismiss()
-            runOnDefaultDispatcher {
-                mainJob.cancel()
-                testJobs.forEach { it.cancel() }
-                test.results.forEach {
-                    try {
-                        ProfileManager.updateProfile(it)
-                    } catch (e: Exception) {
-                        Logs.w(e)
-                    }
-                }
-                GroupManager.postReload(DataStore.currentGroupId())
-                DataStore.runningTest = false
-            }
+            mainJob?.cancel()
         }
         test.minimize = {
             test.dialogStatus.set(1)
-            test.notification = ConnectionTestNotification(
-                dialog.context,
-                "[${group.displayName()}] ${getString(R.string.connection_test)}"
-            )
+            test.notification = ConnectionTestNotification(dialog.context,
+                "[${group.displayName()}] ${getString(R.string.connection_test)}")
             dialog.hide()
+        }
+        mainJob = runOnMainDispatcher {
+            try {
+                withContext(Dispatchers.Default) {
+                    runUrlTestBatch(
+                        load = { SagerDatabase.proxyDao.getByGroup(group.id).filter {
+                            if (icmpPing) it.requireBean().canICMPing() else it.requireBean().canTCPing()
+                        } },
+                        concurrency = concurrency,
+                        test = { profile ->
+                            val document = profile.document
+                            val bean = profile.requireBean()
+                            val result = io.nekohasekai.sagernet.bg.proto.tcpProbe(
+                                profile.id, document, network, bean.serverAddress, bean.serverPort)
+                            profile.status = result.status
+                            profile.ping = result.ping
+                            profile.error = result.error
+                            profile to result
+                        },
+                        save = { results ->
+                            ProfileManager.updateConnectionTestResults(results.map { it.second })
+                            GroupManager.postReload(group.id)
+                        },
+                        onStarted = { test.proxyN = it },
+                        onResult = { test.update(it.first) },
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                cancelled.suppressed.forEach { Logs.w(it) }
+            } catch (error: Exception) {
+                Logs.w(error)
+                if (isAdded) snackbar(error.readableMessage).show()
+            } finally {
+                withContext(NonCancellable + Dispatchers.Main.immediate) {
+                    test.dialogStatus.set(2)
+                    test.notification?.updateNotification(test.finishedN.get(), test.proxyN, true)
+                    dialog.dismiss()
+                    DataStore.runningTest = false
+                }
+            }
         }
     }
 
@@ -1203,20 +1121,24 @@ class ConfigurationFragment @JvmOverloads constructor(
                                 ConnectionTestResult(profile.id, 1, urlTest.doTest(profile), null)
                             } catch (cancelled: CancellationException) {
                                 throw cancelled
+                            } catch (unsupported: io.nekohasekai.sagernet.bg.proto.UnsupportedStandaloneProbe) {
+                                ConnectionTestResult(profile.id, -1, 0, unsupported.message)
                             } catch (error: Exception) {
                                 // Native request aborts and cleanup failures must not become failed nodes.
                                 if (!currentCoroutineContext().isActive) Logs.w(error)
                                 currentCoroutineContext().ensureActive()
                                 ConnectionTestResult(profile.id, 3, 0, error.readableMessage)
                             }
-                            val description = if (result.status == 1) {
+                            val description = if (result.status == -1) {
+                                result.error.orEmpty()
+                            } else if (result.status == 1) {
                                 application.getString(R.string.available, result.ping)
                             } else {
                                 val error = result.error.orEmpty()
                                 Protocols.genFriendlyMsg(error).takeIf { it != error }
                                     ?: application.getString(R.string.unavailable)
                             }
-                            CompletedUrlTest(result, profile.displayName(), profile.displayType(), description)
+                            CompletedUrlTest(result.copy(expectedDocument = profile.document), profile.displayName(), profile.displayType(), description)
                         },
                         save = { results ->
                             ProfileManager.updateConnectionTestResults(results.map { it.result })
@@ -1231,11 +1153,11 @@ class ConfigurationFragment @JvmOverloads constructor(
                             state.updateAndGet { it.copy(
                                 completed = it.completed + 1,
                                 available = it.available + if (available) 1 else 0,
-                                failed = it.failed + if (available) 0 else 1,
+                                failed = it.failed + if (completed.result.status in 2..3) 1 else 0,
                                 lastName = completed.name,
                                 lastProtocol = completed.protocol,
                                 lastResult = completed.description,
-                                lastSuccess = available,
+                                lastSuccess = if (completed.result.status == -1) null else available,
                             ) }
                         },
                     )
@@ -2141,7 +2063,10 @@ class ConfigurationFragment @JvmOverloads constructor(
                 (trafficText.parent as View).isGone =
                     (!showTraffic || proxyEntity.status <= 0) && address.isBlank()
 
-                if (proxyEntity.status <= 0) {
+                if (proxyEntity.status == -1) {
+                    profileStatus.text = proxyEntity.error.orEmpty()
+                    profileStatus.setTextColor(requireContext().getColorAttr(android.R.attr.textColorSecondary))
+                } else if (proxyEntity.status == 0) {
                     if (showTraffic) {
                         profileStatus.text = trafficText.text
                         profileStatus.setTextColor(requireContext().getColorAttr(android.R.attr.textColorSecondary))

@@ -161,3 +161,28 @@ git diff --check
 ### 规则集错误提示改进
 
 后续按用户要求，将规则集兜底错误提示改为“规则集无效，请检查地址和格式”，不再要求用户一律重新下载。适用于本次发现的链接、端口、路径和格式校验错误，底层校验逻辑保持不变。版本递增至 2.1.1 / VERSION_CODE=99；本项为文案改动，未重新声明正式包真机验收。
+
+## 2.1.2：旧管理与测速入口五项修复
+
+复核基线 `1020530092d10d333161f86988fae8eb1f5d9a00`。五项调用链问题均在源码中确认；此前规则集元数据校验和 CI 阻塞继续关闭。本轮没有改动 Go 核心或重写已验证的运行编译流程。
+
+| 项目 | 修复与证据 |
+|---|---|
+| 手动去重误删 | 普通节点复用订阅的完整 Profile 连接语义，只忽略 id/name。链与原始配置保守保留，不自动去重。测试覆盖凭据、TLS、传输差异、端点拼接碰撞及仅名称不同；删除事务还重新核对候选文档、分组和仍存在的保留副本，确认期间被修改或已成为最后副本时不删。 |
+| 测速整行写回 | TCP、URL 结果只写 status/ping/error，并通过 document 条件拒绝配置已变化的旧结果；清除结果使用组内字段级 UPDATE。真实 Room 测试按旧快照→配置与流量提交→测速保存/清除的顺序验证配置保留、tx 从 100 经 200 与 50 增量达到 350，未回退。没有数据库 schema 变化。 |
+| 空网络与取消 | TCP 使用同一个经过空值检查的 Network 快照完成 DNS/建连，无网络返回中性提示。复用批次协程的取消、等待和稳定结果保存；会话 finally 清理通知、对话框、运行标志。新增空网络、DNS 不打开 socket、取消关闭 socket 并等待工作退出测试，既有批次失败/取消回归一并通过。 |
+| 原始配置独立测速 | 完整 raw config 在测速快照阶段明确拒绝，显示“该配置不支持独立测速”，不启动第二个实例。中性结果不算不可用，也不进入“删除不可用节点”。真机启动一个真实 mixed 监听，调用 TestInstance 收到预期拒绝后，再次完成 SOCKS 握手，原实例正常，最后关闭该合成实例。 |
+| 外部链接 | 增加 vless/hysteria2/hy2/tuic/anytls，修正 socks5/socks4a 拼写。真机由核心导出六种合成 URI，用 PackageManager 验证隐式 ACTION_VIEW/BROWSABLE 能解析到当前测试包的 MainActivity；普通 HTTP/HTTPS 不被截获。未打开个人链接或写入用户节点。 |
+
+验证命令（沿用锁定 Java 25 与工具链）：
+
+```sh
+./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+adb shell am instrument -w -r -e class io.nekohasekai.sagernet.LegacyBoundaryNativeTest,io.nekohasekai.sagernet.ConnectionTestPersistenceNativeTest com.vialen.app.debug.test/androidx.test.runner.AndroidJUnitRunner
+python3 scripts/check-public-content.py
+git diff --check
+```
+
+- 最终 JUnit XML 汇总 318 tests / 0 failures / 0 errors / 0 skipped；Lint 0 errors / 0 warnings / 11 hints；两个 Debug APK 编译成功。
+- 连接真机上的 5 项 instrumentation 专项通过，使用隔离测试包、内存数据库和合成回环监听，不是对正式安装包全部界面的验收。没有关闭 Wi-Fi、变更显示参数、创建模拟器或操作个人节点删除。原始测试输出保留在仓库外。
+- 版本递增至 2.1.2 / VERSION_CODE=100。本轮未推送、未发布 APK，也未替换手机上的正式包。旧 Android、长期网络切换与全部页面交互不因这些测试转为通过。

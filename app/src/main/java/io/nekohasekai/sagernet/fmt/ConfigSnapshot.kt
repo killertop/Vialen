@@ -207,6 +207,7 @@ internal class ConfigSnapshot private constructor(
         fun capture(proxy: ProxyEntity, forTest: Boolean, forExport: Boolean): ConfigSnapshot {
             val chosen = ProfileDocument.decode(proxy.document)
             if (chosen.kind == "raw_config" && chosen.scope == "config") {
+                if (forTest) throw io.nekohasekai.sagernet.bg.proto.UnsupportedStandaloneProbe()
                 return ConfigSnapshot(null, mapOf(proxy.id to proxy.copy()), emptyMap(), proxy.id, -1, chosen.content)
             }
             lateinit var policy: JsonObject
