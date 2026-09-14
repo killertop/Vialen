@@ -168,7 +168,13 @@ object ProfileManager {
     suspend fun updateProfile(profile: ProxyEntity) {
         if (profile.type != ProxyEntity.TYPE_CHAIN && profile.type != ProxyEntity.TYPE_CONFIG) CoreClient.validate(profile.requireProfile())
         currentCoroutineContext().ensureActive()
-        SagerDatabase.proxyDao.updateProxy(profile)
+        SagerDatabase.instance.runInTransaction {
+            val traffic = SagerDatabase.proxyDao.getTraffic(profile.id)
+                ?: error("Profile no longer exists")
+            profile.tx = traffic.tx
+            profile.rx = traffic.rx
+            SagerDatabase.proxyDao.updateProxy(profile)
+        }
         iterator { onUpdated(profile, false) }
     }
 

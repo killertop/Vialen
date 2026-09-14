@@ -1,5 +1,6 @@
 package io.nekohasekai.sagernet
 
+import android.os.SystemClock
 import androidx.room.Room
 import org.robolectric.RuntimeEnvironment
 import io.nekohasekai.sagernet.database.SagerDatabase
@@ -100,7 +101,12 @@ class TrafficEfficiencyLifecycleTest {
             unmockkAll()
         }
     }
-    private fun start(selector:Boolean=false, supplied:ConfigBuildResult?=null):TrafficLooper {
+    private fun start(
+        selector:Boolean=false,
+        supplied:ConfigBuildResult?=null,
+        checkpointIntervalMillis:Long=TrafficLooper.CHECKPOINT_INTERVAL_MILLIS,
+        elapsedRealtime:()->Long=SystemClock::elapsedRealtime,
+    ):TrafficLooper {
         val rows=(1L..2L).map { id -> ProxyEntity(id=id,rx=id*100,tx=id*10).apply {
             putBean(SOCKSBean().applyDefaultValues())
         } }
@@ -113,7 +119,13 @@ class TrafficEfficiencyLifecycleTest {
         // changeState reads its backing field directly; populate it for the real Data spy too.
         data.proxy = proxy
         every { data.proxy } returns proxy
-        return TrafficLooper(data,readStats={tag,direction -> readStats(tag,direction)},installStats={installs.incrementAndGet();Unit}).also { looper=it;every { proxy.looper } returns it;it.start() }
+        return TrafficLooper(
+            data,
+            readStats={tag,direction -> readStats(tag,direction)},
+            installStats={installs.incrementAndGet();Unit},
+            checkpointIntervalMillis=checkpointIntervalMillis,
+            elapsedRealtime=elapsedRealtime,
+        ).also { looper=it;every { proxy.looper } returns it;it.start() }
     }
     private fun add(tag:String,tx:Long,rx:Long) {
         counters.computeIfAbsent("$tag/uplink") { AtomicLong() }.addAndGet(tx)
@@ -135,6 +147,29 @@ class TrafficEfficiencyLifecycleTest {
         stop()
         val row=persisted.last { it.id==1L }
         assertEquals(17L,row.tx);assertEquals(111L,row.rx)
+    }
+
+    @Test fun periodicCheckpointPersistsEveryTrackedRowWithoutSelectionOrStop() = runBlocking {
+        start(
+            checkpointIntervalMillis = 40,
+            // Robolectric's SystemClock does not advance with coroutine delays.
+            elapsedRealtime = { System.nanoTime() / 1_000_000L },
+        )
+        awaitCondition { queries.get() >= 6 }
+        add("one", 7, 11)
+        add("two", 13, 17)
+        awaitCondition {
+            database.proxyDao().getById(1)!!.tx == 17L &&
+                database.proxyDao().getById(1)!!.rx == 111L &&
+                database.proxyDao().getById(2)!!.tx == 33L &&
+                database.proxyDao().getById(2)!!.rx == 217L
+        }
+        // Later checkpoints re-read reset native counters but must not add the same bytes twice.
+        delay(120)
+        assertEquals(17L, database.proxyDao().getById(1)!!.tx)
+        assertEquals(111L, database.proxyDao().getById(1)!!.rx)
+        assertEquals(33L, database.proxyDao().getById(2)!!.tx)
+        assertEquals(217L, database.proxyDao().getById(2)!!.rx)
     }
 
     @Test fun resetDrainsOldCountersAndQueuedWritesCannotRestoreThem() = runBlocking {
@@ -265,6 +300,18 @@ class TrafficEfficiencyLifecycleTest {
         val before=queries.get();loop.selectMain(1)
         assertEquals(before,queries.get())
     }
+    @Test fun savingStaleProfilePreservesCommittedTraffic() = runBlocking {
+        start(selector = true)
+        val draft = checkNotNull(database.proxyDao().getById(2))
+        draft.requireBean().name = "saved draft"
+        ProfileManager.addTraffic(TrafficData(2, 17, 29))
+        ProfileManager.updateProfile(draft)
+        val saved = checkNotNull(database.proxyDao().getById(2))
+        assertEquals(37L, saved.tx)
+        assertEquals(229L, saved.rx)
+        assertEquals("saved draft", saved.requireBean().name)
+    }
+
     private fun editSecondProfile() {
         val row = checkNotNull(database.proxyDao().getById(2))
         row.userOrder = 91

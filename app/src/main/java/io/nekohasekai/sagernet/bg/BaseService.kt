@@ -20,6 +20,7 @@ import io.nekohasekai.sagernet.database.ProfileManager
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.utils.DefaultNetworkListener
 import kotlinx.coroutines.*
+import kotlinx.coroutines.cancel as cancelScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import libcore.Libcore
@@ -60,11 +61,12 @@ class BaseService {
                 Action.RELOAD -> service.reload(intent.getBooleanExtra("forceRestart", false))
                 // Action.SWITCH_WAKE_LOCK -> runOnDefaultDispatcher { service.switchWakeLock() }
                 PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED -> {
+                    val running = proxy?.takeIf { state == State.Connected && it.isInitialized() }
                     if (SagerNet.power.isDeviceIdleMode) {
                         recovery?.idleChanged(true)
-                        proxy?.box?.sleep()
+                        running?.box?.sleep()
                     } else {
-                        proxy?.box?.wake()
+                        running?.box?.wake()
                         recovery?.idleChanged(false)
                     }
                 }
@@ -87,6 +89,8 @@ class BaseService {
 
         val binder = Binder(this)
         var connectingJob: Job? = null
+        internal var reloadJob: Job? = null
+        internal var reloadGeneration = 0L
 
         fun changeState(s: State, msg: String? = null) {
             if (state == s && msg == null) return
@@ -172,12 +176,14 @@ class BaseService {
         }
 
         override fun urlTest(): Int {
-            if (data?.proxy?.box == null) {
+            val current = data
+            val proxy = current?.proxy
+            if (current?.state != State.Connected || proxy == null || !proxy.isInitialized()) {
                 error("core not started")
             }
             try {
                 return Libcore.urlTest(
-                    data!!.proxy!!.box, DataStore.connectionTestURL, 3000
+                    proxy.box, DataStore.connectionTestURL, 3000
                 )
             } catch (e: Exception) {
                 error(Protocols.genFriendlyMsg(e.readableMessage))
@@ -193,7 +199,7 @@ class BaseService {
             callbacks.kill()
             callbackIdMap.clear()
             data?.proxy?.looper?.onConsumersChanged()
-            cancel()
+            cancelScope()
             data = null
         }
     }
@@ -207,58 +213,75 @@ class BaseService {
             if (intent.action == Action.SERVICE) data.binder else null
 
         fun reload(forceRestart: Boolean = false) {
-            if (DataStore.selectedProxy == 0L) {
+            val selectedId = DataStore.selectedProxy
+            if (selectedId == 0L) {
                 stopRunner(false, (this as Context).getString(R.string.profile_empty))
                 return
             }
-            val reusable = try {
-                if (forceRestart) {
-                    val candidate = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
-                        ?: error("Missing selected profile")
-                    ProxyInstance(candidate).buildConfigTmp()
-                    false
-                } else canReloadSelector()
-            } catch (error: Exception) {
-                if (error is CancellationException) throw error
-                // A candidate must compile before the live instance is touched. Do not log
-                // compiler messages, which may contain user configuration or credentials.
-                Toast.makeText(this as Context, R.string.reload_invalid_config, Toast.LENGTH_LONG).show()
-                return
-            }
-            if (reusable) {
-                val ent = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
-                val tag = data.proxy!!.config.profileTagMap[ent?.id] ?: ""
-                if (tag.isNotBlank() && ent != null) {
-                    // The native wrapper updates accounting and UI through its selection callback.
-                    data.proxy!!.box.selectOutbound(tag)
-                    return
+
+            data.reloadJob?.cancel(null)
+            val generation = ++data.reloadGeneration
+            val running = data.proxy
+            val reloadJob = data.binder.launch(start = CoroutineStart.LAZY) {
+                try {
+                    // Build and semantically validate every candidate before an existing
+                    // instance can be selected, stopped, or restarted.
+                    val candidate = buildReloadCandidate(selectedId)
+                    currentCoroutineContext().ensureActive()
+                    if (generation != data.reloadGeneration || selectedId != DataStore.selectedProxy ||
+                        data.proxy !== running || data.state == State.Stopping) return@launch
+
+                    val reusable = !forceRestart && canReloadSelector(candidate)
+                    if (reusable) {
+                        val tag = running!!.config.profileTagMap[selectedId].orEmpty()
+                        if (tag.isNotBlank()) {
+                            // The native wrapper updates accounting and UI through its selection callback.
+                            running.box.selectOutbound(tag)
+                            return@launch
+                        }
+                    }
+                    when (data.state) {
+                        State.Stopped -> startRunner()
+                        State.Connecting, State.Connected -> stopRunner(true)
+                        else -> Logs.w("Illegal state ${data.state} when invoking use")
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    if (generation == data.reloadGeneration && selectedId == DataStore.selectedProxy &&
+                        data.state != State.Stopping) {
+                        // A candidate must validate before the live instance is touched. Do not log
+                        // compiler messages, which may contain user configuration or credentials.
+                        Toast.makeText(this@Interface as Context, R.string.reload_invalid_config, Toast.LENGTH_LONG).show()
+                    }
+                } finally {
+                    if (data.reloadJob === currentCoroutineContext()[Job]) data.reloadJob = null
                 }
             }
-            val s = data.state
-            when {
-                s == State.Stopped -> startRunner()
-                s.canStop -> stopRunner(true)
-                else -> Logs.w("Illegal state $s when invoking use")
-            }
+            data.reloadJob = reloadJob
+            reloadJob.start()
         }
 
-        fun canReloadSelector(): Boolean {
+        suspend fun buildReloadCandidate(profileId: Long): ProxyInstance = withContext(Dispatchers.IO) {
+            val profile = SagerDatabase.proxyDao.getById(profileId)
+                ?: error("Missing selected profile")
+            ProxyInstance(profile).also { it.buildConfigTmpAndValidate() }
+        }
+
+        fun canReloadSelector(candidate: ProxyInstance): Boolean {
             val running = data.proxy ?: return false
             if (data.state != State.Connected || !running.isInitialized()) return false
             if ((data.proxy?.config?.selectorGroupId ?: -1L) < 0) return false
-            val ent = SagerDatabase.proxyDao.getById(DataStore.selectedProxy) ?: return false
-            val tmpBox = ProxyInstance(ent)
-            tmpBox.buildConfigTmp()
-            if (running.platformConfig != tmpBox.platformConfig) return false
+            if (running.platformConfig != candidate.platformConfig) return false
             return SelectorReloadPolicy.canReuse(
-                running.lastSelectorGroupId, tmpBox.lastSelectorGroupId,
-                running.config.config, tmpBox.config.config,
-                running.config.profileTagMap, tmpBox.config.profileTagMap, ent.id,
+                running.lastSelectorGroupId, candidate.lastSelectorGroupId,
+                running.config.config, candidate.config.config,
+                running.config.profileTagMap, candidate.config.profileTagMap, candidate.profile.id,
             )
         }
 
         suspend fun startProcesses() {
-            data.proxy!!.launch()
+            withContext(Dispatchers.IO) { data.proxy!!.launch() }
         }
 
         fun startRunner() {
@@ -288,7 +311,18 @@ class BaseService {
                 data.recovery = null
             }
             try {
-                data.proxy?.close()
+                // Return close failures as values so the main lifecycle keeps the original
+                // throwable identity when it combines later cleanup failures.
+                val proxy = data.proxy
+                val closeFailure = withContext(Dispatchers.IO) {
+                    try {
+                        proxy?.closeAndAwait()
+                        null
+                    } catch (error: Throwable) {
+                        error
+                    }
+                }
+                closeFailure?.let(::retain)
             } catch (error: Throwable) {
                 retain(error)
             }
@@ -317,11 +351,14 @@ class BaseService {
             val switchService = data.proxy?.platformConfig?.serviceMode?.let {
                 it != DataStore.serviceMode
             } == true
-            DataStore.baseService = null
-            DataStore.vpnService = null
 
             if (data.state == State.Stopping) return
             this as Service
+
+            if (DataStore.baseService === this) DataStore.baseService = null
+            data.reloadGeneration++
+            data.reloadJob?.cancel(null)
+            data.reloadJob = null
 
             data.changeState(State.Stopping)
 
@@ -344,6 +381,11 @@ class BaseService {
                     attempt { data.connectingJob?.cancelAndJoin() }
                     data.connectingJob = null
                     attempt { killProcesses() }
+                    attempt {
+                        // A launch in the IO dispatcher can still enter startVpn until its
+                        // connecting job has joined. Clear only the service that owns this stop.
+                        if (DataStore.vpnService === this@Interface) DataStore.vpnService = null
+                    }
                     attempt {
                         if (data.closeReceiverRegistered) unregisterReceiver(data.receiver)
                     }
@@ -389,7 +431,9 @@ class BaseService {
                 context = Dispatchers.Main.immediate,
                 now = { SystemClock.elapsedRealtime() },
                 probe = {
-                    val box = data.proxy?.box
+                    val box = data.proxy?.takeIf {
+                        data.state == State.Connected && it.isInitialized()
+                    }?.box
                     val target = ConnectionRecovery.probeTarget(DataStore.connectionTestURL)
                     if (data.state != State.Connected || box == null || target == null) {
                         ConnectionRecovery.Health.Unavailable
@@ -462,10 +506,9 @@ class BaseService {
         }
 
         fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-            DataStore.baseService = this
-
             val data = data
             if (data.state != State.Stopped) return Service.START_NOT_STICKY
+            DataStore.baseService = this
             cleanupFailure?.let { message ->
                 data.notification = createNotification("")
                 stopRunner(false, message)
@@ -521,7 +564,7 @@ class BaseService {
                     data.notification = createNotification(ServiceNotification.genTitle(profile))
 
                     preInit()
-                    proxy.init()
+                    withContext(Dispatchers.IO) { proxy.init() }
                     DataStore.currentProfile = profile.id
 
                     startProcesses()

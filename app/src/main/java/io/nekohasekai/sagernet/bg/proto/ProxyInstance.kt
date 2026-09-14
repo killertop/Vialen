@@ -6,7 +6,11 @@ import io.nekohasekai.sagernet.bg.PlatformConfigSnapshot
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.ktx.Logs
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import libcore.Libcore
+import moe.matsuri.nb4a.net.LocalResolverImpl
 
 class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = null) :
     BoxInstance(profile) {
@@ -36,6 +40,23 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
         buildConfig()
     }
 
+    /**
+     * Build and construct a temporary native instance before a running service is
+     * stopped. The Kotlin compiler catches graph errors, while the native
+     * constructor catches sing-box option errors (including full raw configs).
+     * The temporary instance is never started and is always closed before return.
+     */
+    suspend fun buildConfigTmpAndValidate() = withContext(Dispatchers.IO) {
+        buildConfigTmp()
+        val candidate = Libcore.newSingBoxInstance(config.config, LocalResolverImpl)
+        try {
+            // Construction is the semantic validation step. Do not start this
+            // instance: a candidate must not open a TUN or bind a listener.
+        } finally {
+            candidate.close()
+        }
+    }
+
     override fun launch() {
         box.setAsMain()
         super.launch() // start box
@@ -43,7 +64,9 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
         looper?.start()
     }
 
-    override fun close() {
+    override fun close() = runBlocking { closeAndAwait() }
+
+    suspend fun closeAndAwait() {
         var failure: Throwable? = null
         try {
             super.close()
@@ -51,7 +74,7 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
             failure = error
         }
         try {
-            runBlocking { looper?.stop() }
+            looper?.stop()
         } catch (error: Throwable) {
             val previous = failure
             if (previous == null) failure = error

@@ -34,9 +34,11 @@ import com.github.shadowsocks.plugin.Empty
 import com.github.shadowsocks.plugin.fragment.AlertDialogFragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.*
+import io.nekohasekai.sagernet.bg.proto.ProxyInstance
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.GroupManager
 import io.nekohasekai.sagernet.database.ProfileManager
+import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
 import io.nekohasekai.sagernet.databinding.LayoutGroupItemBinding
@@ -182,8 +184,17 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
             } else {
                 val entity = SagerDatabase.proxyDao.getById(editingId)
                     ?: error(getString(R.string.form_missing_record))
+                entity.apply { (requireBean() as T).serializeDraft() }
+                // ProfileManager validates normal nodes. Full/raw configurations need the
+                // native constructor as well, otherwise a valid JSON object can still stop
+                // a working connection before sing-box rejects its options.
+                if (entity.type == ProxyEntity.TYPE_CONFIG) {
+                    ProxyInstance(entity).buildConfigTmpAndValidate()
+                }
+                ProfileManager.updateProfile(entity)
+                // Request the stop only after serialization, validation and the Room write
+                // have all succeeded. An invalid edit must leave the running node untouched.
                 if (entity.id == DataStore.selectedProxy) SagerNet.stopService()
-                ProfileManager.updateProfile(entity.apply { (requireBean() as T).serializeDraft() })
             }
             onMainDispatcher { finish() }
 

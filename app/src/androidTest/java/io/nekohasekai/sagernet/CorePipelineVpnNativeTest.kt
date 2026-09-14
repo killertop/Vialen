@@ -293,6 +293,23 @@ class CorePipelineVpnNativeTest {
                     assertEquals(BaseService.State.Connected.ordinal, connection.service?.state)
                     assertEquals(rebuiltHandle, vpnHandle())
                     assertEquals("RUST_VPN_E2E_$nonce", requestThroughTun(13))
+                    val raw = ProxyEntity(type = ProxyEntity.TYPE_CONFIG, groupId = groupId,
+                        document = ProfileDocument.encode(
+                            ProfileDocument(kind = "raw_config", scope = "config",
+                                content = """{"outbounds":[{"type":"invalid-vialen-test"}]}""")))
+                    raw.id = db.proxyDao().addProxy(raw)
+                    try {
+                        DataStore.selectedProxy = raw.id
+                        for (force in listOf(false, true)) {
+                            SagerNet.reloadService(forceRestart = force)
+                            delay(1_000)
+                            assertEquals(BaseService.State.Connected.ordinal, connection.service?.state)
+                            assertEquals(rebuiltHandle, vpnHandle())
+                            assertEquals("RUST_VPN_E2E_$nonce", requestThroughTun(if (force) 15 else 14))
+                        }
+                    } finally {
+                        DataStore.selectedProxy = profiles.last().id
+                    }
                     SagerNet.stopService(); awaitState(BaseService.State.Stopped)
                     assertNull(io.nekohasekai.sagernet.bg.RunningServiceSnapshot.read(app))
                     println("TUN_RELOAD selection_same_tun=true platform_new_tun=true invalid_candidate_kept_tun=true http_payloads=4 stopped=true")

@@ -39,9 +39,9 @@ class ServiceStopFailureTest {
         var notifications = 0
         var extraStopError: String? = null
         var candidateFailure: Exception? = null
-        override fun canReloadSelector(): Boolean {
+        override suspend fun buildReloadCandidate(profileId: Long): io.nekohasekai.sagernet.bg.proto.ProxyInstance {
             candidateFailure?.let { throw it }
-            return super.canReloadSelector()
+            return mockk(relaxed = true)
         }
         override fun createNotification(profileName: String): ServiceNotification {
             notifications++

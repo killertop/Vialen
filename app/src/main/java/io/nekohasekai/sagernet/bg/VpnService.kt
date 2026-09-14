@@ -354,7 +354,7 @@ class VpnService : BaseVpnService(),
     override fun onRevoke() = stopRunner()
 
     override fun onDestroy() {
-        DataStore.vpnService = null
+        if (DataStore.vpnService === this) DataStore.vpnService = null
         super.onDestroy()
         data.binder.close()
     }

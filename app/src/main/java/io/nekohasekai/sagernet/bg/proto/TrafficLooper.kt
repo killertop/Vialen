@@ -1,5 +1,6 @@
 package io.nekohasekai.sagernet.bg.proto
 
+import android.os.SystemClock
 import io.nekohasekai.sagernet.aidl.SpeedDisplayData
 import io.nekohasekai.sagernet.aidl.TrafficData
 import io.nekohasekai.sagernet.bg.BaseService
@@ -8,6 +9,7 @@ import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
 import io.nekohasekai.sagernet.fmt.TAG_BYPASS
 import io.nekohasekai.sagernet.fmt.TAG_PROXY
+import io.nekohasekai.sagernet.ktx.Logs
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
@@ -18,11 +20,18 @@ class TrafficLooper internal constructor(
     val data: BaseService.Data,
     private val readStats: ((String, String) -> Long)? = null,
     private val installStats: ((String) -> Unit)? = null,
+    private val checkpointIntervalMillis: Long = CHECKPOINT_INTERVAL_MILLIS,
+    private val elapsedRealtime: () -> Long = SystemClock::elapsedRealtime,
 ) {
+    companion object {
+        internal const val CHECKPOINT_INTERVAL_MILLIS = 30_000L
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val lock = Any()
     private val wake = Channel<Unit>(Channel.CONFLATED)
-    private val writes = Channel<Long>(Channel.UNLIMITED)
+    private val writes = Channel<Unit>(Channel.CONFLATED)
+    private val pendingWrites = linkedSetOf<Long>()
     private var job: Job? = null
     private var writer: Job? = null
     private var stopped = false
@@ -36,6 +45,10 @@ class TrafficLooper internal constructor(
     private val owners = linkedMapOf<String, Set<Long>>()
     private val sampled = mutableMapOf<String, TrafficData>()
     private val statistics = DataStore.profileTrafficStatistics
+
+    init {
+        require(checkpointIntervalMillis > 0L) { "Traffic checkpoint interval must be positive" }
+    }
 
     /** Install counters before launch returns and before a selector can change. */
     fun start() {
@@ -60,8 +73,23 @@ class TrafficLooper internal constructor(
             (installStats ?: proxy.box::setV2rayStats)(tagMap.keys.joinToString("\n"))
             updater = TrafficUpdater(readStats ?: proxy.box::queryStats, tagMap.values.toList())
             writer = scope.launch {
-                for (id in writes) {
-                    persistTraffic(id)
+                for (@Suppress("UNUSED_VARIABLE") ignored in writes) {
+                    val ids = synchronized(lock) {
+                        val queued = pendingWrites.toList()
+                        pendingWrites.clear()
+                        queued
+                    }
+                    ids.forEach { id ->
+                        try {
+                            persistTraffic(id)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            // Keep the writer alive. The next bounded periodic checkpoint
+                            // retries this id without spinning or retaining an unbounded queue.
+                            Logs.w("Traffic checkpoint failed", error)
+                        }
+                    }
                 }
             }
             job = scope.launch { loop() }
@@ -79,8 +107,19 @@ class TrafficLooper internal constructor(
         val previousOwners = selectedOwners()
         selectedId = id
         updater?.resetRate(checkNotNull(tagMap[TAG_PROXY]))
-        if (statistics) previousOwners.forEach { writes.trySend(it) }
+        requestPersistenceLocked(previousOwners)
         wake.trySend(Unit)
+    }
+
+    /** This is called under [lock]. A conflated signal plus this set preserves every
+     * affected row while bounding queued work to the active configuration size. */
+    private fun requestPersistenceLocked(ids: Iterable<Long>) {
+        if (!statistics || stopped) return
+        var changed = false
+        ids.forEach { id ->
+            if (id in persisted && pendingWrites.add(id)) changed = true
+        }
+        if (changed) writes.trySend(Unit)
     }
 
     private fun selectedOwners(): Set<Long> {
@@ -143,6 +182,7 @@ class TrafficLooper internal constructor(
                 }
                 if (id in persisted) persisted[id] = TrafficData(id)
             }
+            pendingWrites.removeAll(ids.toSet())
             ids
         }
         ids.forEach { ProfileManager.postUpdate(TrafficData(it)) }
@@ -178,12 +218,18 @@ class TrafficLooper internal constructor(
         data.binder.callbackIdMap.containsValue(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND)
 
     private suspend fun loop() {
+        var nextCheckpointAt = elapsedRealtime() + checkpointIntervalMillis
         while (currentCoroutineContext().isActive) {
             val foreground = hasConsumer()
+            val now = elapsedRealtime()
             persistenceMutex.withLock {
                 val display = synchronized(lock) {
                     if (stopped) return
                     if (foreground || statistics) sampleLocked()
+                    if (statistics && now >= nextCheckpointAt) {
+                        requestPersistenceLocked(persisted.keys)
+                        nextCheckpointAt = now + checkpointIntervalMillis
+                    }
                     if (foreground) displaySnapshot() else null
                 }
                 if (display != null) data.binder.broadcast { callback ->
@@ -193,8 +239,12 @@ class TrafficLooper internal constructor(
                     }
                 }
             }
-            val delay = TrafficSampling.interval(foreground, statistics)
-            if (delay == null) wake.receive()
+            val samplingDelay = TrafficSampling.interval(foreground, statistics) ?: Long.MAX_VALUE
+            val checkpointDelay = if (statistics) {
+                (nextCheckpointAt - elapsedRealtime()).coerceAtLeast(0L)
+            } else Long.MAX_VALUE
+            val delay = minOf(samplingDelay, checkpointDelay)
+            if (delay == Long.MAX_VALUE) wake.receive()
             else withTimeoutOrNull(delay) { wake.receive() }
         }
     }

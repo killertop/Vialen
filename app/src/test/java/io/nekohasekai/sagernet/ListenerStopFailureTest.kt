@@ -290,7 +290,7 @@ class ListenerStopFailureTest {
             val coreFailure = IllegalStateException("core close failed")
             val listenerFailure = IllegalArgumentException("listener unregister failed")
             every { fake.data.proxy } returns proxy
-            every { proxy.close() } throws coreFailure
+            coEvery { proxy.closeAndAwait() } throws coreFailure
             every { connectivity.unregisterNetworkCallback(any<ConnectivityManager.NetworkCallback>()) } throws listenerFailure
             fake.wakeLock = lock
             DefaultNetworkListener.start(fake) {}
@@ -301,7 +301,7 @@ class ListenerStopFailureTest {
             assertTrue("Wake lock reference cleared despite core failure", fake.wakeLock == null)
             assertFalse("Wake lock released despite core failure", lock.isHeld)
             assertFalse("Core failure must not leave the listener registered", DefaultNetworkListener.stop(fake))
-            verify(exactly = 1) { proxy.close() }
+            coVerify(exactly = 1) { proxy.closeAndAwait() }
             verify(exactly = 1) { connectivity.unregisterNetworkCallback(any<ConnectivityManager.NetworkCallback>()) }
         }
     }
