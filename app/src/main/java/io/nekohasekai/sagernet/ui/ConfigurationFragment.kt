@@ -451,7 +451,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                         performToolbarAction(id)
                     }
                 }
-            }, widthDp = 240)
+            }, widthDp = 176)
         }
     }
 
@@ -466,7 +466,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                     CompactMenuAction(item.title ?: "", icon) { performToolbarAction(id) }
                 }
-            }, widthDp = 240)
+            }, widthDp = 176)
         }
     }
 
@@ -474,7 +474,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         toolbar.menu.performIdentifierAction(itemId, 0)
     }
 
-    private fun showCompactMenu(anchor: View, actions: List<CompactMenuAction>, widthDp: Int = 232) {
+    private fun showCompactMenu(anchor: View, actions: List<CompactMenuAction>, widthDp: Int = 176) {
         if (actions.isEmpty() || !isAdded) return
         compactMenuPopup?.dismiss()
 
@@ -526,7 +526,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             if (anchor.isAttachedToWindow) anchor.background = originalBackground
         }
         compactMenuPopup = popup
-        popup.showAsDropDown(anchor, 0, dp2px(4), android.view.Gravity.END)
+        popup.showAsDropDown(anchor, -dp2px(9), dp2px(4), android.view.Gravity.END)
     }
 
     private fun compactMenuRow(
