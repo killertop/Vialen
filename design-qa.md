@@ -14,8 +14,7 @@ final result: passed
 
 原生 Android 实现，不使用网页预览、模拟器或静态截图冒充实际 UI。视觉稿落地与 design-qa 流程用于逐页实际截图对照；现有原生图标、logo 和字体角色是交互不变约束下的资产依据。
 
-源目录：`/redacted/.codex/generated_images/01a090e9-88dd-7621-b986-8421fc007d0f/`。
-最终实现/对照目录：`/redacted/Downloads/Vialen-pearl-1.7.6-20260912-UfuihA/resume-QFm8qe/`。父目录保留首次对照的历史证据，不覆盖旧图。
+原始效果图和真机对照资料保留在本地，不随源码公开。
 
 | 页面 | 源文件 | 实现截图 | 同输入并排证据 |
 | --- | --- | --- | --- |

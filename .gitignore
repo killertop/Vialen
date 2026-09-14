@@ -22,5 +22,13 @@ jniLibs/
 
 # Keep local signing material outside source control.
 /release.keystore
+*.jks
+*.keystore
+*keystore-password*
+/.env
+/.env.*
+/qa/*
+!/qa/fixtures/
+!/qa/README.md
 
 __pycache__/
