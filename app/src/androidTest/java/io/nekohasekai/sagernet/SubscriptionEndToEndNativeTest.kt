@@ -129,7 +129,14 @@ class SubscriptionEndToEndNativeTest {
                 assertTrue(runCatching { RawUpdater.doUpdate(group, sub, ui, false) }.isFailure)
                 assertEquals(rows.map { it.id }, db.proxyDao().getByGroup(group.id).map { it.id })
                 assertEquals(3, successes)
-                assertEquals(6, server.requests.get())
+                server.reply.set(LoopbackHttpFixture.Reply(body = "proxies: [{type: socks5, name: ordinary, server: example.test, port: 1080}, {type: socks5, name: dependent, server: example.test, port: 1081, dialer-proxy: synthetic-dependency}]"))
+                val dependencyFailure = runCatching { RawUpdater.doUpdate(group, sub, ui, false) }.exceptionOrNull()
+                assertNotNull(dependencyFailure)
+                assertFalse(dependencyFailure!!.message.orEmpty().contains("synthetic-dependency"))
+                assertEquals(rows.map { it.id }, db.proxyDao().getByGroup(group.id).map { it.id })
+                assertEquals(lastUpdated, db.groupDao().getById(group.id)!!.subscription!!.lastUpdated)
+                assertEquals(3, successes)
+                assertEquals(7, server.requests.get())
             } finally {
                 db.runInTransaction { db.proxyDao().deleteByGroup(group.id); db.groupDao().deleteById(group.id) }
             }

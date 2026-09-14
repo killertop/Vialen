@@ -22,6 +22,17 @@ object RawUpdater : GroupUpdater() {
         byUser: Boolean
     ) {
 
+        refresh(SubscriptionRefresh.begin(SagerDatabase.instance, proxyGroup.id), userInterface, byUser)
+    }
+
+    internal suspend fun refresh(ticket: SubscriptionRefresh.Ticket, userInterface: GroupManager.Interface?, byUser: Boolean) {
+        val currentGroup = ticket.group
+        val currentSubscription = checkNotNull(currentGroup.subscription)
+        update(ticket, currentGroup, currentSubscription, userInterface, byUser)
+    }
+
+    private suspend fun update(ticket: SubscriptionRefresh.Ticket, proxyGroup: ProxyGroup,
+        subscription: SubscriptionBean, userInterface: GroupManager.Interface?, byUser: Boolean) {
         val link = subscription.link
         var proxies: List<Profile>
         var remoteUserinfo: String? = null
@@ -61,25 +72,13 @@ object RawUpdater : GroupUpdater() {
         } else emptyList()
 
         currentCoroutineContext().ensureActive()
-        val previousName = proxyGroup.name
-        val previousUserinfo = subscription.subscriptionUserinfo
-        val previousTimestamp = subscription.lastUpdated
-        remoteGroupName?.let { proxyGroup.name = it }
-        remoteUserinfo?.let { subscription.subscriptionUserinfo = it }
-        subscription.lastUpdated = (System.currentTimeMillis() / 1000).toInt()
-        val result = try {
-            SubscriptionPersistence.apply(SagerDatabase.instance, proxyGroup, proxies)
-        } catch (error: Throwable) {
-            proxyGroup.name = previousName
-            subscription.subscriptionUserinfo = previousUserinfo
-            subscription.lastUpdated = previousTimestamp
-            throw error
-        }
+        val result = SubscriptionPersistence.apply(SagerDatabase.instance, ticket, proxies, remoteUserinfo, remoteGroupName)
         currentCoroutineContext().ensureActive()
         io.nekohasekai.sagernet.database.ProfileManager.selectFirstIfNeeded(proxyGroup.id)
 
         userInterface?.onUpdateSuccess(
-            proxyGroup, result.changed, result.added, result.updated, result.deleted, duplicate, byUser
+            SagerDatabase.groupDao.getById(proxyGroup.id) ?: return,
+            result.changed, result.added, result.updated, result.deleted, duplicate, byUser
         )
     }
 

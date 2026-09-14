@@ -39,13 +39,18 @@ class ServiceStopFailureTest {
         var notifications = 0
         var extraStopError: String? = null
         var candidateFailure: Exception? = null
+        var notificationFailure: Exception? = null
+        var preInitCalls = 0
+        override suspend fun preInit() { preInitCalls++ }
         override suspend fun buildReloadCandidate(profileId: Long): io.nekohasekai.sagernet.bg.proto.ProxyInstance {
             candidateFailure?.let { throw it }
             return mockk(relaxed = true)
         }
         override fun createNotification(profileName: String): ServiceNotification {
             notifications++
-            return mockk(relaxed = true)
+            return mockk<ServiceNotification>(relaxed = true).also { notification ->
+                coEvery { notification.start() } coAnswers { notificationFailure?.let { throw it }; Unit }
+            }
         }
         override fun acquireWakeLock() = Unit
         override suspend fun killProcesses() {
@@ -86,6 +91,40 @@ class ServiceStopFailureTest {
         it.data.state = BaseService.State.Connected
         it.data.notification = mockk(relaxed = true)
         it.data.closeReceiverRegistered = true
+    }
+
+    @Test fun foregroundTypesSeparateVpnAndPureProxy() {
+        assertEquals(android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED, ServiceNotification.foregroundType(true))
+        assertEquals(android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE, ServiceNotification.foregroundType(false))
+    }
+
+    @Test fun foregroundFailureAbortsBeforeNativeInitializationAndCleansUp() {
+        val service = service()
+        service.data.state = BaseService.State.Stopped
+        service.notificationFailure = SecurityException("synthetic foreground rejection")
+        every { DataStore.selectedProxy } returns 1L
+        every { DataStore.selectedGroup } returns 1L
+        every { DataStore.pendingSelectionGroup } returns 0L
+        every { DataStore.persistAcrossReboot } returns false
+        mockkObject(io.nekohasekai.sagernet.database.SagerDatabase.Companion,
+            io.nekohasekai.sagernet.database.ProfileManager, BootReceiver.Companion)
+        every { BootReceiver.enabled = any() } just Runs
+        every { io.nekohasekai.sagernet.database.ProfileManager.selectFirstIfNeeded(any()) } just Runs
+        val dao = mockk<io.nekohasekai.sagernet.database.ProxyEntity.Dao>()
+        every { io.nekohasekai.sagernet.database.SagerDatabase.instance } returns mockk(relaxed = true)
+        every { io.nekohasekai.sagernet.database.SagerDatabase.proxyDao } returns dao
+        every { dao.getById(any()) } returns io.nekohasekai.sagernet.database.ProxyEntity(id = 1).putProfile(
+            io.nekohasekai.sagernet.core.Profile(type = "socks", server = "example.test", port = 1080,
+                socks = io.nekohasekai.sagernet.core.Profile.Socks()))
+        service.onStartCommand(null, 0, 1)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertEquals(1, service.notifications)
+        assertEquals(0, service.preInitCalls)
+        assertEquals(BaseService.State.Stopped, service.data.state)
+        assertEquals(1, service.killCalls)
+        assertNull(service.data.proxy)
+        assertNull(service.data.notification)
+        assertTrue(shadowOf(service).isStoppedBySelf)
     }
 
     @Test fun invalidReloadCandidateKeepsTheLiveInstanceAndReportsControlledMessage() {

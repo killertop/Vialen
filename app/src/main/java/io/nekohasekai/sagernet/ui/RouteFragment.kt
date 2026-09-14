@@ -360,7 +360,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                     ruleEntity.enabled = enabled
                     writes.submit {
                         try {
-                            val changed = SagerDatabase.rulesDao.updateEnabled(id, enabled)
+                            val changed = ProfileManager.setRuleEnabled(id, enabled)
                             onMainDispatcher {
                                 if (epoch != version || pendingEnabled[id]?.first != ticket) return@onMainDispatcher
                                 pendingEnabled.remove(id)

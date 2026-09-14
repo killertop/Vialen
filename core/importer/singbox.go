@@ -125,6 +125,14 @@ func singboxProfile(m map[string]any) (profile.Profile, error) {
 		return p, bad("UNSUPPORTED_PROTOCOL", "Unsupported sing-box node type")
 	}
 	advancedFields(&f, &p, false)
+	for _, key := range []string{"bind_interface", "inet4_bind_address", "inet6_bind_address"} {
+		if f.has(key) && f.str(key) != "" {
+			return p, bad("UNSUPPORTED_SECURITY_FIELD", "Connection binding cannot be preserved by an independent profile")
+		}
+	}
+	if f.has("routing_mark") && f.uint("routing_mark", math.MaxUint32) != 0 {
+		return p, bad("UNSUPPORTED_SECURITY_FIELD", "Connection routing mark cannot be preserved by an independent profile")
+	}
 	if f.has("detour") && f.str("detour") != "" {
 		return p, bad("DEPENDENT_NODE", "Detour nodes require an explicit chain and cannot be imported independently")
 	}

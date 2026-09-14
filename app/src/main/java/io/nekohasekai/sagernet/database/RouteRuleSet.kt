@@ -49,21 +49,27 @@ data class RouteRuleSet(
 
     companion object {
         fun validateRule(row: RuleEntity) {
-            decode(row.ruleSets)
+            val refs = decode(row.ruleSets)
+            refs.filter { !it.source.startsWith("https://") }.forEach {
+                val file = if (it.source.startsWith('/')) File(it.source)
+                    else File(io.nekohasekai.sagernet.SagerNet.application.filesDir, it.source)
+                require(file.isFile && file.canRead()) { "规则文件不存在，请重新导入" }
+            }
+            val uids = if (row.packages.isEmpty()) emptyList() else {
+                io.nekohasekai.sagernet.utils.PackageCache.awaitLoadSync()
+                row.packages.map {
+                    requireNotNull(io.nekohasekai.sagernet.utils.PackageCache[it]) { "应用已卸载，请重新选择" }
+                        .also { uid -> require(uid >= 0) { "应用信息无效，请重新选择" } }
+                }
+            }
             for (raw in listOf(row.domains, row.ip, row.source)) {
                 require(raw.split(',', '\n').none { val v = it.trim(); v.startsWith("geoip:") || v.startsWith("geosite:") || v.startsWith("geoip-") || v.startsWith("geosite-") || v.contains("://") }) {
                     "Use the rule-set selector instead of GeoIP/Geosite shorthand or URLs in address fields"
                 }
             }
-            for (raw in listOf(row.port, row.sourcePort)) {
-                raw.split(',', '\n').map(String::trim).filter(String::isNotEmpty).forEach { part ->
-                    val bounds = part.split(':')
-                    require(bounds.size in 1..2) { "Invalid port: $part" }
-                    fun port(s: String, default: Int?): Int = (if (s.isEmpty()) default else s.toIntOrNull())?.takeIf { it in 0..65535 } ?: error("Invalid port: $part")
-                    if (bounds.size == 1) port(bounds[0], null)
-                    else require(port(bounds[0], 0) <= port(bounds[1], 65535)) { "Reversed port range: $part" }
-                }
-            }
+            val match = io.nekohasekai.sagernet.fmt.ConfigSnapshot.match(row, uids)
+            match.add("rule_set_ids", com.google.gson.Gson().toJsonTree(refs.indices.map { "set-$it" }))
+            io.nekohasekai.sagernet.core.CoreClient.validateRuleMatch(match)
         }
         fun decode(raw: String): List<RouteRuleSet> {
             if (raw.isBlank()) return emptyList()

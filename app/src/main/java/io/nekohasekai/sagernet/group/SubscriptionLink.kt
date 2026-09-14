@@ -3,11 +3,9 @@ package io.nekohasekai.sagernet.group
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 internal object SubscriptionLink {
-    fun normalize(raw: String, existing: String? = null): String {
+    fun normalize(raw: String): String {
         val value = raw.trim()
         require(value.isNotEmpty()) { "请填写订阅链接" }
-        // Preserve existing document subscriptions without accepting new file access URLs.
-        if (value == existing && value.startsWith("content://")) return value
         require(value.none { it.isWhitespace() || it == '\\' } &&
             Regex("(?i)^https?://").containsMatchIn(value)) { "订阅链接格式不正确" }
         val url = value.toHttpUrlOrNull()

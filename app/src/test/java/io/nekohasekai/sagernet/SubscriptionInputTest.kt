@@ -6,15 +6,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SubscriptionInputTest {
-    @Test fun acceptsWebLinksWithoutChangingTokensAndPreservesExistingDocuments() {
+    @Test fun acceptsWebLinksWithoutChangingTokensAndRejectsNewDocuments() {
         val link = "https://example.com/sub?token=a%2Fb%2B&x=1"
         assertEquals(link, SubscriptionLink.normalize("  $link\n"))
-        assertEquals("content://provider/id", SubscriptionLink.normalize("content://provider/id", "content://provider/id"))
+        assertThrows(IllegalArgumentException::class.java) { SubscriptionLink.normalize("content://provider/id") }
     }
 
     @Test fun internationalHostsPreserveTokensAndExistingLinksRemainEditable() {
         val raw = "https://例子.中国:8443/sub?token=a%2fb%2B&x=1#label"
-        assertEquals("https://xn--fsqu00a.xn--fiqs8s:8443/sub?token=a%2fb%2B&x=1#label", SubscriptionLink.normalize(raw, raw))
+        assertEquals("https://xn--fsqu00a.xn--fiqs8s:8443/sub?token=a%2fb%2B&x=1#label", SubscriptionLink.normalize(raw))
         assertEquals("https://[::1]:8443/sub?token=a%2Fb", SubscriptionLink.normalize("https://[::1]:8443/sub?token=a%2Fb"))
         assertEquals("http://example.com/sub", SubscriptionLink.normalize("HTTP://example.com/sub"))
     }

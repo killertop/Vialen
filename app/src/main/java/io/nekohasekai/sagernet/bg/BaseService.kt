@@ -562,6 +562,7 @@ class BaseService {
             val connectingJob = GlobalScope.launch(Dispatchers.Main.immediate, start = CoroutineStart.LAZY) {
                 try {
                     data.notification = createNotification(ServiceNotification.genTitle(profile))
+                    data.notification!!.start()
 
                     preInit()
                     withContext(Dispatchers.IO) { proxy.init() }

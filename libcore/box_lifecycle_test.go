@@ -3,6 +3,7 @@ package libcore
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"libcore/nekoutils"
 	"log"
@@ -24,6 +25,43 @@ import (
 	M "github.com/sagernet/sing/common/metadata"
 	"github.com/sagernet/sing/service"
 )
+
+func TestDormantPreflightCannotBindOrDisruptRunningOwner(t *testing.T) {
+	running := startedLifecycleBox(t)
+	running.SetAsMain()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	port := listener.Addr().(*net.TCPAddr).Port
+	// The port is already occupied: a preflight that starts its listener fails.
+	candidate, err := NewSingBoxInstance(fmt.Sprintf(`{"inbounds":[{"type":"mixed","listen":"127.0.0.1","listen_port":%d}],"outbounds":[{"type":"direct"}],"experimental":{"cache_file":{"enabled":false}}}`, port), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if candidate.started {
+		t.Fatal("preflight started")
+	}
+	if err := candidate.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if mainInstanceSnapshot() != running {
+		t.Fatal("temporary close changed main ownership")
+	}
+	if invalid, err := NewSingBoxInstance(`{"route":{"rules":[{"domain_regex":["["],"action":"reject"}]},"experimental":{"cache_file":{"enabled":false}}}`, nil); err == nil {
+		_ = invalid.Close()
+		t.Fatal("invalid native regex accepted")
+	}
+	if mainInstanceSnapshot() != running {
+		t.Fatal("failed preflight changed main ownership")
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) }))
+	defer server.Close()
+	if _, err := UrlTest(running, server.URL, 2000); err != nil {
+		t.Fatalf("live instance no longer works: %v", err)
+	}
+}
 
 func startedLifecycleBox(t *testing.T) *BoxInstance {
 	t.Helper()

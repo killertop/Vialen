@@ -94,7 +94,9 @@ abstract class GroupUpdater {
             if (!updating.add(proxyGroup.id)) return@coroutineScope false
             try {
                 GroupManager.postReload(proxyGroup.id)
-                val subscription = checkNotNull(proxyGroup.subscription)
+                val ticket = SubscriptionRefresh.begin(io.nekohasekai.sagernet.database.SagerDatabase.instance,
+                    proxyGroup.id, requireAutoUpdate = !byUser)
+                val subscription = checkNotNull(ticket.group.subscription)
                 val userInterface = GroupManager.userInterface
                 if (byUser && (subscription.link?.startsWith("http://") == true || subscription.updateWhenConnectedOnly) &&
                     !DataStore.serviceState.connected) {
@@ -102,7 +104,7 @@ abstract class GroupUpdater {
                         return@coroutineScope false
                     }
                 }
-                RawUpdater.doUpdate(proxyGroup, subscription, userInterface, byUser)
+                RawUpdater.refresh(ticket, userInterface, byUser)
                 true
             } catch (e: CancellationException) {
                 throw e
@@ -118,7 +120,7 @@ abstract class GroupUpdater {
         suspend fun finishUpdate(proxyGroup: ProxyGroup) {
             updating.remove(proxyGroup.id)
             progress.remove(proxyGroup.id)
-            GroupManager.postUpdate(proxyGroup)
+            GroupManager.postUpdate(proxyGroup.id)
         }
 
     }

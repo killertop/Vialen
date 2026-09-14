@@ -36,12 +36,13 @@ internal object SubscriptionPersistence {
         return result
     }
 
-    suspend fun apply(db: SagerDatabase, group: ProxyGroup, proxies: List<Profile>): Result {
+    suspend fun apply(db: SagerDatabase, ticket: SubscriptionRefresh.Ticket, proxies: List<Profile>,
+        remoteUserinfo: String? = null, remoteName: String? = null): Result {
         require(proxies.isNotEmpty()) { "Empty subscription cannot replace saved profiles" }
         currentCoroutineContext().ensureActive()
         return db.withTransaction {
             currentCoroutineContext().ensureActive()
-            check(db.groupDao().getById(group.id) != null) { "Subscription group was deleted during refresh" }
+            val group = SubscriptionRefresh.requireCurrent(db, ticket)
             val dao = db.proxyDao()
             val old = dao.getByGroup(group.id)
             val previous = old.map { Existing(it.sourceKey, it.requireProfile()) }
@@ -72,6 +73,10 @@ internal object SubscriptionPersistence {
             currentCoroutineContext().ensureActive()
             dao.deleteProxy(removed)
             check(dao.countByGroup(group.id) == proxies.size.toLong()) { "Subscription row count mismatch" }
+            // Merge only fields owned by refresh into the freshly loaded row.
+            remoteUserinfo?.let { group.subscription!!.subscriptionUserinfo = it }
+            group.subscription!!.lastUpdated = (System.currentTimeMillis() / 1000).toInt()
+            if (group.name?.startsWith("Subscription #") == true) remoteName?.let { group.name = it }
             db.groupDao().updateGroup(group)
             currentCoroutineContext().ensureActive()
             Result(removed.size + added.size + updated.size, added, updated,

@@ -87,7 +87,7 @@ class NewClientCoreNativeTest {
                     assertEquals(listOf("0.0.0.0/0", "::/0"), imported.single().wireguard!!.allowedIps)
                     assertEquals(25L, imported.single().wireguard!!.persistentKeepalive)
                 }
-                SubscriptionPersistence.apply(SagerDatabase.instance, group, imported)
+                SubscriptionPersistence.apply(SagerDatabase.instance, io.nekohasekai.sagernet.group.SubscriptionRefresh.begin(SagerDatabase.instance, group.id), imported)
                 val row = SagerDatabase.proxyDao.getByGroup(group.id).single()
                 assertEquals(imported.single().copy(id = row.requireProfile().id), row.requireProfile())
                 assertTrue(row.requireProfile().id.isNotBlank())
@@ -112,7 +112,7 @@ class NewClientCoreNativeTest {
             assertTrue(partial.profiles.isNotEmpty())
             assertTrue(partial.issues.any { it.severity == "error" })
             assertTrue(runCatching {
-                SubscriptionPersistence.apply(SagerDatabase.instance, group, partial.requireComplete())
+                SubscriptionPersistence.apply(SagerDatabase.instance, io.nekohasekai.sagernet.group.SubscriptionRefresh.begin(SagerDatabase.instance, group.id), partial.requireComplete())
             }.isFailure)
             assertEquals(before, SagerDatabase.proxyDao.getByGroup(group.id).map { it.id to it.document })
         }
@@ -139,7 +139,7 @@ class NewClientCoreNativeTest {
             val nonce = "new-client-http-${System.nanoTime()}"
             LoopbackSocksFixture(nonce).use { fixture ->
                 val profiles = CoreClient.importProfiles("socks5://127.0.0.1:${fixture.port}#$nonce", "links").requireComplete()
-                SubscriptionPersistence.apply(SagerDatabase.instance, group, profiles)
+                SubscriptionPersistence.apply(SagerDatabase.instance, io.nekohasekai.sagernet.group.SubscriptionRefresh.begin(SagerDatabase.instance, group.id), profiles)
                 val row = SagerDatabase.proxyDao.getByGroup(group.id).single()
                 initializeWithoutStarting(ConfigSnapshot.capture(row, true, false).generate().result.config)
                 val rtt = withTimeout(6000) { TestInstance(row, "http://198.18.0.254/$nonce", 4000).doTest() }
@@ -159,7 +159,7 @@ class NewClientCoreNativeTest {
             val profiles = CoreClient.importProfiles(text, "links").requireComplete()
             val importedAt = SystemClock.elapsedRealtimeNanos()
             assertEquals(1000, profiles.size)
-            SubscriptionPersistence.apply(SagerDatabase.instance, group, profiles)
+            SubscriptionPersistence.apply(SagerDatabase.instance, io.nekohasekai.sagernet.group.SubscriptionRefresh.begin(SagerDatabase.instance, group.id), profiles)
             val rows = SagerDatabase.proxyDao.getByGroup(group.id)
             val savedAt = SystemClock.elapsedRealtimeNanos()
             assertEquals(1000, rows.size)

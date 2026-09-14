@@ -20,8 +20,11 @@ class SubscriptionPersistenceNativeTest {
     private fun bean(name: String, host: String = name) = Profile(name = name, type = "trojan", server = host,
         port = 443, tls = Profile.Tls(), trojan = Profile.Password("synthetic"))
     private fun persist(db: SagerDatabase, group: ProxyGroup, profiles: List<Profile>) = runBlocking {
-        SubscriptionPersistence.apply(db, group, profiles)
+        SubscriptionPersistence.apply(db, io.nekohasekai.sagernet.group.SubscriptionRefresh.begin(db, group.id), profiles)
     }
+
+    private fun subscriptionGroup(name: String) = ProxyGroup(id = 42, name = name, type = GroupType.SUBSCRIPTION,
+        subscription = io.nekohasekai.sagernet.database.SubscriptionBean().apply { initializeDefaultValues() })
 
     private fun database() = Room.inMemoryDatabaseBuilder(
         ApplicationProvider.getApplicationContext(), SagerDatabase::class.java
@@ -48,7 +51,8 @@ class SubscriptionPersistenceNativeTest {
             insert("removed", 9)
             val prepared = SubscriptionDedup.apply(listOf(bean("A", "changed"), bean("B"), bean("C"), bean("duplicate", "C")))
             group.name = "after"
-            group.subscription!!.lastUpdated = 200
+            db.groupDao().updateGroup(group) // Persist the user edit before beginning a new refresh.
+            val refreshStarted = (System.currentTimeMillis() / 1000).toInt()
             val result = persist(db, group, prepared.proxies)
             val rows = db.proxyDao().getByGroup(42)
             assertEquals(listOf("A", "B", "C"), rows.map { it.displayName() })
@@ -56,7 +60,8 @@ class SubscriptionPersistenceNativeTest {
             assertEquals(a, rows[0].id); assertEquals(b, rows[1].id)
             assertEquals("changed", rows[0].requireProfile().server)
             assertEquals("after", db.groupDao().getById(42)!!.name)
-            assertEquals(200, db.groupDao().getById(42)!!.subscription!!.lastUpdated)
+            assertTrue(db.groupDao().getById(42)!!.subscription!!.lastUpdated in
+                refreshStarted..(System.currentTimeMillis() / 1000).toInt())
             assertEquals(listOf("C"), result.added)
             assertEquals(mapOf("A" to "A"), result.updated)
             assertEquals(listOf("removed"), result.deleted)
@@ -68,7 +73,7 @@ class SubscriptionPersistenceNativeTest {
 
     @Test fun failedInsertRollsBackEarlierInsertAndRetainsExistingRows() {
         withDatabase { db ->
-            val group = ProxyGroup(id = 42, name = "before")
+            val group = subscriptionGroup("before")
             db.groupDao().createGroup(group)
             persist(db, group, listOf(bean("old")))
             val original = db.proxyDao().getByGroup(42).single().id
@@ -84,7 +89,7 @@ class SubscriptionPersistenceNativeTest {
 
     @Test fun failedGroupWriteRollsBackAllProxyChanges() {
         withDatabase { db ->
-            val group = ProxyGroup(id = 42, name = "before")
+            val group = subscriptionGroup("before")
             db.groupDao().createGroup(group)
             persist(db, group, listOf(bean("A"), bean("old")))
             val ids = db.proxyDao().getByGroup(42).map { it.id }
@@ -102,7 +107,7 @@ class SubscriptionPersistenceNativeTest {
 
     @Test fun duplicateNamesKeepFirstIdAndEmptyRefreshCannotClearGroup() {
         withDatabase { db ->
-            val group = ProxyGroup(id = 42, name = "group")
+            val group = subscriptionGroup("group")
             db.groupDao().createGroup(group)
             db.groupDao().createGroup(ProxyGroup(id = 43, name = "other"))
             fun row(groupId: Long, order: Long) = db.proxyDao().addProxy(
@@ -121,14 +126,14 @@ class SubscriptionPersistenceNativeTest {
 
     @Test fun cancelledRefreshDoesNotWriteRoom() {
         withDatabase { db ->
-            val group = ProxyGroup(id = 42, name = "before")
+            val group = subscriptionGroup("before")
             db.groupDao().createGroup(group)
             persist(db, group, listOf(bean("old")))
             val before = db.proxyDao().getByGroup(42).single()
             runBlocking {
                 val job = launch {
                     currentCoroutineContext().cancel()
-                    SubscriptionPersistence.apply(db, group, listOf(bean("replacement")))
+                    SubscriptionPersistence.apply(db, io.nekohasekai.sagernet.group.SubscriptionRefresh.begin(db, group.id), listOf(bean("replacement")))
                 }
                 job.join()
                 assertTrue(job.isCancelled)

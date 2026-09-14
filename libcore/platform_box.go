@@ -137,8 +137,14 @@ func (w *boxPlatformInterfaceWrapper) FindConnectionOwner(request *adapter.FindC
 		default:
 			network = "tcp"
 		}
-		source, _ := netip.ParseAddrPort(fmt.Sprintf("%s:%d", request.SourceAddress, request.SourcePort))
-		destination, _ := netip.ParseAddrPort(fmt.Sprintf("%s:%d", request.DestinationAddress, request.DestinationPort))
+		source, err := procfs.OwnerAddress(request.SourceAddress, request.SourcePort)
+		if err != nil {
+			return nil, fmt.Errorf("source: %w", err)
+		}
+		destination, err := procfs.OwnerAddress(request.DestinationAddress, request.DestinationPort)
+		if err != nil {
+			return nil, fmt.Errorf("destination: %w", err)
+		}
 		uid = procfs.ResolveSocketByProcSearch(network, source, destination)
 		if uid == -1 {
 			return nil, E.New("procfs: not found")

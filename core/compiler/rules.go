@@ -90,6 +90,14 @@ func (p *planner) rules(r Request) error {
 	}
 	return nil
 }
+
+// ValidateRuleMatch uses exactly the same predicate checks as runtime compilation,
+// without constructing a box, opening files, binding listeners or starting a VPN.
+func ValidateRuleMatch(m Match) error {
+	_, _, err := compileMatch(m, Platform{VPN: true, SupportsUIDRules: true})
+	return err
+}
+
 func compileMatch(m Match, platform Platform) (option.RawDefaultRule, bool, error) {
 	o := option.RawDefaultRule{IPIsPrivate: m.IPIsPrivate, SourceIPIsPrivate: m.SourceIPIsPrivate, RuleSetIPCIDRMatchSource: m.RuleSetIPCIDRMatchSource}
 	if m.RuleSetIPCIDRMatchSource && len(m.RuleSetIDs) == 0 {

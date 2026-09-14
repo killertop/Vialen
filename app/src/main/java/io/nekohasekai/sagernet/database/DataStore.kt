@@ -40,6 +40,14 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var selectedProxy by configurationStore.long(Key.PROFILE_ID)
     var pendingSelectionGroup by configurationStore.long("pendingSelectionGroup")
 
+    /** Profile deletion has already committed in its separate database. Do not
+     * overwrite a selection made while deletion was running. Startup's existing
+     * selectFirstIfNeeded also repairs a stale selection after process death. */
+    fun clearDeletedSelection(expected: Long): Boolean = PublicDatabase.instance.runInTransaction<Boolean> {
+        if (expected == 0L || selectedProxy != expected) false
+        else { selectedProxy = 0L; true }
+    }
+
     /** Candidate lookup must happen before this short transaction. SQLite serializes this
      * conditional write with ordinary selectedProxy writes, including other processes.
      */

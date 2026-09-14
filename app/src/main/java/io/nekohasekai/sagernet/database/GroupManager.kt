@@ -54,8 +54,13 @@ object GroupManager {
     }
 
     suspend fun clearGroup(groupId: Long) {
-        DataStore.selectedProxy = 0L
-        SagerDatabase.proxyDao.deleteAll(groupId)
+        val selected = DataStore.selectedProxy
+        val removedSelection = SagerDatabase.instance.runInTransaction<Boolean> {
+            val belongs = SagerDatabase.proxyDao.getById(selected)?.groupId == groupId
+            SagerDatabase.proxyDao.deleteAll(groupId)
+            belongs
+        }
+        if (removedSelection) DataStore.clearDeletedSelection(selected)
         iterator { groupUpdated(groupId) }
     }
 
@@ -80,6 +85,12 @@ object GroupManager {
     }
 
     suspend fun createGroup(group: ProxyGroup): ProxyGroup {
+        group.applyDefaultValues()
+        if (group.type == GroupType.SUBSCRIPTION) {
+            checkNotNull(group.subscription).let {
+                it.link = io.nekohasekai.sagernet.group.SubscriptionLink.normalize(it.link)
+            }
+        }
         group.userOrder = SagerDatabase.groupDao.nextOrder() ?: 1
         group.id = SagerDatabase.groupDao.createGroup(group.applyDefaultValues())
         iterator { groupAdd(group) }
@@ -91,7 +102,30 @@ object GroupManager {
     }
 
     suspend fun updateGroup(group: ProxyGroup) {
-        SagerDatabase.groupDao.updateGroup(group)
+        group.applyDefaultValues()
+        SagerDatabase.instance.runInTransaction {
+            val stored = SagerDatabase.groupDao.getById(group.id) ?: error("分组已删除")
+            if (group.type == GroupType.SUBSCRIPTION) {
+                val subscription = checkNotNull(group.subscription)
+                val raw = subscription.link.trim()
+                subscription.link = if (raw.startsWith("content://")) {
+                    val uri = android.net.Uri.parse(raw)
+                    require(stored.type == GroupType.SUBSCRIPTION && stored.subscription?.link == raw &&
+                        io.nekohasekai.sagernet.SagerNet.application.contentResolver.persistedUriPermissions.any {
+                            it.isReadPermission && it.uri == uri
+                        }) { "文档授权已失效，请重新选择订阅文件" }
+                    raw
+                } else io.nekohasekai.sagernet.group.SubscriptionLink.normalize(raw)
+                if (stored.type == GroupType.SUBSCRIPTION && stored.subscription?.link == subscription.link) {
+                    subscription.lastUpdated = stored.subscription!!.lastUpdated
+                    subscription.subscriptionUserinfo = stored.subscription!!.subscriptionUserinfo
+                } else {
+                    subscription.lastUpdated = 0
+                    subscription.subscriptionUserinfo = ""
+                }
+            }
+            SagerDatabase.groupDao.updateGroup(group)
+        }
         iterator { groupUpdated(group) }
         if (group.type == GroupType.SUBSCRIPTION) {
             SubscriptionUpdater.reconfigureUpdater()

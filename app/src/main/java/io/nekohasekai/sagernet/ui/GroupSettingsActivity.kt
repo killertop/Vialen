@@ -269,11 +269,6 @@ class GroupSettingsActivity(
         if (!draftReady || !saveLock.tryLock()) return
         try {
             val editingId = DataStore.editingId
-            if (DataStore.groupType == GroupType.SUBSCRIPTION) {
-                val original = if (editingId == 0L) null else SagerDatabase.groupDao.getById(editingId)?.subscription?.link
-                DataStore.subscriptionLink = io.nekohasekai.sagernet.group.SubscriptionLink.normalize(
-                    DataStore.subscriptionLink, original)
-            }
             if (editingId == 0L) {
                 GroupManager.createGroup(ProxyGroup().apply { serialize() })
             } else if (needSave()) {

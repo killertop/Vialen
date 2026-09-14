@@ -66,15 +66,18 @@ class ProfileAutoSelectionNativeTest {
     @Test fun subscriptionPersistenceThenSelectionKeepsFirstAcrossRefresh() = runBlocking {
         val target = group()
         val group = SagerDatabase.groupDao.getById(target)!!
+        group.type = GroupType.SUBSCRIPTION
+        group.subscription = io.nekohasekai.sagernet.database.SubscriptionBean().apply { initializeDefaultValues() }
+        SagerDatabase.groupDao.updateGroup(group)
         fun named(name: String) = bean().copy(name = name)
         io.nekohasekai.sagernet.group.SubscriptionPersistence.apply(
-            SagerDatabase.instance, group, listOf(named("first"), named("second"))
+            SagerDatabase.instance, io.nekohasekai.sagernet.group.SubscriptionRefresh.begin(SagerDatabase.instance, group.id), listOf(named("first"), named("second"))
         )
         ProfileManager.selectFirstIfNeeded(target)
         val first = SagerDatabase.proxyDao.getIdsByGroup(target).first()
         assertEquals(first, DataStore.selectedProxy)
         io.nekohasekai.sagernet.group.SubscriptionPersistence.apply(
-            SagerDatabase.instance, group, listOf(named("new"), named("second"), named("first"))
+            SagerDatabase.instance, io.nekohasekai.sagernet.group.SubscriptionRefresh.begin(SagerDatabase.instance, group.id), listOf(named("new"), named("second"), named("first"))
         )
         ProfileManager.selectFirstIfNeeded(target)
         assertEquals(first, DataStore.selectedProxy)

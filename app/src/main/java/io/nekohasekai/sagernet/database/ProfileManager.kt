@@ -258,8 +258,11 @@ object ProfileManager {
 
     suspend fun createRule(rule: RuleEntity, post: Boolean = true): RuleEntity {
         RouteRuleSet.validateRule(rule)
-        rule.userOrder = SagerDatabase.rulesDao.nextOrder() ?: 1
-        rule.id = SagerDatabase.rulesDao.createRule(rule)
+        SagerDatabase.instance.runInTransaction {
+            requireRuleReferences(rule)
+            rule.userOrder = SagerDatabase.rulesDao.nextOrder() ?: 1
+            rule.id = SagerDatabase.rulesDao.createRule(rule)
+        }
         if (post) {
             ruleIterator { onAdd(rule) }
         }
@@ -268,8 +271,28 @@ object ProfileManager {
 
     suspend fun updateRule(rule: RuleEntity) {
         RouteRuleSet.validateRule(rule)
-        SagerDatabase.rulesDao.updateRule(rule)
+        SagerDatabase.instance.runInTransaction {
+            requireRuleReferences(rule)
+            check(SagerDatabase.rulesDao.getById(rule.id) != null) { "规则已删除" }
+            SagerDatabase.rulesDao.updateRule(rule)
+        }
         ruleIterator { onUpdated(rule) }
+    }
+
+    private fun requireRuleReferences(rule: RuleEntity) {
+        require(rule.outbound in -2L..0L || SagerDatabase.proxyDao.getById(rule.outbound) != null) { "目标节点已删除，请重新选择" }
+    }
+
+    /** Enabling an old rule must pass the same checks as saving a new rule. */
+    fun setRuleEnabled(id: Long, enabled: Boolean): Int {
+        val row = SagerDatabase.rulesDao.getById(id) ?: return 0
+        if (enabled) RouteRuleSet.validateRule(row)
+        return SagerDatabase.instance.runInTransaction<Int> {
+            val current = SagerDatabase.rulesDao.getById(id) ?: return@runInTransaction 0
+            check(current == row) { "规则已修改，请重试" }
+            if (enabled) requireRuleReferences(current)
+            SagerDatabase.rulesDao.updateEnabled(id, enabled)
+        }
     }
 
     suspend fun deleteRule(ruleId: Long) {

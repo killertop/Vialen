@@ -7,6 +7,6 @@ class CoreBridgeRobolectricTestRunner(testClass: Class<*>) : RobolectricTestRunn
     override fun createClassLoaderConfig(method: FrameworkMethod): InstrumentationConfiguration =
         InstrumentationConfiguration.Builder(super.createClassLoaderConfig(method))
             .doNotAcquirePackage("io.nekohasekai.sagernet.core.")
+            .doNotAcquirePackage("com.google.gson.")
             .build()
 }
-

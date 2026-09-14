@@ -8,8 +8,8 @@ import androidx.core.content.ContextCompat
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED
+import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
 import android.os.Build
-import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import io.nekohasekai.sagernet.Action
@@ -18,7 +18,6 @@ import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.getColorAttr
-import io.nekohasekai.sagernet.ktx.runOnMainDispatcher
 import io.nekohasekai.sagernet.utils.Theme
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -43,6 +42,10 @@ class ServiceNotification(
             PendingIntent.FLAG_IMMUTABLE
 
         fun genTitle(ent: ProxyEntity): String = ent.displayName()
+
+        @androidx.annotation.RequiresApi(34)
+        internal fun foregroundType(vpn: Boolean): Int =
+            if (vpn) FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED else FOREGROUND_SERVICE_TYPE_SPECIAL_USE
     }
 
     suspend fun postNotificationTitle(newTitle: String) {
@@ -85,11 +88,12 @@ class ServiceNotification(
         Theme.apply(app)
         Theme.apply(service)
         builder.color = service.getColorAttr(R.attr.colorPrimary)
+    }
 
-        runOnMainDispatcher {
-            updateActions()
-            show()
-        }
+    /** Startup must await this call; failure must abort the service state machine. */
+    suspend fun start() {
+        updateActions()
+        show()
     }
 
     private suspend fun updateActions() {
@@ -109,22 +113,14 @@ class ServiceNotification(
 
     private suspend fun show() =
         useBuilder {
-            try {
-                if (Build.VERSION.SDK_INT >= 34) {
-                    (service as Service).startForeground(
-                        notificationId,
-                        it.build(),
-                        FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED
-                    )
-                } else {
-                    (service as Service).startForeground(notificationId, it.build())
-                }
-            } catch (e: Exception) {
-                Toast.makeText(
-                    SagerNet.application,
-                    "startForeground: $e",
-                    Toast.LENGTH_LONG
-                ).show()
+            if (Build.VERSION.SDK_INT >= 34) {
+                (service as Service).startForeground(
+                    notificationId,
+                    it.build(),
+                    foregroundType(service is android.net.VpnService)
+                )
+            } else {
+                (service as Service).startForeground(notificationId, it.build())
             }
         }
 

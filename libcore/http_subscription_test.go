@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -98,6 +99,9 @@ func TestSubscriptionHTTPSizeLimit(t *testing.T) {
 	}
 }
 func TestSubscriptionHTTPTimeoutIncludesBody(t *testing.T) {
+	// Keep heap cleanup from preceding native-core fixtures outside this test's
+	// deliberately short request budget; the 100 ms deadline remains unchanged.
+	runtime.GC()
 	disconnected := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)

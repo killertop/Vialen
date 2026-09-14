@@ -1,0 +1,96 @@
+name: Android and libcore contracts
+
+on:
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'core/**'
+      - 'libcore/**'
+      - 'buildScript/**'
+      - 'scripts/**'
+      - 'buildSrc/**'
+      - 'gradle/**'
+      - '*.gradle.kts'
+      - 'gradle.properties'
+      - 'gradlew*'
+      - '.github/workflows/android-contracts.yml'
+  push:
+    paths:
+      - 'app/**'
+      - 'core/**'
+      - 'libcore/**'
+      - 'buildScript/**'
+      - 'scripts/**'
+      - 'buildSrc/**'
+      - 'gradle/**'
+      - '*.gradle.kts'
+      - 'gradle.properties'
+      - 'gradlew*'
+      - '.github/workflows/android-contracts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GOTOOLCHAIN: local
+  GOWORK: "off"
+  VIALEN_NDK_VERSION: 28.1.13356709
+
+jobs:
+  contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: Vialen
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: Vialen
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.1'
+          cache: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25.0.2'
+      - name: Prepare pinned Android toolchain and patched dependencies
+        run: |
+          set -euo pipefail
+          mkdir -p ci-artifacts
+          bash scripts/ci/prepare-toolchain.sh ci-artifacts/toolchain.txt
+          bash buildScript/lib/core/get_source.sh
+      - name: Test libcore independently with production feature tags
+        run: |
+          set -euo pipefail
+          go -C libcore test -mod=readonly -tags with_conntrack,with_gvisor,with_quic,with_wireguard,with_utls -count=1 ./...
+          go -C libcore test -mod=readonly -race -tags with_conntrack,with_gvisor,with_quic,with_wireguard,with_utls -count=1 ./...
+          (cd libcore && go test -mod=readonly -tags with_gvisor -run '^TestLinkEndpointFilter(DetachPassesNil|AttachKeepsFiltering|DetachStopsFDBasedReceiver)$' -count=1 -timeout=30s github.com/sagernet/sing-tun)
+      - name: Build the native AAR required by Android compilation
+        env:
+          GOPATH: ${{ runner.temp }}/vialen-core-go
+          GOCACHE: ${{ runner.temp }}/vialen-core-cache
+        run: |
+          set -euo pipefail
+          export PATH="$GOPATH/bin:$PATH"
+          (cd libcore && bash init.sh)
+          bash buildScript/lib/core/build.sh
+          test -s app/libs/libcore.aar
+      - name: JVM regressions, lint, and isolated test APK compilation
+        run: |
+          set -euo pipefail
+          printf 'sdk.dir=%s\nndk.dir=%s\n' "$ANDROID_HOME" "$ANDROID_NDK_HOME" > local.properties
+          ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: Android-contract-reports
+          path: |
+            Vialen/app/build/reports/tests/
+            Vialen/app/build/test-results/
+            Vialen/app/build/reports/lint-results-debug.*
+          if-no-files-found: warn

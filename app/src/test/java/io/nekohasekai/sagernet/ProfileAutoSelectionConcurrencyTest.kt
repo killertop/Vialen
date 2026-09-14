@@ -35,6 +35,7 @@ class ProfileAutoSelectionConcurrencyTest {
         private const val MANUAL = 202L
         private lateinit var preferences: PublicDatabase
         private lateinit var profiles: ProxyEntity.Dao
+        private lateinit var profileDatabase: SagerDatabase
 
         private fun ensureDatabase() {
             if (!::preferences.isInitialized) setUpDatabase()
@@ -45,11 +46,14 @@ class ProfileAutoSelectionConcurrencyTest {
                 RuntimeEnvironment.getApplication(), PublicDatabase::class.java
             ).allowMainThreadQueries().build()
             profiles = mockk()
+            profileDatabase = Room.inMemoryDatabaseBuilder(RuntimeEnvironment.getApplication(), SagerDatabase::class.java)
+                .allowMainThreadQueries().build()
             mockkObject(PublicDatabase.Companion, TempDatabase.Companion, SagerDatabase.Companion)
             every { PublicDatabase.instance } returns preferences
             every { PublicDatabase.kvPairDao } returns preferences.keyValuePairDao()
             every { TempDatabase.profileCacheDao } returns preferences.keyValuePairDao()
             every { SagerDatabase.proxyDao } returns profiles
+            every { SagerDatabase.instance } returns profileDatabase
             // DataStore and its selectedProxy delegate are real, backed by Room/SQLite.
             // Only profile lookup is mocked to make the race deterministic.
             DataStore.selectedProxy = 0L
@@ -57,6 +61,7 @@ class ProfileAutoSelectionConcurrencyTest {
 
         @AfterClass @JvmStatic fun closeDatabase() {
             if (::preferences.isInitialized) preferences.close()
+            if (::profileDatabase.isInitialized) profileDatabase.close()
             unmockkObject(PublicDatabase.Companion, TempDatabase.Companion, SagerDatabase.Companion)
         }
     }
@@ -74,8 +79,55 @@ class ProfileAutoSelectionConcurrencyTest {
         assertEquals(FIRST, DataStore.selectedProxy)
         DataStore.selectedProxy = 0L
         clearMocks(profiles)
+        profileDatabase.clearAllTables()
         DataStore.serviceState = BaseService.State.Stopped
         every { profiles.getIdsByGroup(TARGET) } returns listOf(FIRST)
+    }
+
+    @Test fun clearUnrelatedGroupPreservesSelectionAndClearsOnlyTargetRows() = kotlinx.coroutines.runBlocking {
+        clearFixture()
+        io.nekohasekai.sagernet.database.GroupManager.clearGroup(20)
+        assertEquals(FIRST, DataStore.selectedProxy)
+        assertEquals(listOf(FIRST), profileDatabase.proxyDao().getAll().map { it.id })
+    }
+
+    @Test fun clearSelectedGroupClearsSelectionAfterSuccessfulDelete() = kotlinx.coroutines.runBlocking {
+        clearFixture()
+        io.nekohasekai.sagernet.database.GroupManager.clearGroup(TARGET)
+        assertEquals(0L, DataStore.selectedProxy)
+        assertEquals(listOf(MANUAL), profileDatabase.proxyDao().getAll().map { it.id })
+    }
+
+    @Test fun failedGroupDeletionPreservesRowsAndSelection() = kotlinx.coroutines.runBlocking {
+        clearFixture()
+        profileDatabase.openHelper.writableDatabase.execSQL("CREATE TRIGGER reject_clear BEFORE DELETE ON proxy_entities BEGIN SELECT RAISE(ABORT, 'synthetic deletion failure'); END")
+        try {
+            org.junit.Assert.assertTrue(runCatching { io.nekohasekai.sagernet.database.GroupManager.clearGroup(TARGET) }.isFailure)
+            assertEquals(FIRST, DataStore.selectedProxy)
+            assertEquals(2, profileDatabase.proxyDao().getAll().size)
+        } finally { profileDatabase.openHelper.writableDatabase.execSQL("DROP TRIGGER reject_clear") }
+    }
+
+    @Test fun selectionChangedDuringDeletionIsNeverCleared() = kotlinx.coroutines.runBlocking {
+        clearFixture()
+        every { profiles.deleteAll(TARGET) } answers {
+            DataStore.selectedProxy = MANUAL
+            profileDatabase.proxyDao().deleteAll(TARGET)
+        }
+        io.nekohasekai.sagernet.database.GroupManager.clearGroup(TARGET)
+        assertEquals(MANUAL, DataStore.selectedProxy)
+        assertEquals(listOf(MANUAL), profileDatabase.proxyDao().getAll().map { it.id })
+    }
+
+    private fun clearFixture() {
+        fun row(id: Long, group: Long) = ProxyEntity(id = id, groupId = group).putProfile(
+            io.nekohasekai.sagernet.core.Profile(type = "socks", server = "example.test", port = 1080,
+                socks = io.nekohasekai.sagernet.core.Profile.Socks()))
+        profileDatabase.proxyDao().addProxy(row(FIRST, TARGET))
+        profileDatabase.proxyDao().addProxy(row(MANUAL, 20))
+        every { profiles.getById(any()) } answers { profileDatabase.proxyDao().getById(firstArg()) }
+        every { profiles.deleteAll(any()) } answers { profileDatabase.proxyDao().deleteAll(firstArg()) }
+        DataStore.selectedProxy = FIRST
     }
 
     @Test fun absentAndInvalidSelectionsPickTheFirstCandidate() {

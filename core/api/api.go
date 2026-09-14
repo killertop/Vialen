@@ -76,6 +76,14 @@ func ValidateProfiles(input []byte) error {
 	return nil
 }
 
+func ValidateRuleMatch(input []byte) error {
+	var match compiler.Match
+	if err := decode(input, &match); err != nil {
+		return err
+	}
+	return compiler.ValidateRuleMatch(match)
+}
+
 func ExportProfile(input []byte) ([]byte, error) {
 	var p profile.Profile
 	if err := decode(input, &p); err != nil {
@@ -101,6 +109,8 @@ func Execute(operation string, input []byte) ([]byte, error) {
 		return ExportProfile(input)
 	case "validate":
 		return []byte("{}"), ValidateProfiles(input)
+	case "validate_rule":
+		return []byte("{}"), ValidateRuleMatch(input)
 	default:
 		return nil, errors.New("unknown core operation")
 	}

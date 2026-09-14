@@ -9,17 +9,23 @@ import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.fmt.KryoConverters
 import io.nekohasekai.sagernet.fmt.gson.GsonConverters
 
-@Database(entities = [ProxyGroup::class, ProxyEntity::class, RuleEntity::class], version = 1)
+@Database(entities = [ProxyGroup::class, ProxyEntity::class, RuleEntity::class, SubscriptionRefreshState::class], version = 2)
 @TypeConverters(value = [KryoConverters::class, GsonConverters::class])
 abstract class SagerDatabase : RoomDatabase() {
 
     companion object {
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS subscription_refresh_state (groupId INTEGER NOT NULL, configVersion INTEGER NOT NULL, generation INTEGER NOT NULL, PRIMARY KEY(groupId), FOREIGN KEY(groupId) REFERENCES proxy_groups(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
+            }
+        }
         val instance by lazy {
             SagerNet.application.getDatabasePath(Key.DB_PROFILE).parentFile?.mkdirs()
             Room.databaseBuilder(SagerNet.application, SagerDatabase::class.java, Key.DB_PROFILE)
                 .setJournalMode(JournalMode.TRUNCATE)
                 .allowMainThreadQueries()
                 .enableMultiInstanceInvalidation()
+                .addMigrations(MIGRATION_1_2)
                 .build()
         }
 

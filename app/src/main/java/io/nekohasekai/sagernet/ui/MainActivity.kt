@@ -214,7 +214,13 @@ class MainActivity : ThemedActivity(),
     }
 
     private suspend fun finishImportSubscription(subscription: ProxyGroup) {
-        GroupManager.createGroup(subscription)
+        try {
+            GroupManager.createGroup(subscription)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            onMainDispatcher { alert(io.nekohasekai.sagernet.utils.UserFacingError.describe(error)).show() }
+        }
     }
 
     suspend fun importProfile(uri: Uri) {

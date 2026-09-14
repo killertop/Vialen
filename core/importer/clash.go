@@ -42,6 +42,43 @@ func clashProfile(v any, global string) (profile.Profile, error) {
 		return profile.Profile{}, e
 	}
 	f := fields{m: m}
+	if f.has("dialer-proxy") {
+		dependency := f.str("dialer-proxy")
+		if f.err != nil {
+			return profile.Profile{}, f.err
+		}
+		if dependency != "" {
+			if strings.TrimSpace(dependency) == "" {
+				return profile.Profile{}, fieldError("dialer-proxy")
+			}
+			return profile.Profile{}, bad("DEPENDENT_NODE", "Proxy dependencies require an explicit chain")
+		}
+	}
+	// These constraints cannot be represented by a standalone profile. Do not
+	// silently turn a constrained connection into an unconstrained one.
+	for _, key := range []string{"interface-name", "fingerprint", "certificate", "private-key", "certificate-path", "private-key-path"} {
+		if key == "private-key" && strings.EqualFold(f.str("type"), "wireguard") {
+			continue
+		}
+		if f.has(key) {
+			value := f.str(key)
+			if f.err != nil {
+				return profile.Profile{}, f.err
+			}
+			if value != "" {
+				return profile.Profile{}, bad("UNSUPPORTED_SECURITY_FIELD", "Unsupported connection constraint: "+key)
+			}
+		}
+	}
+	if f.has("routing-mark") {
+		mark := f.uint("routing-mark", math.MaxUint32)
+		if f.err != nil {
+			return profile.Profile{}, f.err
+		}
+		if mark != 0 {
+			return profile.Profile{}, bad("UNSUPPORTED_SECURITY_FIELD", "Unsupported connection constraint: routing-mark")
+		}
+	}
 	ty := strings.ToLower(f.str("type"))
 	p := profile.Profile{Name: f.str("name"), Server: f.str("server"), Port: uint16(f.uint("port", 65535))}
 	switch ty {

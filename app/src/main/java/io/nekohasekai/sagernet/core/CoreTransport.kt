@@ -6,7 +6,7 @@ internal fun interface CoreBackend {
     fun execute(operation: String, input: ByteArray): ByteArray
 }
 
-/** Four coarse calls. The host adapter exists only in the JVM test source set. */
+/** Coarse business calls. The host adapter exists only in the JVM test source set. */
 internal object CoreTransport {
     private val backend: CoreBackend = System.getProperty("vialen.core.testBackend")?.let {
         Class.forName(it).getDeclaredConstructor().newInstance() as CoreBackend
@@ -16,6 +16,7 @@ internal object CoreTransport {
             "compile" -> Libcore.coreCompile(input)
             "export" -> Libcore.coreExportProfile(input)
             "validate" -> { Libcore.coreValidateProfiles(input); "{}".encodeToByteArray() }
+            "validate_rule" -> { Libcore.coreValidateRuleMatch(input); "{}".encodeToByteArray() }
             else -> error("Unknown core operation")
         }
     }

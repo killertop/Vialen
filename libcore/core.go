@@ -19,6 +19,11 @@ func CoreValidateProfiles(input []byte) (err error) {
 	defer coreBoundary(&output, &err)
 	return api.ValidateProfiles(input)
 }
+func CoreValidateRuleMatch(input []byte) (err error) {
+	var output []byte
+	defer coreBoundary(&output, &err)
+	return api.ValidateRuleMatch(input)
+}
 func coreBoundary(output *[]byte, err *error) {
 	if recover() != nil {
 		*output = nil

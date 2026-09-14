@@ -10,6 +10,7 @@ class ProfileSelectionRobolectricTestRunner(testClass: Class<*>) : RobolectricTe
     override fun createClassLoaderConfig(method: FrameworkMethod): InstrumentationConfiguration =
         InstrumentationConfiguration.Builder(super.createClassLoaderConfig(method))
             .doNotAcquirePackage("io.nekohasekai.sagernet.core.")
+            .doNotAcquirePackage("com.google.gson.")
             .doNotAcquireClass(ProfileSelectionRobolectricTestRunner::class.java.name)
             .build()
 }
