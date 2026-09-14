@@ -106,3 +106,14 @@ git diff --check
 最终 libcore 普通与 race 全包检查通过；没有 race detector 报告。Android 最终 310 项 JVM 回归、Lint 和两个 Debug APK 构建通过。公开内容扫描为 0 项，diff 空白检查通过。未执行或无法执行的设备、远端 CI 和正式发布验收仍按上文保留，不因本地测试通过而改写为成功。
 
 修复源码提交：`a7454682dd561f1dc793dab25bbda17c3866edd1`（`fix: guard subscription commits and validate runtime boundaries`）。本记录单独做文档提交，不再改动已验证代码；最终仓库 HEAD 为该文档提交，可由 `git log -1` 核对。结束时保持 `main`、单一分支及工作树、无未提交或未跟踪文件，没有夹带其他任务修改，没有 push。测试生成的临时 cache 数据库移入系统垃圾篓，未永久删除。应用仍为 2.0.8 / VERSION_CODE=96。
+
+## 后续获授权发布：2.0.9
+
+用户随后明确要求推送 GitHub，按既定规则同时交付正式安装包。由于 2.0.8 已公开，本次仅递增发布版本至 2.0.9 / VERSION_CODE=97（APK versionCode=485），此前七项修复代码不再变更。
+
+- 使用已验证的原生 AAR；其隔离构建目录中的 54 个生产 Go 源文件与本次源码逐文件一致。
+- `:app:assembleRelease :app:lintRelease` 成功，沿用仓库锁定工具链和默认压缩设置。
+- 正式 `com.vialen.app` ARM64 APK 使用原 Release 密钥签名，证书与原公开签名证书一致；密钥和密码始终留在仓库外，未提交。
+- 源码及签名 APK 的公开内容扫描均为 0 项；ELF 和 APK 的 16 KB 对齐检查通过。
+- APK SHA-256：`bd8cf1b860e18f6de9cc205c730644b460f89eb7e425dd065dd031897429a7fc`。
+- 本次发布不增加真机验收结论，沿用上述明确列出的未验证范围；安装包未预置个人节点、账号或订阅。
