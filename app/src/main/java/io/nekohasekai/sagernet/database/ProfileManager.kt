@@ -191,23 +191,22 @@ object ProfileManager {
         }
     }
 
-    suspend fun deleteProfile2(groupId: Long, profileId: Long) {
-        if (SagerDatabase.proxyDao.deleteById(profileId) == 0) return
-        if (DataStore.selectedProxy == profileId) {
-            DataStore.selectedProxy = 0L
-        }
+    suspend fun deleteProfile(groupId: Long, profileId: Long) {
+        deleteProfiles(listOf(ProfileDeletion(profileId, groupId)))
     }
 
-    suspend fun deleteProfile(groupId: Long, profileId: Long) {
-        if (SagerDatabase.proxyDao.deleteById(profileId) == 0) return
-        if (DataStore.selectedProxy == profileId) {
-            DataStore.selectedProxy = 0L
+    suspend fun deleteProfiles(requests: List<ProfileDeletion>) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            currentCoroutineContext().ensureActive()
+            // Once accepted, finish the commit and its post-commit selection/notification work.
+            // This is NOT a cross-database transaction: selection has its own conditional write.
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                val removed = SagerDatabase.proxyDao.deleteProfiles(requests)
+                removed.forEach { DataStore.clearDeletedSelection(it.id) }
+                removed.forEach { iterator { onRemoved(it.groupId, it.id) } }
+                removed
+            }
         }
-        iterator { onRemoved(groupId, profileId) }
-        if (SagerDatabase.proxyDao.countByGroup(groupId) > 1) {
-            GroupManager.rearrange(groupId)
-        }
-    }
 
     fun getProfile(profileId: Long): ProxyEntity? {
         if (profileId == 0L) return null

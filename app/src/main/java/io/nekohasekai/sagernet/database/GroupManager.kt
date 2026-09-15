@@ -65,11 +65,7 @@ object GroupManager {
     }
 
     fun rearrange(groupId: Long) {
-        val entities = SagerDatabase.proxyDao.getByGroup(groupId)
-        for (index in entities.indices) {
-            entities[index].userOrder = (index + 1).toLong()
-        }
-        SagerDatabase.proxyDao.updateProxy(entities)
+        SagerDatabase.proxyDao.rearrange(groupId)
     }
 
     suspend fun postUpdate(group: ProxyGroup) {

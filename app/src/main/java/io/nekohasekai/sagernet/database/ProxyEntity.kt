@@ -350,6 +350,37 @@ class ProxyEntity(
             return deleteById(id)
         }
 
+        /** One transaction owns deletion and order repair; UI rows are only identifiers/guards. */
+        @Transaction
+        fun deleteProfiles(requests: List<ProfileDeletion>): List<ProfileDeletion> {
+            val removed = mutableListOf<ProfileDeletion>()
+            for (request in requests.distinctBy { it.id }) {
+                val current = getById(request.id) ?: continue
+                if (current.groupId != request.groupId) continue
+                if (request.unavailableDocument != null &&
+                    (current.document != request.unavailableDocument || current.status !in 2..3)) continue
+                if (deleteById(current.id) != 0) removed.add(ProfileDeletion(current.id, current.groupId))
+            }
+            removed.map { it.groupId }.distinct().forEach(::rearrange)
+            return removed
+        }
+
+        /** Never write fields owned by configuration, traffic or connection tests. */
+        @Transaction
+        fun rearrange(groupId: Long) {
+            getIdsByGroup(groupId).forEachIndexed { index, id ->
+                updateOrder(id, index + 1L)
+            }
+        }
+
+        /** Preserve a confirmed drag's order values, but do not affect rows moved elsewhere. */
+        @Transaction
+        fun updateOrders(groupId: Long, orders: Map<Long, Long>) {
+            orders.forEach { (id, order) ->
+                if (getById(id)?.groupId == groupId) updateOrder(id, order)
+            }
+        }
+
         @Query("UPDATE proxy_entities SET userOrder = :order WHERE id = :id")
         fun updateOrder(id: Long, order: Long): Int
 

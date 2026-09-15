@@ -1,5 +1,7 @@
 package io.nekohasekai.sagernet
 
+import kotlinx.coroutines.launch
+import io.mockk.coEvery
 import androidx.room.Room
 import io.mockk.clearMocks
 import io.mockk.every
@@ -215,6 +217,78 @@ class ProfileAutoSelectionConcurrencyTest {
             DataStore.serviceState = BaseService.State.Stopped
             whileCandidateLookupIsBlocked { DataStore.serviceState = state }
             assertEquals("state=$state", 0L, DataStore.selectedProxy)
+        }
+    }
+
+    @Test fun batchDeletionUsesSeparateConditionalSelectionTransactionAndCommittedEvents() = kotlinx.coroutines.runBlocking {
+        val dao = profileDatabase.proxyDao()
+        val first = dao.addProxy(ProxyEntity(groupId = 10, userOrder = 4))
+        val unrelated = dao.addProxy(ProxyEntity(groupId = 20, userOrder = 8))
+        val manual = dao.addProxy(ProxyEntity(groupId = 30, userOrder = 9))
+        DataStore.selectedProxy = first
+        every { SagerDatabase.proxyDao } returns dao
+        val events = mutableListOf<Long>()
+        val listener = mockk<ProfileManager.Listener>(relaxed = true)
+        coEvery { listener.onRemoved(any(), any()) } coAnswers {
+            val id = secondArg<Long>()
+            org.junit.Assert.assertNull(dao.getById(id))
+            events.add(id)
+        }
+        ProfileManager.addListener(listener)
+        try {
+            ProfileManager.deleteProfile(20, unrelated)
+            assertEquals(first, DataStore.selectedProxy)
+            // The profile transaction commits before the separate preferences transaction.
+            val switchingDao = object : ProxyEntity.Dao by dao {
+                override fun deleteProfiles(requests: List<io.nekohasekai.sagernet.database.ProfileDeletion>): List<io.nekohasekai.sagernet.database.ProfileDeletion> {
+                    val removed = dao.deleteProfiles(requests)
+                    DataStore.selectedProxy = manual
+                    return removed
+                }
+            }
+            every { SagerDatabase.proxyDao } returns switchingDao
+            ProfileManager.deleteProfile(10, first)
+            assertEquals(manual, DataStore.selectedProxy)
+            every { SagerDatabase.proxyDao } returns dao
+            ProfileManager.deleteProfile(30, manual)
+            assertEquals(0L, DataStore.selectedProxy)
+            assertEquals(listOf(unrelated, first, manual), events)
+        } finally {
+            ProfileManager.removeListener(listener)
+            every { SagerDatabase.proxyDao } returns profiles
+        }
+    }
+
+    @Test fun acceptedDeletionFinishesSelectionAndEventsWhenCallerCancels() = kotlinx.coroutines.runBlocking {
+        val dao = profileDatabase.proxyDao()
+        val id = dao.addProxy(ProxyEntity(groupId = 10, userOrder = 4))
+        DataStore.selectedProxy = id
+        val entered = CountDownLatch(1); val release = CountDownLatch(1)
+        every { SagerDatabase.proxyDao } returns object : ProxyEntity.Dao by dao {
+            override fun deleteProfiles(requests: List<io.nekohasekai.sagernet.database.ProfileDeletion>): List<io.nekohasekai.sagernet.database.ProfileDeletion> {
+                entered.countDown(); check(release.await(5, TimeUnit.SECONDS))
+                return dao.deleteProfiles(requests)
+            }
+        }
+        val event = CountDownLatch(1)
+        val listener = mockk<ProfileManager.Listener>(relaxed = true)
+        coEvery { listener.onRemoved(10, id) } coAnswers { event.countDown() }
+        ProfileManager.addListener(listener)
+        val task = launch(kotlinx.coroutines.Dispatchers.IO) {
+            ProfileManager.deleteProfile(10, id)
+        }
+        try {
+            assertTrue(entered.await(5, TimeUnit.SECONDS))
+            task.cancel()
+        } finally { release.countDown() }
+        try {
+            task.join()
+            org.junit.Assert.assertNull(dao.getById(id))
+            assertEquals(0L, DataStore.selectedProxy)
+            assertEquals(0L, event.count)
+        } finally {
+            ProfileManager.removeListener(listener)
+            every { SagerDatabase.proxyDao } returns profiles
         }
     }
 }

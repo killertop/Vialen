@@ -793,27 +793,17 @@ class ConfigurationFragment @JvmOverloads constructor(
                             MaterialAlertDialogBuilder(requireContext()).setTitle(R.string.confirm)
                                 .setMessage(getString(R.string.ui_delete_nodes, toClear.size))
                                 .setPositiveButton(R.string.delete) { _, _ ->
-                                    for (profile in toClear) {
-                                        adapter.groupFragments[DataStore.selectedGroup]?.adapter?.apply {
-                                            val index = configurationIdList.indexOf(profile.id)
-                                            if (index >= 0) {
-                                                configurationIdList.removeAt(index)
-                                                configurationList.remove(profile.id)
-                                                notifyItemRemoved(index)
-                                            }
-                                        }
-                                    }
                                     runOnDefaultDispatcher {
-                                        for (profile in toClear) {
-                                            ProfileManager.deleteProfile2(
-                                                profile.groupId, profile.id
-                                            )
+                                        try {
+                                            ProfileManager.deleteProfiles(toClear.map {
+                                                io.nekohasekai.sagernet.database.ProfileDeletion(it.id, it.groupId, it.document)
+                                            })
+                                        } catch (error: Exception) {
+                                            if (error is kotlinx.coroutines.CancellationException) throw error
+                                            onMainDispatcher { (activity as? MainActivity)?.snackbar(error.readableMessage)?.show() }
+                                        } finally {
+                                            GroupManager.postReload(toClear.first().groupId)
                                         }
-                                        val targetAdapter = onMainDispatcher {
-                                            (activity as? MainActivity)?.refreshProfileAvailability()
-                                            adapter.groupFragments[toClear.first().groupId]?.adapter
-                                        }
-                                        targetAdapter?.reloadProfiles()
                                     }
                                 }
                                 .setNegativeButton(android.R.string.cancel, null)
@@ -1760,11 +1750,12 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             fun commitMove() {
-                val orders = updated.map { it.id to it.userOrder }
+                val orders = updated.associate { it.id to it.userOrder }
+                val groupId = proxyGroup.id
                 updated.clear()
                 if (orders.isEmpty()) return
                 profileWrites.submit {
-                    try { orders.forEach { (id, order) -> SagerDatabase.proxyDao.updateOrder(id, order) } }
+                    try { SagerDatabase.proxyDao.updateOrders(groupId, orders) }
                     catch (error: Exception) {
                         if (error is kotlinx.coroutines.CancellationException) throw error
                         onMainDispatcher { if (alive()) (activity as? MainActivity)?.snackbar(error.readableMessage)?.show() }
@@ -1798,7 +1789,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 val profiles = actions.map { it.second }
                 profileWrites.submit {
                     try {
-                        for (entity in profiles) ProfileManager.deleteProfile(entity.groupId, entity.id)
+                        ProfileManager.deleteProfiles(profiles.map { io.nekohasekai.sagernet.database.ProfileDeletion(it.id, it.groupId) })
                     } catch (error: Exception) {
                         if (error is kotlinx.coroutines.CancellationException) throw error
                         onMainDispatcher { if (alive()) (activity as? MainActivity)?.snackbar(error.readableMessage)?.show() }
