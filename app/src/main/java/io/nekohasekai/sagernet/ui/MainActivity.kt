@@ -189,9 +189,10 @@ class MainActivity : ThemedActivity(),
             return
         }
 
-        val name = group.name.takeIf { !it.isNullOrBlank() } ?: group.subscription?.link
-        ?: group.subscription?.token
-        if (name.isNullOrBlank()) return
+        // Show a readable source without exposing query tokens in the confirmation.
+        val name = group.name.takeIf { !it.isNullOrBlank() }
+            ?: Uri.parse(url).host
+            ?: getString(R.string.subscription_import)
 
         group.name = group.name.takeIf { !it.isNullOrBlank() }
             ?: ("Subscription #" + System.currentTimeMillis())
@@ -201,6 +202,7 @@ class MainActivity : ThemedActivity(),
             displayFragmentWithId(R.id.nav_group)
 
             MaterialAlertDialogBuilder(this@MainActivity).setTitle(R.string.subscription_import)
+                .setIcon(R.drawable.ic_settings_link_outline)
                 .setMessage(getString(R.string.subscription_import_message, name))
                 .setPositiveButton(R.string.ui_import) { _, _ ->
                     runOnDefaultDispatcher {

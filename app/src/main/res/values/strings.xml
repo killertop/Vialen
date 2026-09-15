@@ -375,9 +375,7 @@
     <string name="subscription_traffic">%1$s Used / %2$s Remaining</string>
     <string name="subscription_expire">Expire: %s</string>
     <string name="subscription_import">Import subscription</string>
-    <string name="subscription_import_message">Confirm you want to import subscription %s? If you
-        are coming from an untrusted source, doing this may result in your IP and this behavior
-        being leaked.</string>
+    <string name="subscription_import_message">Add subscription from %s?</string>
     <string name="profile_import">Import profile</string>
     <string name="profile_import_message">Confirm you want to import profile %s?</string>
     <string name="clear_profiles_message">Are you sure you want to clear this group?</string>
@@ -549,4 +547,9 @@
     <string name="vialen_releases">Vialen releases</string>
     <string name="close">Close</string>
     <string name="ui_app_routing">App routing</string>
+    <string name="subscription_update_complete">Subscription updated</string>
+    <string name="subscription_update_summary">%1$s\n\nAdded  %2$d\nUpdated  %3$d\nRemoved  %4$d\nDuplicates  %5$d</string>
+    <string name="subscription_done">Done</string>
+    <string name="subscription_show_details">View details</string>
+    <string name="subscription_hide_details">Back to summary</string>
 </resources>

@@ -8,7 +8,6 @@ import io.nekohasekai.sagernet.ktx.onMainDispatcher
 import io.nekohasekai.sagernet.ktx.runOnMainDispatcher
 import io.nekohasekai.sagernet.ui.ThemedActivity
 import io.nekohasekai.sagernet.widget.operationSucceeded
-import kotlinx.coroutines.delay
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
@@ -43,12 +42,6 @@ class GroupInterfaceAdapter(val context: ThemedActivity) : GroupManager.Interfac
                     )
             ).operationSucceeded().show() }
         } else {
-            onMainDispatcher {
-                if (!context.isFinishing && !context.isDestroyed) {
-                    context.snackbar(context.getString(R.string.group_updated, group.name, changed)).operationSucceeded().show()
-                }
-            }
-
             var status = ""
             if (added.isNotEmpty()) {
                 status += context.getString(
@@ -73,14 +66,29 @@ class GroupInterfaceAdapter(val context: ThemedActivity) : GroupManager.Interfac
             }
 
             onMainDispatcher {
-                delay(1000L)
                 if (context.isFinishing || context.isDestroyed) return@onMainDispatcher
-
-                MaterialAlertDialogBuilder(context).setTitle(
-                        context.getString(
-                                R.string.group_diff, group.displayName()
+                val summary = context.getString(
+                    R.string.subscription_update_summary,
+                    group.displayName(), added.size, updated.size, deleted.size, duplicate.size
+                )
+                val dialog = MaterialAlertDialogBuilder(context)
+                    .setIcon(R.drawable.ic_action_done)
+                    .setTitle(R.string.subscription_update_complete)
+                    .setMessage(summary)
+                    .setPositiveButton(R.string.subscription_done, null)
+                    .setNeutralButton(R.string.subscription_show_details, null)
+                    .create()
+                dialog.setOnShowListener {
+                    var expanded = false
+                    dialog.getButton(android.content.DialogInterface.BUTTON_NEUTRAL).setOnClickListener {
+                        expanded = !expanded
+                        dialog.setMessage(if (expanded) status.trim() else summary)
+                        dialog.getButton(android.content.DialogInterface.BUTTON_NEUTRAL).setText(
+                            if (expanded) R.string.subscription_hide_details else R.string.subscription_show_details
                         )
-                ).setMessage(status.trim()).setPositiveButton(android.R.string.ok, null).show()
+                    }
+                }
+                dialog.show()
             }
 
         }

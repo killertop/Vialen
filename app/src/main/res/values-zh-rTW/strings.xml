@@ -320,7 +320,7 @@
     <string name="subscription_used">已用 %s</string>
     <string name="subscription_traffic">已用 %1$s / 剩餘 %2$s</string>
     <string name="subscription_import">匯入訂閱</string>
-    <string name="subscription_import_message">您確定要匯入訂閱 %s 嗎？如果訂閱的來源不可信，您的 IP 和行為將被洩漏。</string>
+    <string name="subscription_import_message">加入訂閱：%s</string>
     <string name="profile_import">匯入設定檔</string>
     <string name="profile_import_message">您確定要匯入設定檔 %s 嗎？</string>
     <string name="clear_profiles_message">您確定要清除此群組嗎？</string>
@@ -395,4 +395,9 @@
     <string name="shortcut_start_confirm">使用目前所選節點啟動 VPN 嗎？</string>
     <string name="shortcut_profile_confirm">啟動 VPN 或切換至節點「%1$s」嗎？</string>
     <string name="traffic_reset_unavailable">暫時無法清除流量統計，請等待連線啟動或停止完成後重試。</string>
+    <string name="subscription_update_complete">節點已更新</string>
+    <string name="subscription_update_summary">%1$s\n\n新增  %2$d 個\n更新  %3$d 個\n移除  %4$d 個\n重複  %5$d 個</string>
+    <string name="subscription_done">完成</string>
+    <string name="subscription_show_details">查看詳情</string>
+    <string name="subscription_hide_details">收起詳情</string>
 </resources>
