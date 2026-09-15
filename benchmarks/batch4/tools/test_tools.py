@@ -56,4 +56,42 @@ class AnalysisContracts(unittest.TestCase):
       runpy.run_path(str(pathlib.Path(__file__).with_name('run_plan.py')),run_name='__main__')
     self.assertEqual(device.run.call_count,1 if stage=='seed' else 2)
     self.assertEqual(device.install.call_count,1)
+
+class CoolingContracts(unittest.TestCase):
+ def device(self,root,states):
+  d=MagicMock();d.root=pathlib.Path(root);d.environment.side_effect=states;return d
+ def state(self,temp=360,usb='false'):
+  return dict(temperature_tenths_c=str(temp),thermal_status=0,ac='false',usb=usb,status='3')
+ def clock(self):
+  now=[0]
+  def sleep(seconds):now[0]+=seconds
+  return lambda:now[0],sleep
+ def test_hot_device_waits_then_requires_two_ready_checks(self):
+  from cooling import CoolingBudget
+  with tempfile.TemporaryDirectory() as root,contextlib.redirect_stdout(io.StringIO()):
+   d=self.device(root,[self.state(390),self.state(),self.state()]);clock,sleep=self.clock()
+   gate=CoolingBudget(d,clock=clock,sleep=sleep);gate.wait('sample')
+   self.assertEqual(clock(),32);self.assertEqual(gate.remaining,1768)
+   self.assertEqual(len(json.loads((pathlib.Path(root)/'sample-cooling.json').read_text())['checks']),3)
+ def test_wait_is_bounded_and_evidence_survives_failure(self):
+  from cooling import CoolingBudget
+  with tempfile.TemporaryDirectory() as root,contextlib.redirect_stdout(io.StringIO()):
+   d=self.device(root,[self.state(390)]*3);clock,sleep=self.clock()
+   with self.assertRaisesRegex(RuntimeError,'budget exhausted'):
+    CoolingBudget(d,max_wait=60,clock=clock,sleep=sleep).wait('sample')
+   self.assertEqual(clock(),60);self.assertTrue((pathlib.Path(root)/'sample-cooling.json').exists())
+ def test_missing_state_and_power_change_fail_closed(self):
+  from cooling import CoolingBudget
+  for states in [[{}],[self.state(),self.state(usb='true')]]:
+   with tempfile.TemporaryDirectory() as root,contextlib.redirect_stdout(io.StringIO()):
+    d=self.device(root,states);clock,sleep=self.clock()
+    with self.assertRaises(RuntimeError):CoolingBudget(d,clock=clock,sleep=sleep).wait('sample')
+ def test_total_budget_applies_across_gates(self):
+  from cooling import CoolingBudget
+  with tempfile.TemporaryDirectory() as root,contextlib.redirect_stdout(io.StringIO()):
+   d=self.device(root,[self.state()]*3);clock,sleep=self.clock();gate=CoolingBudget(d,total_wait=2,clock=clock,sleep=sleep)
+   gate.wait('first')
+   with self.assertRaisesRegex(RuntimeError,'budget exhausted'):gate.wait('second')
+   self.assertEqual(clock(),2)
+
 if __name__=='__main__':unittest.main()

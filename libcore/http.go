@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"io"
 	"libcore/ech"
 	"net"
@@ -333,7 +332,8 @@ func (r *httpRequest) doH3Direct(request *http.Request) (*http.Response, error) 
 		ctx, cancel := context.WithCancel(request.Context())
 		cancels[i] = cancel
 		go func(index int, ctx context.Context, cancel context.CancelFunc) {
-			headerTimer := time.AfterFunc(10*time.Second, cancel)
+			ctx, headerCancel := context.WithCancelCause(ctx)
+			headerTimer := time.AfterFunc(10*time.Second, func() { headerCancel(context.DeadlineExceeded) })
 			req := request.Clone(ctx)
 			if request.GetBody != nil {
 				req.Body, _ = request.GetBody()
@@ -364,8 +364,11 @@ func (r *httpRequest) doH3Direct(request *http.Request) (*http.Response, error) 
 			}
 			response, err := (&http.Client{Transport: transport}).Do(req)
 			headerTimer.Stop()
+			if err != nil && errors.Is(context.Cause(ctx), context.DeadlineExceeded) {
+				err = context.DeadlineExceeded
+			}
 			if err == nil && response.StatusCode != http.StatusOK {
-				err = fmt.Errorf("HTTP status %d", response.StatusCode)
+				err = httpStatusError(response.StatusCode)
 			}
 			if err != nil {
 				if response != nil {
@@ -381,11 +384,11 @@ func (r *httpRequest) doH3Direct(request *http.Request) (*http.Response, error) 
 		}(i, ctx, cancel)
 	}
 	var winner *http.Response
-	var lastErr error
+	transportErrors := make([]error, count)
 	for i := 0; i < count; i++ {
 		got := <-results
 		if got.err != nil {
-			lastErr = got.err
+			transportErrors[got.index] = got.err
 			continue
 		}
 		if winner != nil {
@@ -405,7 +408,15 @@ func (r *httpRequest) doH3Direct(request *http.Request) (*http.Response, error) 
 	if request.Context().Err() != nil {
 		return nil, request.Context().Err()
 	}
-	return nil, lastErr
+	// Prefer an actual HTTP rejection over a competing transport failure.
+	// When both transports fail, use a stable transport order, not race timing.
+	for _, failure := range transportErrors {
+		var status httpStatusError
+		if errors.As(failure, &status) {
+			return nil, failure
+		}
+	}
+	return nil, transportErrors[0]
 }
 
 var errResponseTooLarge = errors.New("HTTP response exceeds size limit")

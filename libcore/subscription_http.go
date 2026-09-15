@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"net"
 )
 
 type httpStatusError int
@@ -35,10 +36,20 @@ func subscriptionHTTPCode(err error) string {
 	}
 	var status httpStatusError
 	if errors.As(err, &status) {
-		if status == 408 || status == 425 || status == 429 || status >= 500 {
-			return "TEMPORARY"
+		switch {
+		case status == 408:
+			return "TIMEOUT"
+		case status == 429:
+			return "RATE_LIMITED"
+		case status == 425 || status >= 500:
+			return "SERVER_ERROR"
+		case status == 401 || status == 403:
+			return "ACCESS_DENIED"
+		case status == 404 || status == 410:
+			return "NOT_FOUND"
+		default:
+			return "HTTP_REJECTED"
 		}
-		return "HTTP_REJECTED"
 	}
 	var unknown x509.UnknownAuthorityError
 	var invalid x509.CertificateInvalidError
@@ -46,7 +57,15 @@ func subscriptionHTTPCode(err error) string {
 	if errors.As(err, &unknown) || errors.As(err, &invalid) || errors.As(err, &hostname) {
 		return "TLS_REJECTED"
 	}
-	return "TEMPORARY"
+	var dnsError *net.DNSError
+	if errors.As(err, &dnsError) {
+		return "DNS_FAILED"
+	}
+	var networkError net.Error
+	if errors.As(err, &networkError) && networkError.Timeout() {
+		return "TIMEOUT"
+	}
+	return "NETWORK_ERROR"
 }
 
 func (r *httpRequest) ExecuteSubscription() *SubscriptionHTTPResult {

@@ -62,3 +62,15 @@ python3 scripts/check-public-content.py
 原始系统 trace 不提交，因此其他读者可从公开逐轮结果复算汇总，不能仅凭公开文件重新验证完整系统 trace。原始证据由本地保留，未上传公共服务。
 
 测量限制：本轮没有观察点关闭/开启的独立开销对照，A/A 只估计当前整套工具的重复性。未执行的 import/JNI/GC 驱动仍需小规模真机预检；当前 import 会记录 selection_valid，但不能仅依靠顶层 ok 忽略选择失败，正式对照前须补齐这项硬断言和通知计数。当前 GC 两秒窗口也不能单独证明所有异步回收已结束或长期内存代价。
+
+
+## 自然冷却计划（提示修复后补充）
+
+在 `run_plan.py` 上显式加 `--cooling`；相同实验的 A/A 和 L-list 都使用同一开关，不能混用有/无冷却结果。门控位于每轮 seed 前以及 seed 完成后的测量前，均在计时窗口外。就绪需连续两次温度不高于 37℃、thermal status 为 0；就绪复核间隔 2 秒，未就绪时每 30 秒读取一次。每个门控最多 300 秒，全计划累计等待最多 1,800 秒；耗尽、状态缺失或冷却中供电变化即终止并保留记录。不改系统设置、不用风扇/外部降温干预、不反复重跑无效样本。原运行中 40℃、热限频及配对温差规则继续有效。
+
+```sh
+python3 benchmarks/batch4/tools/run_plan.py --target-file "$BENCH_RAW/target" --artifacts "$BENCH_ARTIFACTS" --output "$BENCH_RAW/aa-cooled" --plan aa --cooling
+python3 benchmarks/batch4/tools/run_plan.py --target-file "$BENCH_RAW/target" --artifacts "$BENCH_ARTIFACTS" --output "$BENCH_RAW/L-cooled" --plan L-list --cooling
+```
+
+冷却策略单独写入 `cooling-policy.json`，每次门控的读取值与耗时只写入仓库外原始目录。它是一项预先固定的采集条件，不是性能优化；此前测量数据不能追溯改标为已采用此策略。

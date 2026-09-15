@@ -6,7 +6,6 @@ import io.nekohasekai.sagernet.bg.RunningServiceSnapshot
 import io.nekohasekai.sagernet.ktx.USER_AGENT
 import kotlinx.coroutines.*
 import libcore.Libcore
-import moe.matsuri.nb4a.utils.Util
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -37,14 +36,7 @@ internal object SubscriptionFetch {
                     try {
                         ensureActive()
                         val response = request.executeSubscription()
-                        when (response.code) {
-                            "OK" -> Unit
-                            "CANCELLED" -> throw CancellationException("订阅更新已取消")
-                            "TEMPORARY", "TIMEOUT" -> throw SubscriptionFailure(true, "暂时无法更新，请稍后重试", response.code)
-                            "TOO_LARGE" -> throw SubscriptionFailure(false, "订阅文件过大", response.code)
-                            "TLS_REJECTED" -> throw SubscriptionFailure(false, "订阅证书无效，请检查链接")
-                            else -> throw SubscriptionFailure(false, "订阅访问被拒绝，请检查链接或权限")
-                        }
+                        checkSubscriptionResponse(response.code)
                         val text = response.content.decodeToString(throwOnInvalidSequence = true)
                         val result = Result(text, response.userinfo, response.disposition)
                         continuation.resume(result)
