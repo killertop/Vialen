@@ -268,3 +268,43 @@ git diff --check
 - `716129163c9b4cf2fee2d42f19215b05d30f02a5`：不可变包快照、串行刷新和同版本消费者。
 - `e6a0371046babadeec1c61fb879f058e3e770ba6`：清流量 IO、统计边界及服务实例门控。
 - 代码收尾仍为 main、2.1.2 / VERSION_CODE=100，无 schema、原生核心、工具链、签名或发布配置变化。QA 记录单独提交；最终状态在任务回复中回读。
+
+## 第二批：高频列表与统计优化
+
+### 基线与边界
+
+起点为 main / `c3ade8f37a390ecc195ccb9704ae042c1df261c1`，Vialen 2.1.2 / VERSION_CODE=100，单一工作树且开始时无修改。本批不升版本、不推送、不发布，不涉及 GC、日志、订阅调度、MTU、转发栈或数据库 schema。原始输出、设备资料和测试生成数据库均保存在仓库外。
+
+独立复核确认：采样已对有效 tag 去重并跳过 ignore，旧跨语言调用数是有效唯一 tag 数乘以二；后台已有降频。本批没有把这两点当成缺陷重写。剩余重复工作包括逐 tag JNI、逐节点前台 Binder、流量完整绑定、主线程 DiffUtil、Kryo 转 List<Byte>、逐次排队的纯读取及导入后逐节点选择检查。
+
+### 实现与一致性边界
+
+- 原生增加 QueryStatsBatch：一次传入 tag 列表，返回按序的小端 tx/rx 整数对。重复 tag 只清读一次；关闭后仍可读取最终计数。Kotlin 一轮调用一次批量接口，保留全部 tag 归属、速率和累计语义。Go 内部依然读取每个有效 tag 的两个计数器，不能宣称这些内部查询消失。
+- 前台按累计值变化通知，每批最多 256 个纯数字 TrafficData；新消费者注册或从后台回到前台触发完整快照。速度独立更新；停止和清零继续沿用已有最终通知与持久化顺序。AIDL 追加方法且保留旧方法，客户端和服务随同一个 APK 更新；没有对外跨版本 RPC 兼容承诺。
+- UI 批量与旧单条回调共用同一 Main 路径，避免额外 Default 跳转带来的顺序交错；每批只切入 Main 一次；流量只绑定流量文本及相关可见区域，不重设点击、名称、类型或异步选择状态。首批数据可在列表加载前缓存，内容更新保留实时统计，重绑定能取回缓存。
+- 列表内容快照复用持久化 document 字符串和显示状态字段，去掉 Kryo/字节装箱集合；保留完整 document 的比较以使隐藏配置变化更新编辑/分享目标。流量独立比较。DiffUtil 在 Default worker 上计算，Main 捕获旧状态和提交结果；代次与视图身份复核保留。
+- OrderedWorkQueue 仅合并同键的待处理纯读取；写操作仍逐项顺序执行。正在执行的旧读取在查询前及发布前检查代次，视图销毁取消待处理读取，已接受删除/排序不随视图销毁取消。
+- 批量导入仍在原有 Room 事务内检查目标并写入全部节点；提交后检查一次默认选择并发一个批次事件。兼容 Listener 默认分发保留，列表消费者覆盖批次入口。节点库与选择偏好库仍为不同数据库，保留条件选择逻辑，没有扩大事务承诺。
+
+### 验证
+
+修复前证据为本轮源码调用链，未声称完成修复前 Android 动态性能测量。
+
+- `JAVA_HOME=<锁定 JDK> ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest`：通过。343 tests / 0 failures / 0 errors / 0 skipped；Lint 0 errors / 0 warnings / 11 原有 hints。
+- 新增 TrafficBatchTest：唯一有效 tag、ignore、零时间间隔、累计只消费一次、新消费者完整快照、零值重置、分片及轻量内容快照。新增队列测试使用明确门控，1,000 个待处理同键读取实际执行 1 次，10 个写操作全部按序完成；失效视图读取取消不影响写入及另一分组。
+- 合成统计夹具：10,000 个有效唯一 tag，每轮一次批量传输，返回 160,000 字节；两轮未重复累计。10,000 行完整通知分成 40 片，无变化下一轮为 0 行。这些是测试接口计数，不是 JNI 耗时、Android 分配量或耗电测量。
+- 在 libcore 目录执行 `GOTOOLCHAIN=go1.27.1 go test -tags=with_conntrack,with_gvisor,with_quic,with_wireguard,with_utls ./...` 及相同标签的 `go test -race`：均通过。新增真实 HTTP 回环测试验证关闭后最终流量、重复 tag、缺失 tag、第二次读取清零。
+- `JAVA_HOME=<锁定 JDK> bash scripts/build-private-android.sh`：中性目录重建 AAR 成功。原生测试使用现有生产标签；最初从仓库根目录运行 Go 命令无模块，以及省略构建标签的尝试失败，随后按工作流标签重跑通过。首次 Kotlin 编译发现协程接收者与私有缓存访问错误，修正后上述全量命令通过；没有删除失败用例或放宽断言。
+- `git diff --check` 与 `python3 scripts/check-public-content.py`：通过，公开内容 0 findings。
+
+真机专项 **未执行**：设备初始在线，流式安装长时间未完成；重试非流式安装返回连接关闭，随后 ADB 无设备。用户提供地址后重连成功，但从固定仓库外副本进行的非流式安装在 180 秒内仍未完成；窗口查询也超时。没有安装成功回执，因此未启动 instrumentation，不以旧包或 JVM 结果替代。没有卸载正式包、清用户数据、切换 Wi-Fi/显示设置或启动 VPN。
+
+已编译但尚未执行的真机用例：TrafficBatchNativeTest（真实 HTTP 回环/JNI 最终计数、重复 tag、Parcel 分片上限、1,000 节点 Room 导入单次已提交事件及手动选择）；FormLifecycleNativeTest 的 lastNodeDeleteUndoAndCommitRefreshConnectionControls 新增流量变化/归零不重绑名称断言；本轮尚未重跑 BatchConsistencyNativeTest、TrafficEfficiencyNativeTest 与 SelectorCallbackNativeTest。第一批既有真机通过记录保留，但不算第二批重新通过。
+
+恢复稳定真机连接后的命令：先安装本轮已构建的 `.debug` APK 与其 androidTest APK，再用 `adb shell am instrument -w -e class io.nekohasekai.sagernet.TrafficBatchNativeTest,io.nekohasekai.sagernet.BatchConsistencyNativeTest,io.nekohasekai.sagernet.TrafficEfficiencyNativeTest,io.nekohasekai.sagernet.SelectorCallbackNativeTest com.vialen.app.debug.test/androidx.test.runner.AndroidJUnitRunner`；表单专项单独运行，传入 `-e vialenForms true -e class io.nekohasekai.sagernet.FormLifecycleNativeTest#lastNodeDeleteUndoAndCommitRefreshConnectionControls`。仅限隔离包与合成数据。
+
+尚未测量 1,000/10,000 节点滚动帧耗时、CPU/能耗、多消费者 Binder 进程死亡压力；不据功能测试推断省电百分比。
+
+结论：第二批代码与宿主回归完成，可本地提交；真机验收尚不能关闭，不能声称已验证 Android 性能或功耗收益。本批只在 main 留本地提交，版本及发布状态不变。
+
+本地实现提交：`405033c`（原生批量计数接口与回环回归）、`0794707`（Android 增量通知、列表/队列/导入优化及回归）。实现提交后工作树仅剩本节 QA 记录，记录单独提交；没有夹带既有修改。
