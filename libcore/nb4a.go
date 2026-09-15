@@ -5,7 +5,6 @@ import (
 	"libcore/device"
 	"os"
 	"path/filepath"
-	"runtime/debug"
 	"strings"
 	_ "unsafe"
 
@@ -29,7 +28,7 @@ func NekoLogClear() {
 }
 
 func ForceGc() {
-	go debug.FreeOSMemory()
+	forcedGC.request()
 }
 
 func InitCore(process, cachePath, internalAssets, externalAssets string,

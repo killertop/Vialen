@@ -120,7 +120,15 @@ class SagerNet : Application(),
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
 
-        Libcore.forceGc()
+        // Do not discard live UID/configuration/statistics state on UI hiding.
+        val lowMemory = if (level == android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
+            val info = android.app.ActivityManager.MemoryInfo()
+            (getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager).getMemoryInfo(info)
+            info.lowMemory
+        } else false
+        if (io.nekohasekai.sagernet.utils.MemoryTrimPolicy.shouldCollect(Build.VERSION.SDK_INT, level, lowMemory)) {
+            Libcore.forceGc()
+        }
     }
 
     @SuppressLint("InlinedApi")
