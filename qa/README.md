@@ -297,14 +297,24 @@ git diff --check
 - `JAVA_HOME=<锁定 JDK> bash scripts/build-private-android.sh`：中性目录重建 AAR 成功。原生测试使用现有生产标签；最初从仓库根目录运行 Go 命令无模块，以及省略构建标签的尝试失败，随后按工作流标签重跑通过。首次 Kotlin 编译发现协程接收者与私有缓存访问错误，修正后上述全量命令通过；没有删除失败用例或放宽断言。
 - `git diff --check` 与 `python3 scripts/check-public-content.py`：通过，公开内容 0 findings。
 
-真机专项 **未执行**：设备初始在线，流式安装长时间未完成；重试非流式安装返回连接关闭，随后 ADB 无设备。用户提供地址后重连成功，但从固定仓库外副本进行的非流式安装在 180 秒内仍未完成；窗口查询也超时。没有安装成功回执，因此未启动 instrumentation，不以旧包或 JVM 结果替代。没有卸载正式包、清用户数据、切换 Wi-Fi/显示设置或启动 VPN。
+USB 接入前的历史阻塞（现已解除）：设备初始在线，流式安装长时间未完成；重试非流式安装返回连接关闭，随后 ADB 无设备。用户提供地址后重连成功，但从固定仓库外副本进行的非流式安装在 180 秒内仍未完成；窗口查询也超时。没有安装成功回执，因此未启动 instrumentation，不以旧包或 JVM 结果替代。没有卸载正式包、清用户数据、切换 Wi-Fi/显示设置或启动 VPN。
 
-已编译但尚未执行的真机用例：TrafficBatchNativeTest（真实 HTTP 回环/JNI 最终计数、重复 tag、Parcel 分片上限、1,000 节点 Room 导入单次已提交事件及手动选择）；FormLifecycleNativeTest 的 lastNodeDeleteUndoAndCommitRefreshConnectionControls 新增流量变化/归零不重绑名称断言；本轮尚未重跑 BatchConsistencyNativeTest、TrafficEfficiencyNativeTest 与 SelectorCallbackNativeTest。第一批既有真机通过记录保留，但不算第二批重新通过。
+当时已编译但尚未执行的真机用例：TrafficBatchNativeTest（真实 HTTP 回环/JNI 最终计数、重复 tag、Parcel 分片上限、1,000 节点 Room 导入单次已提交事件及手动选择）；FormLifecycleNativeTest 的 lastNodeDeleteUndoAndCommitRefreshConnectionControls 新增流量变化/归零不重绑名称断言；本轮尚未重跑 BatchConsistencyNativeTest、TrafficEfficiencyNativeTest 与 SelectorCallbackNativeTest。第一批既有真机通过记录保留，但不算第二批重新通过。
 
 恢复稳定真机连接后的命令：先安装本轮已构建的 `.debug` APK 与其 androidTest APK，再用 `adb shell am instrument -w -e class io.nekohasekai.sagernet.TrafficBatchNativeTest,io.nekohasekai.sagernet.BatchConsistencyNativeTest,io.nekohasekai.sagernet.TrafficEfficiencyNativeTest,io.nekohasekai.sagernet.SelectorCallbackNativeTest com.vialen.app.debug.test/androidx.test.runner.AndroidJUnitRunner`；表单专项单独运行，传入 `-e vialenForms true -e class io.nekohasekai.sagernet.FormLifecycleNativeTest#lastNodeDeleteUndoAndCommitRefreshConnectionControls`。仅限隔离包与合成数据。
 
 尚未测量 1,000/10,000 节点滚动帧耗时、CPU/能耗、多消费者 Binder 进程死亡压力；不据功能测试推断省电百分比。
 
-结论：第二批代码与宿主回归完成，可本地提交；真机验收尚不能关闭，不能声称已验证 Android 性能或功耗收益。本批只在 main 留本地提交，版本及发布状态不变。
+USB 接入前结论：第二批代码与宿主回归完成，可本地提交；当时真机验收尚不能关闭，不能声称已验证 Android 性能或功耗收益。本批只在 main 留本地提交，版本及发布状态不变。
 
 本地实现提交：`405033c`（原生批量计数接口与回环回归）、`0794707`（Android 增量通知、列表/队列/导入优化及回归）。实现提交后工作树仅剩本节 QA 记录，记录单独提交；没有夹带既有修改。
+
+### USB 真机续验
+
+- USB 识别及实际 shell 响应成功，隔离 `.debug` 应用和测试 APK 均取得安装成功回执。正式包、Wi-Fi、显示参数和生产 VPN 未操作。
+- 首轮 8 项中 7 通过、1 失败：新增 HTTP 回环夹具只接受一个连接，而 RTT 路径还会发起后续请求，导致等待响应头超时。为新用例补上既有 BenchmarkForegroundRule 后仍复现同一超时；因此不能仅归因于后台限制。将夹具改为接受连续连接，显式关闭 listener 后 join worker，保留原有超时、最终流量、重复 tag、二次清读和 Parcel 上限断言。仅改测试夹具，未改生产代码或放宽断言。
+- `:app:assembleDebugAndroidTest` 通过；通过 USB 更新测试包。TrafficBatchNativeTest 2 项、BatchConsistencyNativeTest 3 项、TrafficEfficiencyNativeTest 1 项、SelectorCallbackNativeTest 2 项，共 **8 项通过**，运行报告 `OK (8 tests)`。
+- 列表界面专项 `FormLifecycleNativeTest#lastNodeDeleteUndoAndCommitRefreshConnectionControls` 通过：非零流量及清零保持名称绑定，最后节点删除、撤销、提交及连接按钮状态正确。另以 `am instrument -w -r` 核对完成状态码为 **0**，不是 assumption 跳过；报告 `OK (1 test)`。
+- 原始运行输出保存在仓库外，QA 不包含设备标识或调试地址。此次仅新增测试夹具修正和本记录，无生产代码变化，因此未重复此前已通过的 343 项 JVM、Go 普通/race 和 Lint。
+
+续验结论：第二批本次安排的 **9 项真机功能专项已通过**，安装阻塞已通过 USB 绕过，本批已安排的功能验收待办可以关闭（不代表无线传输已修复）。1,000/10,000 节点帧耗时、CPU/能耗及多消费者 Binder 进程死亡压力仍未测量，不作性能或省电量化结论。

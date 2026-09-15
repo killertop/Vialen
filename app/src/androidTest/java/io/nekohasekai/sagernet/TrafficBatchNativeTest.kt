@@ -16,6 +16,7 @@ import org.junit.runner.RunWith
 /** Synthetic rows and outbound-only native instance in the isolated package. */
 @RunWith(AndroidJUnit4::class)
 class TrafficBatchNativeTest {
+    @get:Rule(order = Int.MIN_VALUE) val foreground = BenchmarkForegroundRule()
     @get:Rule val profileState = ProfileSelectionStateRule()
 
     @Test fun batchJniDrainsFinalCountersOnceAndUsesBoundedParcel() {
@@ -28,15 +29,22 @@ class TrafficBatchNativeTest {
                 val worker = java.util.concurrent.Executors.newSingleThreadExecutor()
                 try {
                     val response = worker.submit {
-                        server.accept().use { socket ->
-                            socket.soTimeout = 5000
-                            val reader = socket.getInputStream().bufferedReader()
-                            while (!reader.readLine().isNullOrEmpty()) { }
-                            socket.getOutputStream().write("HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n".toByteArray())
-                            socket.getOutputStream().flush()
+                        // RTT testing can issue a warm-up request before the measured request.
+                        while (!server.isClosed) {
+                            val accepted = try { server.accept() } catch (closed: java.net.SocketException) {
+                                if (server.isClosed) break else throw closed
+                            }
+                            accepted.use { socket ->
+                                socket.soTimeout = 5000
+                                val reader = socket.getInputStream().bufferedReader()
+                                while (!reader.readLine().isNullOrEmpty()) { }
+                                socket.getOutputStream().write("HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n".toByteArray())
+                                socket.getOutputStream().flush()
+                            }
                         }
                     }
                     Libcore.urlTest(box, "http://127.0.0.1:${server.localPort}/fixture", 3000)
+                    server.close()
                     response.get(5, java.util.concurrent.TimeUnit.SECONDS)
                     box.close()
                     val bytes = box.queryStatsBatch("proxy\nmissing\nproxy")
