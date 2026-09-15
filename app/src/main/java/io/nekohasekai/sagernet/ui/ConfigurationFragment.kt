@@ -666,16 +666,21 @@ class ConfigurationFragment @JvmOverloads constructor(
                     snackbar(getString(R.string.clipboard_empty)).show()
                 } else {
                     val originGroupId = DataStore.selectedGroup
-                    val targetId = try {
-                        DataStore.selectedGroupForImport()
-                    } catch (error: Exception) {
-                        Logs.w(error)
-                        snackbar(error.readableMessage).show()
-                        return true
-                    }
+                    // Keep the node destination tied to this click, but do not let a missing
+                    // basic group prevent importing an independent subscription.
+                    val nodeTarget = runCatching { DataStore.selectedGroupForImport() }
                     val owner = activity as? MainActivity
                     runOnDefaultDispatcher {
                         try {
+                            val subscription = io.nekohasekai.sagernet.group.ClipboardSubscription.find(text)
+                            if (subscription != null) {
+                                if (owner != null && !owner.isFinishing && !owner.isDestroyed) {
+                                    owner.importSubscription(android.net.Uri.Builder().scheme("sn").authority("subscription")
+                                        .appendQueryParameter("url", subscription).build())
+                                }
+                                return@runOnDefaultDispatcher
+                            }
+                            val targetId = nodeTarget.getOrThrow()
                             val proxies = RawUpdater.parseRaw(text)
                             if (proxies.isNullOrEmpty()) {
                                 showMessage(app.getString(R.string.no_proxies_found_in_clipboard))
