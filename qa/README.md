@@ -328,3 +328,82 @@ Release 构建命令 `JAVA_HOME=<锁定 JDK> ./gradlew :app:assembleRelease` 通
 附件：Vialen-2.1.3-arm64-v8a.apk；SHA-256 `1e8555843ff409037480cacf48ea09998917ec3b3facb8dd240746e96c5d346b`。仅上传正式 APK，不上传密钥、日志、测试数据库或设备资料。正式 2.1.3 APK 未安装到生产包，真机结论来自相同生产逻辑的隔离测试包。
 
 两批结果汇总：第一批三项缺陷及可控并发回归关闭；第二批实现和本次 9 项真机功能专项关闭。337 与 343 是先后两次全量 JVM 数量，不得相加；第二批 343 已包含历史回归。不同 OEM 事件风暴、系统杀进程/真实跨进程 Binder 调用方死亡、正式 Android VPN 启停故障注入，以及大列表帧耗时/功耗测量仍未完成。
+
+## 第三批：后台订阅调度与按需内存回收
+
+### 基线、范围及独立复核
+
+起点 main / `79533396032099f5c02eb2c344ad36af03c0d627`，Vialen 2.1.3 / VERSION_CODE=101（ARM64=505），单一工作树，开始时无已有修改。本批保持版本、schema、工具链、生产依赖、签名和发布状态不变，只做本地提交。测试新增同版本 WorkManager 2.11.2 的 work-testing，不升级运行依赖。原始输出、设备资料、测试数据库在仓库外。
+
+修复前证据为本轮源码调用链，未声称完成旧版本动态功耗或故障复现。确认旧全局周期任务缺少联网约束，Boolean 汇总导致一个失败触发整批 retry；文档和网络来源共用调度。确认 onTrimMemory 不区分级别调用 ForceGc，原生每次请求新建 goroutine 执行 FreeOSMemory。SQLite 配置版本/请求代次、成功提交时间、HTTP 正文取消与大小限制，以及前两批统计/列表/数据库保护已有正确机制，予以保留。
+
+开始时重新读取远端基线工作流及实际步骤：Android/libcore [34953029101](https://github.com/killertop/Vialen/actions/runs/34953029101)、Go [34953029160](https://github.com/killertop/Vialen/actions/runs/34953029160)、公开内容 [34953029233](https://github.com/killertop/Vialen/actions/runs/34953029233) 均 success。Android 工具链准备、libcore 普通/race、AAR、JVM/Lint/测试 APK 步骤实际成功；下载基线报告解析为 343 tests / 0 failures / 0 errors / 0 skipped。Go 工作流的业务测试与 race、公开内容的拒绝私密材料步骤也实际成功。这些结果只证明旧基线，不能证明本批未推送的提交。
+
+### A：确认并优化自动订阅调度
+
+- `SubscriptionSchedule` 为每个自动订阅生成独立周期任务：网络来源 CONNECTED，content 来源 NOT_REQUIRED，不增加 Wi-Fi-only/充电/电量限制。沿用用户间隔及 WorkManager 的 15 分钟下限；输入只有分组 ID 和配置摘要，任务名称不携带原始链接。摘要覆盖来源、更新间隔和用户控制项，不包含 lastUpdated 等远端元数据。
+- `SubscriptionUpdater.reconfigureUpdaterOrThrow` 保留进程 Mutex、跨进程文件锁、远端操作完成确认和超时。取消旧 `SubscriptionUpdater` 唯一任务；查询新标签，仅取消失效配置/已删除/关闭自动更新的任务，按需 enqueueUniquePeriodicWork(UPDATE)。配置不变时保留现有任务及下次执行时间，避免 UPDATE 保留原 enqueue time 而重新计算 initialDelay 造成时间偏移。配置改变时必须使用新身份，以停止仍按旧来源约束运行的实例；没有无故重建全部任务。持锁读取后若配置又改变，执行前及提交事务仍会拒绝过期结果，下一次重配置负责收敛调度。
+- 旧持久化 Worker 缺少新输入时只执行有界迁移，不再下载全组。取消旧 WorkSpec 的完成回执证明调度状态已更新，不冒充所有旧协程已经退出；HTTP 协程另有取消与 IO 子任务 join。每次运行使用独立通知标识，即使同一 WorkSpec 的旧尝试延迟清理，也不能取消新尝试的通知。
+- `SubscriptionRun` / `GroupUpdater.executeUpdateResult` 明确区分 UPDATED、SKIPPED、SUPERSEDED、TEMPORARY_FAILURE、PERMANENT_FAILURE。Worker 重读分组并检查来源摘要、自动更新、到期及仅连接时条件。`SubscriptionRefresh.begin` 在同一个 Room 事务内、递增请求代次之前复核预期配置，防止旧排队任务反过来使有效的新刷新失效。既有配置版本、请求代次及提交事务检查仍保留，网络约束不替代它们。
+- 临时失败每个周期最多 3 次尝试，交给 WorkManager 30 秒起的指数退避；没有自建重试循环。格式、明确权限、HTTP 拒绝、证书和超大正文等错误本轮不立即重试。正常周期仍可再次尝试，配置修改/主动刷新也可重试；不修改 autoUpdate，不把失败时间写成 lastUpdated。成功、永久错误和过期任务互不拖入其他订阅的退避。
+- 周期任务的 success/failure 不是一次性任务的终止状态；本实现非临时结果返回 success 结束当前 occurrence，之后仍 ENQUEUED 等待正常周期。语义依据 [Android 周期工作状态](https://developer.android.com/develop/background-work/background-tasks/persistent/how-to/states)、[更新已有工作](https://developer.android.com/develop/background-work/background-tasks/persistent/how-to/update-work)，并由当前 2.11.2 TestDriver 验证 success/retry 后的实际状态。
+- `SubscriptionFetch` 使用新增 Go 结构化结果，不按异常 message 或中文文案分类。失败仅返回稳定代码，不带 URL、token、正文或响应头；正常结果保留必要订阅元数据。CancellationException 继续传播；HTTP 取消进入真实请求/正文并等待子任务退出，30 秒超时与 16 MiB 上限保留。
+- `SubscriptionDocument` 向 ContentResolver 传 CancellationSignal，取消时关闭已打开流，IO 子任务随调用作用域结束。SecurityException/FileNotFoundException 属本轮不立即重试，普通 IO 可临时重试；content 提供者可能依赖远端，不保证离线一定成功。合作式 Provider 的打开取消已验证；无法强制保证任意第三方 Provider 响应 CancellationSignal 或跨线程 close，相关设备边界见下文。
+- 通知权限不存在时不影响更新；通知、页面反馈失败不把已经提交的更新改报为数据库失败。提交后默认选择恢复属于另一个数据库边界，反馈失败不回滚已提交节点事务，也没有声称两个数据库原子提交。
+
+### B：确认并优化主动 GC
+
+- `MemoryTrimPolicy` 明确排除 UI_HIDDEN；BACKGROUND 只在回调当时 ActivityManager.MemoryInfo.lowMemory 为真时请求。API 34 以前另接受 RUNNING_CRITICAL/MODERATE/COMPLETE；新 SDK 不依赖这些已经停止通知的旧压力级别。依据 [ComponentCallbacks2 官方说明](https://developer.android.com/reference/android/content/ComponentCallbacks2)。没有增加轮询；不清空 UID 快照、运行配置、订阅状态或待写流量。
+- 全部生产调用链仍只有 SagerNet.onTrimMemory → Libcore.forceGc → Go ForceGc；统一 `gcGate` 在启动 goroutine 之前持锁检查 busy/冷却。同进程最多一个主动回收，无排队/永久 ticker，拒绝请求不创建等待 goroutine。time.Now 的单调分量用于时间差；收集结束或可恢复 panic 均释放门控。
+- 默认冷却 5 分钟，从接受请求时起算，是限制重复主动请求的保守预算，不是实测最优阈值；严重压力请求也不无限绕过冷却。Go 正常 GC 不受此门控限制，没有修改 GOGC/GOMEMLIMIT，没有同时 System.gc。UI 和 :bg 各有自己的 Go 堆与进程内门控，不是跨进程共享回收协调。
+
+### 本地验证及过程中失败
+
+实际命令（使用仓库锁定工具链）：
+
+```text
+JAVA_HOME=<锁定 JDK> bash scripts/build-private-android.sh
+JAVA_HOME=<锁定 JDK> ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+# core 目录
+GOTOOLCHAIN=go1.27.1 go test -count=1 ./...
+GOTOOLCHAIN=go1.27.1 go test -race -count=1 ./...
+# libcore 目录
+GOTOOLCHAIN=go1.27.1 go test -tags=with_conntrack,with_gvisor,with_quic,with_wireguard,with_utls -count=1 ./...
+GOTOOLCHAIN=go1.27.1 go test -race -tags=with_conntrack,with_gvisor,with_quic,with_wireguard,with_utls -count=1 ./...
+git diff --check
+python3 scripts/check-public-content.py
+```
+
+- 新原生代码通过中性目录流程重建 AAR；后续 Android 构建使用对应新 AAR。core 与 libcore 普通/race 均通过；保留全部历史测试及生产 feature tags。
+- 最终全量 JVM/Room：354 tests / 0 failures / 0 errors / 0 skipped。这是本次完整集合，包含基线 343 和新增 11 项，不与此前阶段全量数量相加。Lint 0 errors / 0 warnings / 11 原有 hints；Debug 和 instrumentation APK 构建通过。
+- `BackgroundPolicyTest` 4 项覆盖来源约束、配置摘要/成功时间、到期和失败分类/退避预算、SDK 回调策略。`SubscriptionRunTest` 4 项覆盖混合结果、排队配置失效、通知异常与取消，以及同一 WorkSpec 两次尝试重叠时通知清理归属。合成四订阅模型的更新调用量分别为 1/3/1/1；这是可控业务回调计数，不是真实网络吞吐或功耗测量。
+- `SubscriptionWorkConstraintsTest` 使用实际 WorkManager 2.11.2 TestDriver 和测试数据库：未满足约束时网络 Worker 执行 0 次，文档 Worker 1 次；满足网络约束后网络执行 1 次返回 retry，文档保持 1 次，两个周期任务均 ENQUEUED。WorkerFactory 用计数 Worker 替换传输边界，不冒充无网络真机测试。
+- `SubscriptionDocumentTest` 合作式 Provider 验证取消信号与权限撤销；`SubscriptionRefreshRaceTest` 新增双 Room 连接验证旧配置在 begin 阶段被拒绝且不使新代次失效。既有真实 Room/SQLite 测试继续覆盖 ABA、删除、乱序、失败/取消、checkpoint 和清零顺序。
+- Go 新测试覆盖 HTTP 成功、401/403/404/408/429/503 分类及失败无正文/头泄漏、结构化取消和服务器 EOF。GC 用注入时钟与收集函数：初次执行期间 1,000 个并发请求全部拒绝，窗口内不排队，窗口结束后再次执行；正常两次执行和 panic 后恢复均验证，race 通过。注入冷却为 1 分钟加速逻辑验证，生产仍为 5 分钟；不是实际 Go GC CPU/RSS 测量。
+- 过程中失败保留：初次 Kotlin 编译发现 feedback lambda 非局部 return 与新增 WorkInfo 可空返回访问错误，修正后通过。文档 Provider 测试先缺 authority，再缺 openTypedAssetFile 向带 CancellationSignal 重载的转发，分别在 Android Provider 校验和文件打开处失败；补齐夹具后原取消/权限断言通过。一次构建日志被两个先后交叠的 Gradle 调用写入，混有旧编译失败；之后使用独立日志且等待上一进程退出，最终结果来自独立完整成功运行。没有删除失败测试、放宽业务断言或用旧 AAR冒充新验证。
+
+### 隔离真机及未验证边界
+
+USB 真机在线，`adb install -r` 更新本轮 `.debug` APK 和对应测试 APK，均收到成功回执。执行：
+
+```text
+adb shell am instrument -w -r -e class io.nekohasekai.sagernet.BackgroundSchedulingNativeTest,io.nekohasekai.sagernet.SubscriptionFetchNativeTest,io.nekohasekai.sagernet.SubscriptionPersistenceNativeTest,io.nekohasekai.sagernet.BatchConsistencyNativeTest com.vialen.app.debug.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+- 本批安排共 14 项：BackgroundSchedulingNativeTest 2、SubscriptionFetchNativeTest 3、SubscriptionPersistenceNativeTest 6、BatchConsistencyNativeTest 3。第一轮全部通过（逐项完成码 0，无 assumption 跳过）。包含真实 RemoteWorkManager/跨进程调度锁、旧任务取消、网络/文档来源切换、不变任务身份保留、关闭/删除清理，以及关闭正在运行的订阅后服务器在夹具清理前观察到 EOF、未提交节点/成功时间。
+- 原生 HTTP 30 秒完整正文超时、超大声明拒绝、取消后子任务 join，以及真实设备 SQLite 保存/回滚、UID 快照与清流量/主线程调度历史回归通过。运行输入为合成节点和回环服务；没有启动生产 VPN、操作正式包、清用户数据、关闭 Wi-Fi 或改变显示参数。
+- 手工分阶段 `WorkUpgradeNativeTest` 已适配新迁移语义：旧全局 UUID 退役、新按组任务保持配置不变时身份，保留原数据恢复和真实请求断言。本轮只编译，未做旧 APK→候选 APK 的完整分阶段迁移；本轮迁移证据来自当前隔离包的真实持久化 WorkSpec 专项。`WorkConnectedOnlyNativeTest` 适配新 Worker 输入但未执行，因为其 VPN 启停超出本轮“不改变生产 VPN”边界；相应条件由可控 JVM 路径覆盖，不能替代真实 VPN 结论。
+- 未覆盖第三方远程文档 Provider 的阻塞读取/权限变化组合、实际断网导致平台约束失效（未关闭 Wi-Fi）、不同 OEM 压力及新旧 SDK 的真实回调频率、系统杀进程、跨进程调用方死亡、正式安装包设备验收；这些旧有或平台专项仍为未验证。
+- 本批功能回归不能代替大列表帧耗时、CPU/能耗、GC CPU/次数、两进程内存和恢复分配的对照测量。没有报告省电比例或保证 FreeOSMemory 后 RSS 必降。
+
+### 收尾结论
+
+A、B 源码问题确认并优化，保留已有正确的版本/事务/统计/取消保障。已消除的无效工作有可控测试依据：不满足联网约束时网络 Worker 不启动、失败来源不带成功来源重复执行、每周期有界重试、旧配置拒绝下载/提交、UI 隐藏不主动 GC、并发/冷却内请求不累积回收任务。不变配置还避免重复远端 UPDATE 和初始时间偏移。
+
+具备进入下一批“性能与功耗测量”的功能基础；测量批次应继续保留上述回归，并针对后台空闲、失败重试、回调压力及两个进程做同机对照。5 分钟冷却及真实平台调度效果仍需测量，不把这些策略写成已经证明的省电收益。本批不推送、不打标签、不发布；新提交只有本地验证，远端绿色仍属于原基线。
+
+最终通知标识与调度时间保护加入后，重新完成全量 354 项 JVM/Room、Lint、Debug/测试 APK 构建，再更新两个隔离 APK，重跑同一组 14 项真机专项，仍全部通过（逐项完成码 0）。这是同组复验，不计为 28 项新增覆盖。新增时间断言确认只改变远端成功时间时，现有 WorkSpec ID 与 nextScheduleTimeMillis 均不变。
+
+收尾再次查询基线三个工作流仍为 success，远端 main 仍为 `7953339`；没有取消或触发远端运行。完整暂存 diff 人工复核、`git diff --cached --check` 和公开内容检查通过，0 findings；未包含凭据、真实订阅、设备标识、原始日志、数据库或无关改动。
+
+本地实现提交：`a4a636598bd2f3e2bcb014924aa5c911211c8570`（压力条件与进程内 GC 单飞/冷却），`535d7680048ab747b9943a27f5ea06c19c6706bf`（按组订阅调度、结构化结果、取消/通知/迁移及回归）。QA 单独提交；收尾仍为 main、单一工作树、2.1.3 / VERSION_CODE=101，本任务全部修改提交完整，无既有修改需要保全。
