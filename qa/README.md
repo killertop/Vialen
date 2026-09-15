@@ -441,3 +441,11 @@ A/A 滚动 P95、主进程 CPU、加载时间的配对差区间均跨零；短�
 本轮执行 `:app:testDebugUnitTest :app:lintDebug :app:assembleDebug`，构建成功；354 tests / 0 failures / 0 errors / 0 skipped，Lint 通过。没有新增仅镜像实现的测试。已安装隔离 `.debug` 包并查看真机首页空状态，确认纯白背景；非空节点的断开/连接过渡未做本轮真机状态切换验证，连接过程文字保留依据源码分支复核。没有启动 VPN、操作正式包数据、修改 Wi-Fi/显示设置。截图和原始构建日志保留仓库外。
 
 未实施此前完整重设计、节点更多菜单或卡片结构调整。本轮只做本地提交，不推送、不发布。
+
+## 隔离包与本地构建残留清理
+
+按用户明确要求，卸载已连接真机的 `com.vialen.app.debug.test`、`com.vialen.app.debug`、`com.vialen.app.benchmark`，三项均返回成功，回读没有残留 Vialen 包。清理前正式 `com.vialen.app` 本就未安装，本轮未安装正式包、未改签名或生产数据。
+
+确认无正在进行的构建，停止 Gradle daemon 后，将源码目录内 13 项可再生构建产物/缓存及 Finder 元数据移入系统垃圾篓，合计约 2013.9 MiB；未清空垃圾篓，因此不宣称释放相同磁盘空间。范围包括 app/build、根 build、Gradle/Kotlin 缓存、buildSrc 构建缓存、core/libcore 构建暂存、重复的 libcore 根 AAR 和 Python 字节码缓存。源码、QA、基准工具和构建需要的 app/libs/libcore.aar 保留，未删除归属不明内容。原始清理清单留在仓库外。
+
+AGENTS.md 已明确后续优先原签名正式包验收，必要时才使用隔离包并在结束后清理；不得卸载正式包、清数据或用隔离包结果替代正式验收。本轮无生产代码变更、不升版、不推送；只执行公开内容检查和 Git/文件回读，不重新构建制造缓存。
