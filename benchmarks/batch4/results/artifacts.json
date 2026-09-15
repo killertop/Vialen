@@ -1,0 +1,26 @@
+{
+  "B1-provenance": {
+    "libcore.aar": "0d8ec3379d64d21192fc01faff57b00c820ca7a0d652fa8ef773861604fc6028",
+    "B1.apk": "cd1a7fd403f0bb0f3623652c6c2ec3d8d554407b1e66f3bb9c42b05f6de2094a",
+    "source_sha": "c32f461ec1621b2e57abf27116a2b727a46a6e8b",
+    "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+    "application_id": "com.vialen.app.benchmark",
+    "version_code": 900001
+  },
+  "L0-provenance": {
+    "libcore.aar": "d64370fc09a5ff76b0563c875979b89648f8655fa708b84423f5d1eebe2540c7",
+    "L0.apk": "31439439331b367cae28760c272f3eb1c44d6740b5dfb637fc66abed6e9559b0",
+    "source_sha": "c3ade8f37a390ecc195ccb9704ae042c1df261c1",
+    "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+    "application_id": "com.vialen.app.benchmark",
+    "version_code": 900001
+  },
+  "L1-provenance": {
+    "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+    "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+    "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+    "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+    "application_id": "com.vialen.app.benchmark",
+    "version_code": 900001
+  }
+}

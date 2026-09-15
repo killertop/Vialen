@@ -1,0 +1,35 @@
+{
+  "L0": {
+    "apk_sha256": "31439439331b367cae28760c272f3eb1c44d6740b5dfb637fc66abed6e9559b0",
+    "signer_sha256": [
+      "6284f1d6d88903f5f126651ac465eef5aac1a8def8f9d312534ee61006182c2a"
+    ],
+    "abis": [
+      "arm64-v8a"
+    ],
+    "profileable_shell": true,
+    "debuggable": false
+  },
+  "L1": {
+    "apk_sha256": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+    "signer_sha256": [
+      "6284f1d6d88903f5f126651ac465eef5aac1a8def8f9d312534ee61006182c2a"
+    ],
+    "abis": [
+      "arm64-v8a"
+    ],
+    "profileable_shell": true,
+    "debuggable": false
+  },
+  "B1": {
+    "apk_sha256": "cd1a7fd403f0bb0f3623652c6c2ec3d8d554407b1e66f3bb9c42b05f6de2094a",
+    "signer_sha256": [
+      "6284f1d6d88903f5f126651ac465eef5aac1a8def8f9d312534ee61006182c2a"
+    ],
+    "abis": [
+      "arm64-v8a"
+    ],
+    "profileable_shell": true,
+    "debuggable": false
+  }
+}

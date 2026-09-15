@@ -1,0 +1,3377 @@
+[
+  {
+    "run": "aa-00-a-1000-list-measure-seed",
+    "mode": "seed",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "inserted": 1000,
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 0.39220619201660156,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "b2662ffe6b49bddac584046b069601ac6779f86931c3f6e2ff312bee70b9905a"
+  },
+  {
+    "run": "aa-00-a-1000-list-measure",
+    "mode": "list",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "load_ms": 99.429896,
+    "scroll": {
+      "elapsed_ms": 4094.344217,
+      "process_cpu_ms": 2176,
+      "driver_cpu_ms": 2.078646,
+      "sql": {
+        "queries": 0,
+        "profile_reads": 0,
+        "writes": 0
+      },
+      "memory_before": {
+        "pss_kb": 110814,
+        "java_used_bytes": 19592696
+      },
+      "memory_after": {
+        "pss_kb": 113686,
+        "java_used_bytes": 22001144
+      },
+      "window_callback_frames": 976,
+      "window_dropped": 0
+    },
+    "refresh": {
+      "elapsed_ms": 67.610312,
+      "process_cpu_ms": 68,
+      "driver_cpu_ms": 0.395574,
+      "sql": {
+        "queries": 6,
+        "profile_reads": 1,
+        "writes": 1
+      },
+      "memory_before": {
+        "pss_kb": 114246,
+        "java_used_bytes": 22427128
+      },
+      "memory_after": {
+        "pss_kb": 121425,
+        "java_used_bytes": 24671864
+      },
+      "window_callback_frames": 4,
+      "window_dropped": 0
+    },
+    "burst": {
+      "elapsed_ms": 46.114479,
+      "process_cpu_ms": 45,
+      "driver_cpu_ms": 1.917343,
+      "sql": {
+        "queries": 12,
+        "profile_reads": 2,
+        "writes": 2
+      },
+      "memory_before": {
+        "pss_kb": 121425,
+        "java_used_bytes": 24671864
+      },
+      "memory_after": {
+        "pss_kb": 125565,
+        "java_used_bytes": 26638072
+      },
+      "window_callback_frames": 2,
+      "window_dropped": 0
+    },
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 7.483725070953369,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "475557c7bc641c6f31a40161c9a520ac02abba7127dff1e6242475b706d25d8e",
+    "label": "L1",
+    "pair": 0,
+    "side": "a",
+    "phase": "measure",
+    "plan_sha256": "f4815b67039e51c89d75180dcb915ee6ab2ef4ce30df9d19bf3d1e9bfbfb01e8",
+    "perfetto": {
+      "windows": {
+        "burst": {
+          "frame_count": 4,
+          "frame_overrun_count": 4,
+          "frame_duration_cpu_ms": {
+            "0.5": 4.681016,
+            "0.95": 12.573240249999996,
+            "0.99": 13.632315249999998
+          },
+          "frame_overrun_ms": {
+            "0.5": -0.16493599999999997,
+            "0.95": 7.172433449999998,
+            "0.99": 7.973999489999998
+          },
+          "overrun_fraction": 0.5,
+          "thread_cpu": [
+            {
+              "process": "bg",
+              "thread": "other",
+              "cpu_ms": "0.112239"
+            },
+            {
+              "process": "main",
+              "thread": "B4Driver",
+              "cpu_ms": "1.730259"
+            },
+            {
+              "process": "main",
+              "thread": "B4Frames",
+              "cpu_ms": "0.031614"
+            },
+            {
+              "process": "main",
+              "thread": "RenderThread",
+              "cpu_ms": "8.631356"
+            },
+            {
+              "process": "main",
+              "thread": "main_thread",
+              "cpu_ms": "18.225416"
+            },
+            {
+              "process": "main",
+              "thread": "other",
+              "cpu_ms": "17.178751"
+            }
+          ]
+        },
+        "refresh": {
+          "frame_count": 4,
+          "frame_overrun_count": 4,
+          "frame_duration_cpu_ms": {
+            "0.5": 6.337292,
+            "0.95": 31.456075099999993,
+            "0.99": 34.58650622
+          },
+          "frame_overrun_ms": {
+            "0.5": 7.6517705000000005,
+            "0.95": 21.263261749999998,
+            "0.99": 21.84196835
+          },
+          "overrun_fraction": 0.5,
+          "thread_cpu": [
+            {
+              "process": "main",
+              "thread": "B4Driver",
+              "cpu_ms": "0.314532"
+            },
+            {
+              "process": "main",
+              "thread": "B4Frames",
+              "cpu_ms": "0.081770"
+            },
+            {
+              "process": "main",
+              "thread": "RenderThread",
+              "cpu_ms": "12.919686"
+            },
+            {
+              "process": "main",
+              "thread": "main_thread",
+              "cpu_ms": "39.247235"
+            },
+            {
+              "process": "main",
+              "thread": "other",
+              "cpu_ms": "16.178176"
+            }
+          ]
+        },
+        "scroll": {
+          "frame_count": 488,
+          "frame_overrun_count": 488,
+          "frame_duration_cpu_ms": {
+            "0.5": 3.8108595000000003,
+            "0.95": 4.700481799999999,
+            "0.99": 5.375711189999999
+          },
+          "frame_overrun_ms": {
+            "0.5": -6.590956500000001,
+            "0.95": -5.3963457,
+            "0.99": -4.74563549
+          },
+          "overrun_fraction": 0.0,
+          "thread_cpu": [
+            {
+              "process": "bg",
+              "thread": "other",
+              "cpu_ms": "40.719636"
+            },
+            {
+              "process": "main",
+              "thread": "B4Driver",
+              "cpu_ms": "1.916925"
+            },
+            {
+              "process": "main",
+              "thread": "B4Frames",
+              "cpu_ms": "32.890278"
+            },
+            {
+              "process": "main",
+              "thread": "RenderThread",
+              "cpu_ms": "1498.762302"
+            },
+            {
+              "process": "main",
+              "thread": "main_thread",
+              "cpu_ms": "479.864599"
+            },
+            {
+              "process": "main",
+              "thread": "other",
+              "cpu_ms": "241.132091"
+            }
+          ]
+        }
+      },
+      "trace_stats": [],
+      "trace_sha256": "07a87895864a3a9464840b9f4ee2cbf8439b98f98cfa09fd45f16cb9aaafdab5"
+    }
+  },
+  {
+    "run": "aa-00-a-1000-list-warm1-seed",
+    "mode": "seed",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "inserted": 1000,
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 0.3868730068206787,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "afa30977b756170db36a47b6169d49ed6e50c966d4410185cf8b7a1b268c2753"
+  },
+  {
+    "run": "aa-00-a-1000-list-warm1",
+    "mode": "list",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "load_ms": 128.102344,
+    "scroll": {
+      "elapsed_ms": 4089.866925,
+      "process_cpu_ms": 1454,
+      "driver_cpu_ms": 1.423648,
+      "sql": {
+        "queries": 0,
+        "profile_reads": 0,
+        "writes": 0
+      },
+      "memory_before": {
+        "pss_kb": 114359,
+        "java_used_bytes": 19432840
+      },
+      "memory_after": {
+        "pss_kb": 113338,
+        "java_used_bytes": 21120392
+      },
+      "window_callback_frames": 976,
+      "window_dropped": 0
+    },
+    "refresh": {
+      "elapsed_ms": 58.20276,
+      "process_cpu_ms": 56,
+      "driver_cpu_ms": 0.391615,
+      "sql": {
+        "queries": 6,
+        "profile_reads": 1,
+        "writes": 1
+      },
+      "memory_before": {
+        "pss_kb": 113886,
+        "java_used_bytes": 21546376
+      },
+      "memory_after": {
+        "pss_kb": 120849,
+        "java_used_bytes": 23758344
+      },
+      "window_callback_frames": 2,
+      "window_dropped": 0
+    },
+    "burst": {
+      "elapsed_ms": 42.997552,
+      "process_cpu_ms": 44,
+      "driver_cpu_ms": 1.113389,
+      "sql": {
+        "queries": 12,
+        "profile_reads": 2,
+        "writes": 2
+      },
+      "memory_before": {
+        "pss_kb": 120853,
+        "java_used_bytes": 23758344
+      },
+      "memory_after": {
+        "pss_kb": 124901,
+        "java_used_bytes": 25708168
+      },
+      "window_callback_frames": 2,
+      "window_dropped": 0
+    },
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 6.489943027496338,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "f7228d8813c7efe1fc9bc1c56081b132584e9ed9148416a8c8a828ee860163ca",
+    "label": "L1",
+    "pair": 0,
+    "side": "a",
+    "phase": "warmup",
+    "plan_sha256": "f4815b67039e51c89d75180dcb915ee6ab2ef4ce30df9d19bf3d1e9bfbfb01e8"
+  },
+  {
+    "run": "aa-00-a-1000-list-warm2-seed",
+    "mode": "seed",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "inserted": 1000,
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 0.44016289710998535,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "de949cf2f532d6366ccc7cb789626d958d09c3b4d334c388dbd280e034d96b08"
+  },
+  {
+    "run": "aa-00-a-1000-list-warm2",
+    "mode": "list",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "load_ms": 98.552604,
+    "scroll": {
+      "elapsed_ms": 4094.683331,
+      "process_cpu_ms": 1580,
+      "driver_cpu_ms": 1.987448,
+      "sql": {
+        "queries": 0,
+        "profile_reads": 0,
+        "writes": 0
+      },
+      "memory_before": {
+        "pss_kb": 110573,
+        "java_used_bytes": 19345888
+      },
+      "memory_after": {
+        "pss_kb": 113122,
+        "java_used_bytes": 21049824
+      },
+      "window_callback_frames": 976,
+      "window_dropped": 0
+    },
+    "refresh": {
+      "elapsed_ms": 64.59625,
+      "process_cpu_ms": 65,
+      "driver_cpu_ms": 0.770416,
+      "sql": {
+        "queries": 6,
+        "profile_reads": 1,
+        "writes": 1
+      },
+      "memory_before": {
+        "pss_kb": 113693,
+        "java_used_bytes": 21475808
+      },
+      "memory_after": {
+        "pss_kb": 120845,
+        "java_used_bytes": 23704352
+      },
+      "window_callback_frames": 4,
+      "window_dropped": 0
+    },
+    "burst": {
+      "elapsed_ms": 40.574583,
+      "process_cpu_ms": 39,
+      "driver_cpu_ms": 0.924008,
+      "sql": {
+        "queries": 12,
+        "profile_reads": 2,
+        "writes": 2
+      },
+      "memory_before": {
+        "pss_kb": 120845,
+        "java_used_bytes": 23720736
+      },
+      "memory_after": {
+        "pss_kb": 125000,
+        "java_used_bytes": 25670560
+      },
+      "window_callback_frames": 2,
+      "window_dropped": 0
+    },
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 6.496187210083008,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "61bc58c1f2bcc0d4c928c364f0371d695f8e899350f648c19b20300195d96b53",
+    "label": "L1",
+    "pair": 0,
+    "side": "a",
+    "phase": "warmup",
+    "plan_sha256": "f4815b67039e51c89d75180dcb915ee6ab2ef4ce30df9d19bf3d1e9bfbfb01e8"
+  },
+  {
+    "run": "aa-00-b-1000-list-measure-seed",
+    "mode": "seed",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "inserted": 1000,
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "340",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 0.38387393951416016,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "c076600df34ca5b8576145a9e5293391b0a54d9bcad258ba836418787a9771ed"
+  },
+  {
+    "run": "aa-00-b-1000-list-measure",
+    "mode": "list",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "load_ms": 116.983229,
+    "scroll": {
+      "elapsed_ms": 4088.588488,
+      "process_cpu_ms": 2135,
+      "driver_cpu_ms": 1.903231,
+      "sql": {
+        "queries": 0,
+        "profile_reads": 0,
+        "writes": 0
+      },
+      "memory_before": {
+        "pss_kb": 112855,
+        "java_used_bytes": 19712424
+      },
+      "memory_after": {
+        "pss_kb": 115427,
+        "java_used_bytes": 22120872
+      },
+      "window_callback_frames": 974,
+      "window_dropped": 0
+    },
+    "refresh": {
+      "elapsed_ms": 58.305208,
+      "process_cpu_ms": 57,
+      "driver_cpu_ms": 0.430571,
+      "sql": {
+        "queries": 6,
+        "profile_reads": 1,
+        "writes": 1
+      },
+      "memory_before": {
+        "pss_kb": 115947,
+        "java_used_bytes": 22546856
+      },
+      "memory_after": {
+        "pss_kb": 123066,
+        "java_used_bytes": 24758872
+      },
+      "window_callback_frames": 4,
+      "window_dropped": 0
+    },
+    "burst": {
+      "elapsed_ms": 43.577188,
+      "process_cpu_ms": 42,
+      "driver_cpu_ms": 1.148125,
+      "sql": {
+        "queries": 12,
+        "profile_reads": 2,
+        "writes": 2
+      },
+      "memory_before": {
+        "pss_kb": 123070,
+        "java_used_bytes": 24758872
+      },
+      "memory_after": {
+        "pss_kb": 126962,
+        "java_used_bytes": 26741464
+      },
+      "window_callback_frames": 2,
+      "window_dropped": 0
+    },
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "340",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "340",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 7.465559005737305,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "d1d2a71c93101e1e87f82b1b440c3f9b0ef7126cb2f16522c56f463af5f7cb56",
+    "label": "L1",
+    "pair": 0,
+    "side": "b",
+    "phase": "measure",
+    "plan_sha256": "f4815b67039e51c89d75180dcb915ee6ab2ef4ce30df9d19bf3d1e9bfbfb01e8",
+    "perfetto": {
+      "windows": {
+        "burst": {
+          "frame_count": 4,
+          "frame_overrun_count": 4,
+          "frame_duration_cpu_ms": {
+            "0.5": 3.779401,
+            "0.95": 12.936252999999997,
+            "0.99": 14.132084199999998
+          },
+          "frame_overrun_ms": {
+            "0.5": -1.0771030000000001,
+            "0.95": 1.9920609499999997,
+            "0.99": 2.11904339
+          },
+          "overrun_fraction": 0.5,
+          "thread_cpu": [
+            {
+              "process": "bg",
+              "thread": "other",
+              "cpu_ms": "0.110625"
+            },
+            {
+              "process": "main",
+              "thread": "B4Driver",
+              "cpu_ms": "1.015678"
+            },
+            {
+              "process": "main",
+              "thread": "B4Frames",
+              "cpu_ms": "0.048855"
+            },
+            {
+              "process": "main",
+              "thread": "RenderThread",
+              "cpu_ms": "7.539740"
+            },
+            {
+              "process": "main",
+              "thread": "main_thread",
+              "cpu_ms": "17.363021"
+            },
+            {
+              "process": "main",
+              "thread": "other",
+              "cpu_ms": "16.432396"
+            }
+          ]
+        },
+        "refresh": {
+          "frame_count": 4,
+          "frame_overrun_count": 4,
+          "frame_duration_cpu_ms": {
+            "0.5": 6.31362,
+            "0.95": 29.15248419999999,
+            "0.99": 32.10212163999999
+          },
+          "frame_overrun_ms": {
+            "0.5": 6.5876225,
+            "0.95": 18.9440983,
+            "0.99": 19.36631086
+          },
+          "overrun_fraction": 0.5,
+          "thread_cpu": [
+            {
+              "process": "main",
+              "thread": "B4Driver",
+              "cpu_ms": "0.377396"
+            },
+            {
+              "process": "main",
+              "thread": "B4Frames",
+              "cpu_ms": "0.128802"
+            },
+            {
+              "process": "main",
+              "thread": "RenderThread",
+              "cpu_ms": "12.733907"
+            },
+            {
+              "process": "main",
+              "thread": "main_thread",
+              "cpu_ms": "37.739843"
+            },
+            {
+              "process": "main",
+              "thread": "other",
+              "cpu_ms": "7.432395"
+            }
+          ]
+        },
+        "scroll": {
+          "frame_count": 487,
+          "frame_overrun_count": 487,
+          "frame_duration_cpu_ms": {
+            "0.5": 3.753907,
+            "0.95": 4.7503589999999996,
+            "0.99": 5.49444314
+          },
+          "frame_overrun_ms": {
+            "0.5": -6.604093,
+            "0.95": -5.3605435,
+            "0.99": -4.77266448
+          },
+          "overrun_fraction": 0.0,
+          "thread_cpu": [
+            {
+              "process": "bg",
+              "thread": "other",
+              "cpu_ms": "32.303023"
+            },
+            {
+              "process": "main",
+              "thread": "B4Driver",
+              "cpu_ms": "1.658855"
+            },
+            {
+              "process": "main",
+              "thread": "B4Frames",
+              "cpu_ms": "33.546246"
+            },
+            {
+              "process": "main",
+              "thread": "RenderThread",
+              "cpu_ms": "1469.106772"
+            },
+            {
+              "process": "main",
+              "thread": "main_thread",
+              "cpu_ms": "468.629307"
+            },
+            {
+              "process": "main",
+              "thread": "other",
+              "cpu_ms": "235.240777"
+            }
+          ]
+        }
+      },
+      "trace_stats": [],
+      "trace_sha256": "179a6a685beeed06996dfea233b9ddfac1edd6552ed4ad3a3ca5016951b8b138"
+    }
+  },
+  {
+    "run": "aa-00-b-1000-list-warm1-seed",
+    "mode": "seed",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "inserted": 1000,
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 0.3960728645324707,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "8c86f02099ab5ee3f0d3c73164fce1e36603082e4336ee9d76463348701de373"
+  },
+  {
+    "run": "aa-00-b-1000-list-warm1",
+    "mode": "list",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "load_ms": 99.817813,
+    "scroll": {
+      "elapsed_ms": 4088.068332,
+      "process_cpu_ms": 1595,
+      "driver_cpu_ms": 2.219999,
+      "sql": {
+        "queries": 0,
+        "profile_reads": 0,
+        "writes": 0
+      },
+      "memory_before": {
+        "pss_kb": 112336,
+        "java_used_bytes": 19446192
+      },
+      "memory_after": {
+        "pss_kb": 114510,
+        "java_used_bytes": 21166512
+      },
+      "window_callback_frames": 974,
+      "window_dropped": 0
+    },
+    "refresh": {
+      "elapsed_ms": 64.64901,
+      "process_cpu_ms": 61,
+      "driver_cpu_ms": 0.337291,
+      "sql": {
+        "queries": 5,
+        "profile_reads": 1,
+        "writes": 1
+      },
+      "memory_before": {
+        "pss_kb": 115085,
+        "java_used_bytes": 21592496
+      },
+      "memory_after": {
+        "pss_kb": 122525,
+        "java_used_bytes": 23788128
+      },
+      "window_callback_frames": 0,
+      "window_dropped": 0
+    },
+    "burst": {
+      "elapsed_ms": 43.439375,
+      "process_cpu_ms": 41,
+      "driver_cpu_ms": 1.131406,
+      "sql": {
+        "queries": 12,
+        "profile_reads": 2,
+        "writes": 2
+      },
+      "memory_before": {
+        "pss_kb": 122525,
+        "java_used_bytes": 23804512
+      },
+      "memory_after": {
+        "pss_kb": 126512,
+        "java_used_bytes": 25737952
+      },
+      "window_callback_frames": 0,
+      "window_dropped": 0
+    },
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 6.501209735870361,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "be434378a2c9c14a376e7630ce25a2d540e13aefe0b85c61e1f7b9c36d866c00",
+    "label": "L1",
+    "pair": 0,
+    "side": "b",
+    "phase": "warmup",
+    "plan_sha256": "f4815b67039e51c89d75180dcb915ee6ab2ef4ce30df9d19bf3d1e9bfbfb01e8"
+  },
+  {
+    "run": "aa-00-b-1000-list-warm2-seed",
+    "mode": "seed",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "inserted": 1000,
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 0.41190099716186523,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "140cb209bb850d5556799f97f479d6f94deabb25c96dadc17cf0d5fd4bd96d5d"
+  },
+  {
+    "run": "aa-00-b-1000-list-warm2",
+    "mode": "list",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "load_ms": 115.743177,
+    "scroll": {
+      "elapsed_ms": 4094.723957,
+      "process_cpu_ms": 1538,
+      "driver_cpu_ms": 7.140264,
+      "sql": {
+        "queries": 0,
+        "profile_reads": 0,
+        "writes": 0
+      },
+      "memory_before": {
+        "pss_kb": 113276,
+        "java_used_bytes": 19424768
+      },
+      "memory_after": {
+        "pss_kb": 114506,
+        "java_used_bytes": 21128704
+      },
+      "window_callback_frames": 976,
+      "window_dropped": 0
+    },
+    "refresh": {
+      "elapsed_ms": 49.988333,
+      "process_cpu_ms": 50,
+      "driver_cpu_ms": 0.349635,
+      "sql": {
+        "queries": 6,
+        "profile_reads": 1,
+        "writes": 1
+      },
+      "memory_before": {
+        "pss_kb": 115082,
+        "java_used_bytes": 21554688
+      },
+      "memory_after": {
+        "pss_kb": 122070,
+        "java_used_bytes": 23766704
+      },
+      "window_callback_frames": 2,
+      "window_dropped": 0
+    },
+    "burst": {
+      "elapsed_ms": 44.130312,
+      "process_cpu_ms": 44,
+      "driver_cpu_ms": 1.159375,
+      "sql": {
+        "queries": 12,
+        "profile_reads": 2,
+        "writes": 2
+      },
+      "memory_before": {
+        "pss_kb": 122070,
+        "java_used_bytes": 23766704
+      },
+      "memory_after": {
+        "pss_kb": 125901,
+        "java_used_bytes": 25732912
+      },
+      "window_callback_frames": 2,
+      "window_dropped": 0
+    },
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "332",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 6.496309995651245,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "bf5da62d9383e153d616b3eaa5152b9ab9262e081202fbdfb48fbfe0cc91aeeb",
+    "label": "L1",
+    "pair": 0,
+    "side": "b",
+    "phase": "warmup",
+    "plan_sha256": "f4815b67039e51c89d75180dcb915ee6ab2ef4ce30df9d19bf3d1e9bfbfb01e8"
+  },
+  {
+    "run": "aa-01-a-1000-list-measure-seed",
+    "mode": "seed",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "inserted": 1000,
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "346",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "346",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 0.37120699882507324,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "684d3a75515974de6a5a6b8a3c99ca7658099740077f420f553b298c8fa57417"
+  },
+  {
+    "run": "aa-01-a-1000-list-measure",
+    "mode": "list",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "load_ms": 113.957916,
+    "scroll": {
+      "elapsed_ms": 4091.639738,
+      "process_cpu_ms": 2171,
+      "driver_cpu_ms": 1.713385,
+      "sql": {
+        "queries": 0,
+        "profile_reads": 0,
+        "writes": 0
+      },
+      "memory_before": {
+        "pss_kb": 114120,
+        "java_used_bytes": 19774144
+      },
+      "memory_after": {
+        "pss_kb": 116937,
+        "java_used_bytes": 22166208
+      },
+      "window_callback_frames": 974,
+      "window_dropped": 0
+    },
+    "refresh": {
+      "elapsed_ms": 64.953646,
+      "process_cpu_ms": 73,
+      "driver_cpu_ms": 2.553021,
+      "sql": {
+        "queries": 6,
+        "profile_reads": 1,
+        "writes": 1
+      },
+      "memory_before": {
+        "pss_kb": 117501,
+        "java_used_bytes": 22592192
+      },
+      "memory_after": {
+        "pss_kb": 124788,
+        "java_used_bytes": 24836928
+      },
+      "window_callback_frames": 2,
+      "window_dropped": 0
+    },
+    "burst": {
+      "elapsed_ms": 45.269011,
+      "process_cpu_ms": 40,
+      "driver_cpu_ms": 1.862969,
+      "sql": {
+        "queries": 12,
+        "profile_reads": 2,
+        "writes": 2
+      },
+      "memory_before": {
+        "pss_kb": 124788,
+        "java_used_bytes": 24836928
+      },
+      "memory_after": {
+        "pss_kb": 128488,
+        "java_used_bytes": 26803136
+      },
+      "window_callback_frames": 0,
+      "window_dropped": 0
+    },
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "346",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "346",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 7.46995997428894,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "beb7f6d6c565d7fb3dd0843cb3772f16f327b64be485767e58716f9c307f0bd9",
+    "label": "L1",
+    "pair": 1,
+    "side": "a",
+    "phase": "measure",
+    "plan_sha256": "f4815b67039e51c89d75180dcb915ee6ab2ef4ce30df9d19bf3d1e9bfbfb01e8",
+    "perfetto": {
+      "windows": {
+        "burst": {
+          "frame_count": 3,
+          "frame_overrun_count": 3,
+          "frame_duration_cpu_ms": {
+            "0.5": 5.283645,
+            "0.95": 15.497239200000001,
+            "0.99": 16.405114240000003
+          },
+          "frame_overrun_ms": {
+            "0.5": 3.342655,
+            "0.95": 4.1694922000000005,
+            "0.99": 4.242988840000001
+          },
+          "overrun_fraction": 0.6666666666666666,
+          "thread_cpu": [
+            {
+              "process": "bg",
+              "thread": "other",
+              "cpu_ms": "0.109740"
+            },
+            {
+              "process": "main",
+              "thread": "B4Driver",
+              "cpu_ms": "1.554061"
+            },
+            {
+              "process": "main",
+              "thread": "RenderThread",
+              "cpu_ms": "4.260572"
+            },
+            {
+              "process": "main",
+              "thread": "main_thread",
+              "cpu_ms": "17.217865"
+            },
+            {
+              "process": "main",
+              "thread": "other",
+              "cpu_ms": "18.180049"
+            }
+          ]
+        },
+        "refresh": {
+          "frame_count": 4,
+          "frame_overrun_count": 4,
+          "frame_duration_cpu_ms": {
+            "0.5": 5.492318,
+            "0.95": 35.56740409999999,
+            "0.99": 39.756772819999995
+          },
+          "frame_overrun_ms": {
+            "0.5": 13.232086,
+            "0.95": 30.31261125,
+            "0.99": 30.71889825
+          },
+          "overrun_fraction": 0.5,
+          "thread_cpu": [
+            {
+              "process": "main",
+              "thread": "B4Driver",
+              "cpu_ms": "0.503697"
+            },
+            {
+              "process": "main",
+              "thread": "B4Frames",
+              "cpu_ms": "0.048386"
+            },
+            {
+              "process": "main",
+              "thread": "RenderThread",
+              "cpu_ms": "10.185783"
+            },
+            {
+              "process": "main",
+              "thread": "main_thread",
+              "cpu_ms": "45.497502"
+            },
+            {
+              "process": "main",
+              "thread": "other",
+              "cpu_ms": "14.970052"
+            }
+          ]
+        },
+        "scroll": {
+          "frame_count": 487,
+          "frame_overrun_count": 487,
+          "frame_duration_cpu_ms": {
+            "0.5": 3.81849,
+            "0.95": 4.6570152,
+            "0.99": 5.368040719999999
+          },
+          "frame_overrun_ms": {
+            "0.5": -6.559389,
+            "0.95": -5.3818431,
+            "0.99": -4.985349040000001
+          },
+          "overrun_fraction": 0.0,
+          "thread_cpu": [
+            {
+              "process": "bg",
+              "thread": "other",
+              "cpu_ms": "37.333543"
+            },
+            {
+              "process": "main",
+              "thread": "B4Driver",
+              "cpu_ms": "1.419895"
+            },
+            {
+              "process": "main",
+              "thread": "B4Frames",
+              "cpu_ms": "33.597913"
+            },
+            {
+              "process": "main",
+              "thread": "RenderThread",
+              "cpu_ms": "1492.189345"
+            },
+            {
+              "process": "main",
+              "thread": "main_thread",
+              "cpu_ms": "470.669408"
+            },
+            {
+              "process": "main",
+              "thread": "other",
+              "cpu_ms": "241.185421"
+            }
+          ]
+        }
+      },
+      "trace_stats": [],
+      "trace_sha256": "833b5f67608b1269adf6cebc4db975e3150d54cb862d9b1ea2c2e1b2a88afdad"
+    }
+  },
+  {
+    "run": "aa-01-a-1000-list-warm1-seed",
+    "mode": "seed",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "inserted": 1000,
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "340",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "340",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 0.3599870204925537,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "b9537cf5d62f18da821d75afb930e15ff0758435b42b6854a75d5eb81716d458"
+  },
+  {
+    "run": "aa-01-a-1000-list-warm1",
+    "mode": "list",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "load_ms": 99.22401,
+    "scroll": {
+      "elapsed_ms": 4092.146665,
+      "process_cpu_ms": 1622,
+      "driver_cpu_ms": 1.820261,
+      "sql": {
+        "queries": 0,
+        "profile_reads": 0,
+        "writes": 0
+      },
+      "memory_before": {
+        "pss_kb": 109576,
+        "java_used_bytes": 19475056
+      },
+      "memory_after": {
+        "pss_kb": 113128,
+        "java_used_bytes": 21178992
+      },
+      "window_callback_frames": 976,
+      "window_dropped": 0
+    },
+    "refresh": {
+      "elapsed_ms": 67.290625,
+      "process_cpu_ms": 70,
+      "driver_cpu_ms": 0.377395,
+      "sql": {
+        "queries": 6,
+        "profile_reads": 1,
+        "writes": 1
+      },
+      "memory_before": {
+        "pss_kb": 113676,
+        "java_used_bytes": 21604976
+      },
+      "memory_after": {
+        "pss_kb": 120956,
+        "java_used_bytes": 23833424
+      },
+      "window_callback_frames": 2,
+      "window_dropped": 0
+    },
+    "burst": {
+      "elapsed_ms": 35.741458,
+      "process_cpu_ms": 38,
+      "driver_cpu_ms": 1.834792,
+      "sql": {
+        "queries": 12,
+        "profile_reads": 2,
+        "writes": 2
+      },
+      "memory_before": {
+        "pss_kb": 120960,
+        "java_used_bytes": 23833424
+      },
+      "memory_after": {
+        "pss_kb": 125331,
+        "java_used_bytes": 25766864
+      },
+      "window_callback_frames": 0,
+      "window_dropped": 0
+    },
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "340",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "346",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 6.487076044082642,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "d474678adc6f6335e50f046d1b71a787738cfc0729330a9e8b6a80ef4c137519",
+    "label": "L1",
+    "pair": 1,
+    "side": "a",
+    "phase": "warmup",
+    "plan_sha256": "f4815b67039e51c89d75180dcb915ee6ab2ef4ce30df9d19bf3d1e9bfbfb01e8"
+  },
+  {
+    "run": "aa-01-a-1000-list-warm2-seed",
+    "mode": "seed",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "inserted": 1000,
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "340",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "340",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 0.40970277786254883,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "089f8fe58f3e898f192f8afcfc35cced7a6d5086eb453a78a352ee441656f53a"
+  },
+  {
+    "run": "aa-01-a-1000-list-warm2",
+    "mode": "list",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "load_ms": 120.067187,
+    "scroll": {
+      "elapsed_ms": 4087.031874,
+      "process_cpu_ms": 1628,
+      "driver_cpu_ms": 2.297292,
+      "sql": {
+        "queries": 0,
+        "profile_reads": 0,
+        "writes": 0
+      },
+      "memory_before": {
+        "pss_kb": 112966,
+        "java_used_bytes": 19520080
+      },
+      "memory_after": {
+        "pss_kb": 115083,
+        "java_used_bytes": 21207632
+      },
+      "window_callback_frames": 974,
+      "window_dropped": 0
+    },
+    "refresh": {
+      "elapsed_ms": 66.421667,
+      "process_cpu_ms": 69,
+      "driver_cpu_ms": 4.509896,
+      "sql": {
+        "queries": 6,
+        "profile_reads": 1,
+        "writes": 1
+      },
+      "memory_before": {
+        "pss_kb": 115639,
+        "java_used_bytes": 21650000
+      },
+      "memory_after": {
+        "pss_kb": 122534,
+        "java_used_bytes": 23845584
+      },
+      "window_callback_frames": 4,
+      "window_dropped": 0
+    },
+    "burst": {
+      "elapsed_ms": 57.361614,
+      "process_cpu_ms": 49,
+      "driver_cpu_ms": 1.539428,
+      "sql": {
+        "queries": 12,
+        "profile_reads": 2,
+        "writes": 2
+      },
+      "memory_before": {
+        "pss_kb": 122538,
+        "java_used_bytes": 23845584
+      },
+      "memory_after": {
+        "pss_kb": 126458,
+        "java_used_bytes": 25795408
+      },
+      "window_callback_frames": 4,
+      "window_dropped": 0
+    },
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "340",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "340",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 6.486938238143921,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "725cf7faba85b1423e42fa9994026a2c96d13173ea8a46809d7b483834722afc",
+    "label": "L1",
+    "pair": 1,
+    "side": "a",
+    "phase": "warmup",
+    "plan_sha256": "f4815b67039e51c89d75180dcb915ee6ab2ef4ce30df9d19bf3d1e9bfbfb01e8"
+  },
+  {
+    "run": "aa-01-b-1000-list-measure-seed",
+    "mode": "seed",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "inserted": 1000,
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "346",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "346",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 0.38901209831237793,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "517ac98552a58d5588ec2cfa81750367e41efc45adc8753dc75c39c33d4b257e"
+  },
+  {
+    "run": "aa-01-b-1000-list-measure",
+    "mode": "list",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "load_ms": 99.740156,
+    "scroll": {
+      "elapsed_ms": 4090.322447,
+      "process_cpu_ms": 2182,
+      "driver_cpu_ms": 2.128486,
+      "sql": {
+        "queries": 0,
+        "profile_reads": 0,
+        "writes": 0
+      },
+      "memory_before": {
+        "pss_kb": 110215,
+        "java_used_bytes": 19764384
+      },
+      "memory_after": {
+        "pss_kb": 114626,
+        "java_used_bytes": 22172832
+      },
+      "window_callback_frames": 974,
+      "window_dropped": 0
+    },
+    "refresh": {
+      "elapsed_ms": 69.16375,
+      "process_cpu_ms": 70,
+      "driver_cpu_ms": 0.497396,
+      "sql": {
+        "queries": 6,
+        "profile_reads": 1,
+        "writes": 1
+      },
+      "memory_before": {
+        "pss_kb": 115174,
+        "java_used_bytes": 22598816
+      },
+      "memory_after": {
+        "pss_kb": 122369,
+        "java_used_bytes": 24827168
+      },
+      "window_callback_frames": 0,
+      "window_dropped": 0
+    },
+    "burst": {
+      "elapsed_ms": 40.797344,
+      "process_cpu_ms": 37,
+      "driver_cpu_ms": 1.803856,
+      "sql": {
+        "queries": 12,
+        "profile_reads": 2,
+        "writes": 2
+      },
+      "memory_before": {
+        "pss_kb": 122437,
+        "java_used_bytes": 24827168
+      },
+      "memory_after": {
+        "pss_kb": 126561,
+        "java_used_bytes": 26776992
+      },
+      "window_callback_frames": 0,
+      "window_dropped": 0
+    },
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "346",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "350",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 7.432817220687866,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "d443e56c5733bd21f71223491d9f4c67f37210bea0ff49e517b430cd0b5c4c00",
+    "label": "L1",
+    "pair": 1,
+    "side": "b",
+    "phase": "measure",
+    "plan_sha256": "f4815b67039e51c89d75180dcb915ee6ab2ef4ce30df9d19bf3d1e9bfbfb01e8",
+    "perfetto": {
+      "windows": {
+        "burst": {
+          "frame_count": 2,
+          "frame_overrun_count": 2,
+          "frame_duration_cpu_ms": {
+            "0.5": 9.065234499999999,
+            "0.95": 15.07721155,
+            "0.99": 15.61160951
+          },
+          "frame_overrun_ms": {
+            "0.5": 2.8590785,
+            "0.95": 3.31077005,
+            "0.99": 3.35092041
+          },
+          "overrun_fraction": 1.0,
+          "thread_cpu": [
+            {
+              "process": "bg",
+              "thread": "other",
+              "cpu_ms": "0.095573"
+            },
+            {
+              "process": "main",
+              "thread": "B4Driver",
+              "cpu_ms": "1.593491"
+            },
+            {
+              "process": "main",
+              "thread": "RenderThread",
+              "cpu_ms": "2.457970"
+            },
+            {
+              "process": "main",
+              "thread": "main_thread",
+              "cpu_ms": "17.719325"
+            },
+            {
+              "process": "main",
+              "thread": "other",
+              "cpu_ms": "15.947083"
+            }
+          ]
+        },
+        "refresh": {
+          "frame_count": 3,
+          "frame_overrun_count": 3,
+          "frame_duration_cpu_ms": {
+            "0.5": 13.13776,
+            "0.95": 44.79947919999999,
+            "0.99": 47.613854239999995
+          },
+          "frame_overrun_ms": {
+            "0.5": 30.675062,
+            "0.95": 34.579518500000006,
+            "0.99": 34.9265813
+          },
+          "overrun_fraction": 1.0,
+          "thread_cpu": [
+            {
+              "process": "main",
+              "thread": "B4Driver",
+              "cpu_ms": "0.307708"
+            },
+            {
+              "process": "main",
+              "thread": "RenderThread",
+              "cpu_ms": "5.919219"
+            },
+            {
+              "process": "main",
+              "thread": "main_thread",
+              "cpu_ms": "49.836716"
+            },
+            {
+              "process": "main",
+              "thread": "other",
+              "cpu_ms": "16.612190"
+            }
+          ]
+        },
+        "scroll": {
+          "frame_count": 487,
+          "frame_overrun_count": 487,
+          "frame_duration_cpu_ms": {
+            "0.5": 3.861302,
+            "0.95": 4.7249739,
+            "0.99": 5.408291499999996
+          },
+          "frame_overrun_ms": {
+            "0.5": -6.5471,
+            "0.95": -5.3656382,
+            "0.99": -4.685680960000001
+          },
+          "overrun_fraction": 0.0,
+          "thread_cpu": [
+            {
+              "process": "bg",
+              "thread": "other",
+              "cpu_ms": "37.653905"
+            },
+            {
+              "process": "main",
+              "thread": "B4Driver",
+              "cpu_ms": "1.706305"
+            },
+            {
+              "process": "main",
+              "thread": "B4Frames",
+              "cpu_ms": "33.481395"
+            },
+            {
+              "process": "main",
+              "thread": "RenderThread",
+              "cpu_ms": "1508.139062"
+            },
+            {
+              "process": "main",
+              "thread": "main_thread",
+              "cpu_ms": "478.352651"
+            },
+            {
+              "process": "main",
+              "thread": "other",
+              "cpu_ms": "244.142373"
+            }
+          ]
+        }
+      },
+      "trace_stats": [],
+      "trace_sha256": "d1669cf850ee282a60acf2fc83a9a7a7344d90bc02c69f90c5a2197475bff876"
+    }
+  },
+  {
+    "run": "aa-01-b-1000-list-warm1-seed",
+    "mode": "seed",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "inserted": 1000,
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "346",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "346",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 0.3631479740142822,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "70ccdda7df5fb70e2089a1801a90b6185ee4c85a1147cd409022e1c22b91e8fa"
+  },
+  {
+    "run": "aa-01-b-1000-list-warm1",
+    "mode": "list",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "load_ms": 105.676823,
+    "scroll": {
+      "elapsed_ms": 4091.602498,
+      "process_cpu_ms": 1618,
+      "driver_cpu_ms": 2.367343,
+      "sql": {
+        "queries": 0,
+        "profile_reads": 0,
+        "writes": 0
+      },
+      "memory_before": {
+        "pss_kb": 112927,
+        "java_used_bytes": 19571864
+      },
+      "memory_after": {
+        "pss_kb": 115490,
+        "java_used_bytes": 21275800
+      },
+      "window_callback_frames": 974,
+      "window_dropped": 0
+    },
+    "refresh": {
+      "elapsed_ms": 65.734583,
+      "process_cpu_ms": 70,
+      "driver_cpu_ms": 5.080575,
+      "sql": {
+        "queries": 6,
+        "profile_reads": 1,
+        "writes": 1
+      },
+      "memory_before": {
+        "pss_kb": 116022,
+        "java_used_bytes": 21701784
+      },
+      "memory_after": {
+        "pss_kb": 123113,
+        "java_used_bytes": 23913752
+      },
+      "window_callback_frames": 2,
+      "window_dropped": 0
+    },
+    "burst": {
+      "elapsed_ms": 61.170573,
+      "process_cpu_ms": 54,
+      "driver_cpu_ms": 1.821094,
+      "sql": {
+        "queries": 12,
+        "profile_reads": 2,
+        "writes": 2
+      },
+      "memory_before": {
+        "pss_kb": 123117,
+        "java_used_bytes": 23913752
+      },
+      "memory_after": {
+        "pss_kb": 126849,
+        "java_used_bytes": 25863576
+      },
+      "window_callback_frames": 4,
+      "window_dropped": 0
+    },
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "346",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "346",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 6.470478057861328,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "666120643f2b7544b25684d1bec701fcf0592cb43cee8980ad69f34551bb04e8",
+    "label": "L1",
+    "pair": 1,
+    "side": "b",
+    "phase": "warmup",
+    "plan_sha256": "f4815b67039e51c89d75180dcb915ee6ab2ef4ce30df9d19bf3d1e9bfbfb01e8"
+  },
+  {
+    "run": "aa-01-b-1000-list-warm2-seed",
+    "mode": "seed",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "inserted": 1000,
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "346",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "346",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 0.3376178741455078,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "b8fa36789b16d954e8bc497e6477bad027fcf54014fa7fd3e014e2b58804ea39"
+  },
+  {
+    "run": "aa-01-b-1000-list-warm2",
+    "mode": "list",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "load_ms": 110.042396,
+    "scroll": {
+      "elapsed_ms": 4090.168592,
+      "process_cpu_ms": 1628,
+      "driver_cpu_ms": 1.784271,
+      "sql": {
+        "queries": 0,
+        "profile_reads": 0,
+        "writes": 0
+      },
+      "memory_before": {
+        "pss_kb": 113446,
+        "java_used_bytes": 19598096
+      },
+      "memory_after": {
+        "pss_kb": 115653,
+        "java_used_bytes": 21318416
+      },
+      "window_callback_frames": 976,
+      "window_dropped": 0
+    },
+    "refresh": {
+      "elapsed_ms": 48.902448,
+      "process_cpu_ms": 44,
+      "driver_cpu_ms": 0.261198,
+      "sql": {
+        "queries": 6,
+        "profile_reads": 1,
+        "writes": 1
+      },
+      "memory_before": {
+        "pss_kb": 116185,
+        "java_used_bytes": 21744400
+      },
+      "memory_after": {
+        "pss_kb": 123136,
+        "java_used_bytes": 23956416
+      },
+      "window_callback_frames": 4,
+      "window_dropped": 0
+    },
+    "burst": {
+      "elapsed_ms": 44.134323,
+      "process_cpu_ms": 39,
+      "driver_cpu_ms": 1.856043,
+      "sql": {
+        "queries": 12,
+        "profile_reads": 2,
+        "writes": 2
+      },
+      "memory_before": {
+        "pss_kb": 123140,
+        "java_used_bytes": 23956416
+      },
+      "memory_after": {
+        "pss_kb": 127176,
+        "java_used_bytes": 25906336
+      },
+      "window_callback_frames": 2,
+      "window_dropped": 0
+    },
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "346",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "346",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 6.432154893875122,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "00fdd9da9e4f18598eed4481d995214ddbd5580071be7f418fd657f5abc43223",
+    "label": "L1",
+    "pair": 1,
+    "side": "b",
+    "phase": "warmup",
+    "plan_sha256": "f4815b67039e51c89d75180dcb915ee6ab2ef4ce30df9d19bf3d1e9bfbfb01e8"
+  },
+  {
+    "run": "aa-02-a-1000-list-measure-seed",
+    "mode": "seed",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "inserted": 1000,
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "350",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "350",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 0.39319825172424316,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "99eae6271c17192315028953afa2c0065e868715816b9a216f5eb22f83dfa3db"
+  },
+  {
+    "run": "aa-02-a-1000-list-measure",
+    "mode": "list",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "load_ms": 111.393386,
+    "scroll": {
+      "elapsed_ms": 4092.007915,
+      "process_cpu_ms": 2174,
+      "driver_cpu_ms": 1.998752,
+      "sql": {
+        "queries": 0,
+        "profile_reads": 0,
+        "writes": 0
+      },
+      "memory_before": {
+        "pss_kb": 110144,
+        "java_used_bytes": 19866968
+      },
+      "memory_after": {
+        "pss_kb": 114236,
+        "java_used_bytes": 22275416
+      },
+      "window_callback_frames": 976,
+      "window_dropped": 0
+    },
+    "refresh": {
+      "elapsed_ms": 81.408802,
+      "process_cpu_ms": 86,
+      "driver_cpu_ms": 0.768908,
+      "sql": {
+        "queries": 6,
+        "profile_reads": 1,
+        "writes": 1
+      },
+      "memory_before": {
+        "pss_kb": 114776,
+        "java_used_bytes": 22701400
+      },
+      "memory_after": {
+        "pss_kb": 121891,
+        "java_used_bytes": 24946184
+      },
+      "window_callback_frames": 4,
+      "window_dropped": 0
+    },
+    "burst": {
+      "elapsed_ms": 63.35526,
+      "process_cpu_ms": 54,
+      "driver_cpu_ms": 1.496251,
+      "sql": {
+        "queries": 12,
+        "profile_reads": 2,
+        "writes": 2
+      },
+      "memory_before": {
+        "pss_kb": 121895,
+        "java_used_bytes": 24946184
+      },
+      "memory_after": {
+        "pss_kb": 125827,
+        "java_used_bytes": 26928776
+      },
+      "window_callback_frames": 4,
+      "window_dropped": 0
+    },
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "350",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "352",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 8.515423059463501,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "0d42835ebff31f93f619bbf25a929c333a10eec2fdd4732363e06d6b788ca0f6",
+    "label": "L1",
+    "pair": 2,
+    "side": "a",
+    "phase": "measure",
+    "plan_sha256": "f4815b67039e51c89d75180dcb915ee6ab2ef4ce30df9d19bf3d1e9bfbfb01e8",
+    "perfetto": {
+      "windows": {
+        "burst": {
+          "frame_count": 4,
+          "frame_overrun_count": 4,
+          "frame_duration_cpu_ms": {
+            "0.5": 3.522786,
+            "0.95": 17.308536749999995,
+            "0.99": 19.186999349999994
+          },
+          "frame_overrun_ms": {
+            "0.5": -0.7097294999999999,
+            "0.95": 7.7227979499999995,
+            "0.99": 7.92093079
+          },
+          "overrun_fraction": 0.5,
+          "thread_cpu": [
+            {
+              "process": "bg",
+              "thread": "other",
+              "cpu_ms": "0.110729"
+            },
+            {
+              "process": "main",
+              "thread": "B4Driver",
+              "cpu_ms": "1.231772"
+            },
+            {
+              "process": "main",
+              "thread": "B4Frames",
+              "cpu_ms": "0.071666"
+            },
+            {
+              "process": "main",
+              "thread": "RenderThread",
+              "cpu_ms": "6.130729"
+            },
+            {
+              "process": "main",
+              "thread": "main_thread",
+              "cpu_ms": "25.344842"
+            },
+            {
+              "process": "main",
+              "thread": "other",
+              "cpu_ms": "24.104734"
+            }
+          ]
+        },
+        "refresh": {
+          "frame_count": 4,
+          "frame_overrun_count": 4,
+          "frame_duration_cpu_ms": {
+            "0.5": 10.383724,
+            "0.95": 37.38262454999999,
+            "0.99": 40.778274509999996
+          },
+          "frame_overrun_ms": {
+            "0.5": 12.731996,
+            "0.95": 27.8536485,
+            "0.99": 28.2137793
+          },
+          "overrun_fraction": 0.75,
+          "thread_cpu": [
+            {
+              "process": "main",
+              "thread": "B4Driver",
+              "cpu_ms": "0.931093"
+            },
+            {
+              "process": "main",
+              "thread": "B4Frames",
+              "cpu_ms": "0.137656"
+            },
+            {
+              "process": "main",
+              "thread": "RenderThread",
+              "cpu_ms": "22.070989"
+            },
+            {
+              "process": "main",
+              "thread": "main_thread",
+              "cpu_ms": "46.312761"
+            },
+            {
+              "process": "main",
+              "thread": "other",
+              "cpu_ms": "18.816401"
+            }
+          ]
+        },
+        "scroll": {
+          "frame_count": 488,
+          "frame_overrun_count": 488,
+          "frame_duration_cpu_ms": {
+            "0.5": 3.80875,
+            "0.95": 4.7637916,
+            "0.99": 5.21944321
+          },
+          "frame_overrun_ms": {
+            "0.5": -6.5666315,
+            "0.95": -5.3644672,
+            "0.99": -4.9126217400000005
+          },
+          "overrun_fraction": 0.0,
+          "thread_cpu": [
+            {
+              "process": "bg",
+              "thread": "other",
+              "cpu_ms": "33.279479"
+            },
+            {
+              "process": "main",
+              "thread": "B4Driver",
+              "cpu_ms": "1.666249"
+            },
+            {
+              "process": "main",
+              "thread": "B4Frames",
+              "cpu_ms": "32.476779"
+            },
+            {
+              "process": "main",
+              "thread": "RenderThread",
+              "cpu_ms": "1493.881698"
+            },
+            {
+              "process": "main",
+              "thread": "main_thread",
+              "cpu_ms": "475.237336"
+            },
+            {
+              "process": "main",
+              "thread": "other",
+              "cpu_ms": "239.859760"
+            }
+          ]
+        }
+      },
+      "trace_stats": [],
+      "trace_sha256": "1202250d751e1a713b6c5521a8ceafd29572fa274c60f1c7cb2a7d19e2164218"
+    }
+  },
+  {
+    "run": "aa-02-a-1000-list-warm1-seed",
+    "mode": "seed",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "inserted": 1000,
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "350",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "350",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 0.37174010276794434,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "eca1c969220c3a50cc61f51def8911e6298816d80581197e140159ff70d92740"
+  },
+  {
+    "run": "aa-02-a-1000-list-warm1",
+    "mode": "list",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "load_ms": 101.983958,
+    "scroll": {
+      "elapsed_ms": 4094.461353,
+      "process_cpu_ms": 1627,
+      "driver_cpu_ms": 1.851095,
+      "sql": {
+        "queries": 0,
+        "profile_reads": 0,
+        "writes": 0
+      },
+      "memory_before": {
+        "pss_kb": 113319,
+        "java_used_bytes": 19616880
+      },
+      "memory_after": {
+        "pss_kb": 115631,
+        "java_used_bytes": 21320816
+      },
+      "window_callback_frames": 976,
+      "window_dropped": 0
+    },
+    "refresh": {
+      "elapsed_ms": 64.377031,
+      "process_cpu_ms": 69,
+      "driver_cpu_ms": 2.737761,
+      "sql": {
+        "queries": 5,
+        "profile_reads": 1,
+        "writes": 1
+      },
+      "memory_before": {
+        "pss_kb": 116210,
+        "java_used_bytes": 21746800
+      },
+      "memory_after": {
+        "pss_kb": 123381,
+        "java_used_bytes": 23958960
+      },
+      "window_callback_frames": 2,
+      "window_dropped": 0
+    },
+    "burst": {
+      "elapsed_ms": 60.77,
+      "process_cpu_ms": 50,
+      "driver_cpu_ms": 1.622136,
+      "sql": {
+        "queries": 12,
+        "profile_reads": 2,
+        "writes": 2
+      },
+      "memory_before": {
+        "pss_kb": 123381,
+        "java_used_bytes": 23958960
+      },
+      "memory_after": {
+        "pss_kb": 127213,
+        "java_used_bytes": 25941552
+      },
+      "window_callback_frames": 4,
+      "window_dropped": 0
+    },
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "350",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "350",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 6.505839824676514,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "97fe9ac7c43cbc85029740f894d120859cc36fd124e0033d21c53a701537d5d6",
+    "label": "L1",
+    "pair": 2,
+    "side": "a",
+    "phase": "warmup",
+    "plan_sha256": "f4815b67039e51c89d75180dcb915ee6ab2ef4ce30df9d19bf3d1e9bfbfb01e8"
+  },
+  {
+    "run": "aa-02-a-1000-list-warm2-seed",
+    "mode": "seed",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "inserted": 1000,
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "350",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "350",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 0.4060370922088623,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "d455983f94279ad7043bdea0ebee77a76cde72a6e159e3f3b28f5c21bab8a1d7"
+  },
+  {
+    "run": "aa-02-a-1000-list-warm2",
+    "mode": "list",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "load_ms": 113.741979,
+    "scroll": {
+      "elapsed_ms": 4091.022186,
+      "process_cpu_ms": 1609,
+      "driver_cpu_ms": 1.857969,
+      "sql": {
+        "queries": 0,
+        "profile_reads": 0,
+        "writes": 0
+      },
+      "memory_before": {
+        "pss_kb": 111860,
+        "java_used_bytes": 19621152
+      },
+      "memory_after": {
+        "pss_kb": 113986,
+        "java_used_bytes": 21292320
+      },
+      "window_callback_frames": 976,
+      "window_dropped": 0
+    },
+    "refresh": {
+      "elapsed_ms": 54.604792,
+      "process_cpu_ms": 59,
+      "driver_cpu_ms": 0.570052,
+      "sql": {
+        "queries": 6,
+        "profile_reads": 1,
+        "writes": 1
+      },
+      "memory_before": {
+        "pss_kb": 114554,
+        "java_used_bytes": 21751168
+      },
+      "memory_after": {
+        "pss_kb": 122157,
+        "java_used_bytes": 23995952
+      },
+      "window_callback_frames": 0,
+      "window_dropped": 0
+    },
+    "burst": {
+      "elapsed_ms": 60.004374,
+      "process_cpu_ms": 54,
+      "driver_cpu_ms": 1.92984,
+      "sql": {
+        "queries": 12,
+        "profile_reads": 2,
+        "writes": 2
+      },
+      "memory_before": {
+        "pss_kb": 122105,
+        "java_used_bytes": 23995952
+      },
+      "memory_after": {
+        "pss_kb": 126269,
+        "java_used_bytes": 25945776
+      },
+      "window_callback_frames": 4,
+      "window_dropped": 0
+    },
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "350",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "350",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 6.494988679885864,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "b7c2cf6552196d4b18f20d61ccb40d77175c49614a0f6e5ab9fb43c50a8b8748",
+    "label": "L1",
+    "pair": 2,
+    "side": "a",
+    "phase": "warmup",
+    "plan_sha256": "f4815b67039e51c89d75180dcb915ee6ab2ef4ce30df9d19bf3d1e9bfbfb01e8"
+  },
+  {
+    "run": "aa-02-b-1000-list-measure-seed",
+    "mode": "seed",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "inserted": 1000,
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "352",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "352",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 0.38068604469299316,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "9dde5c930fd30a32f6d28249d376b47789cd1460ca23ac87d8d3808bd38c18b4"
+  },
+  {
+    "run": "aa-02-b-1000-list-measure",
+    "mode": "list",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "load_ms": 107.632969,
+    "scroll": {
+      "elapsed_ms": 4092.904946,
+      "process_cpu_ms": 2059,
+      "driver_cpu_ms": 1.42031,
+      "sql": {
+        "queries": 0,
+        "profile_reads": 0,
+        "writes": 0
+      },
+      "memory_before": {
+        "pss_kb": 113626,
+        "java_used_bytes": 19904008
+      },
+      "memory_after": {
+        "pss_kb": 116443,
+        "java_used_bytes": 22328840
+      },
+      "window_callback_frames": 976,
+      "window_dropped": 0
+    },
+    "refresh": {
+      "elapsed_ms": 52.534584,
+      "process_cpu_ms": 55,
+      "driver_cpu_ms": 0.432553,
+      "sql": {
+        "queries": 6,
+        "profile_reads": 1,
+        "writes": 1
+      },
+      "memory_before": {
+        "pss_kb": 117011,
+        "java_used_bytes": 22771208
+      },
+      "memory_after": {
+        "pss_kb": 124090,
+        "java_used_bytes": 24999560
+      },
+      "window_callback_frames": 4,
+      "window_dropped": 0
+    },
+    "burst": {
+      "elapsed_ms": 50.538021,
+      "process_cpu_ms": 50,
+      "driver_cpu_ms": 1.463803,
+      "sql": {
+        "queries": 12,
+        "profile_reads": 2,
+        "writes": 2
+      },
+      "memory_before": {
+        "pss_kb": 124094,
+        "java_used_bytes": 24999560
+      },
+      "memory_after": {
+        "pss_kb": 128017,
+        "java_used_bytes": 26965816
+      },
+      "window_callback_frames": 2,
+      "window_dropped": 0
+    },
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "352",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "352",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 7.439450263977051,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "6e78656fdbb989cb0bca3caf47591ca272e80314e02e553de45f8fbb484fb517",
+    "label": "L1",
+    "pair": 2,
+    "side": "b",
+    "phase": "measure",
+    "plan_sha256": "f4815b67039e51c89d75180dcb915ee6ab2ef4ce30df9d19bf3d1e9bfbfb01e8",
+    "perfetto": {
+      "windows": {
+        "burst": {
+          "frame_count": 4,
+          "frame_overrun_count": 4,
+          "frame_duration_cpu_ms": {
+            "0.5": 3.224453,
+            "0.95": 14.321778999999994,
+            "0.99": 15.876647799999995
+          },
+          "frame_overrun_ms": {
+            "0.5": 0.26300349999999995,
+            "0.95": 4.831996149999998,
+            "0.99": 5.123809629999999
+          },
+          "overrun_fraction": 0.5,
+          "thread_cpu": [
+            {
+              "process": "bg",
+              "thread": "other",
+              "cpu_ms": "0.091146"
+            },
+            {
+              "process": "main",
+              "thread": "B4Driver",
+              "cpu_ms": "1.329948"
+            },
+            {
+              "process": "main",
+              "thread": "B4Frames",
+              "cpu_ms": "0.035208"
+            },
+            {
+              "process": "main",
+              "thread": "RenderThread",
+              "cpu_ms": "5.962031"
+            },
+            {
+              "process": "main",
+              "thread": "main_thread",
+              "cpu_ms": "21.176876"
+            },
+            {
+              "process": "main",
+              "thread": "other",
+              "cpu_ms": "22.179426"
+            }
+          ]
+        },
+        "refresh": {
+          "frame_count": 4,
+          "frame_overrun_count": 4,
+          "frame_duration_cpu_ms": {
+            "0.5": 7.84638,
+            "0.95": 26.884940149999995,
+            "0.99": 29.181946429999996
+          },
+          "frame_overrun_ms": {
+            "0.5": 5.4852505,
+            "0.95": 15.578710049999998,
+            "0.99": 16.151747609999997
+          },
+          "overrun_fraction": 0.5,
+          "thread_cpu": [
+            {
+              "process": "main",
+              "thread": "B4Driver",
+              "cpu_ms": "0.338281"
+            },
+            {
+              "process": "main",
+              "thread": "B4Frames",
+              "cpu_ms": "0.110469"
+            },
+            {
+              "process": "main",
+              "thread": "RenderThread",
+              "cpu_ms": "14.965625"
+            },
+            {
+              "process": "main",
+              "thread": "main_thread",
+              "cpu_ms": "33.582550"
+            },
+            {
+              "process": "main",
+              "thread": "other",
+              "cpu_ms": "7.009428"
+            }
+          ]
+        },
+        "scroll": {
+          "frame_count": 488,
+          "frame_overrun_count": 488,
+          "frame_duration_cpu_ms": {
+            "0.5": 3.7152085,
+            "0.95": 4.71858835,
+            "0.99": 5.28714223
+          },
+          "frame_overrun_ms": {
+            "0.5": -6.681051500000001,
+            "0.95": -5.443447900000001,
+            "0.99": -4.966474890000001
+          },
+          "overrun_fraction": 0.0,
+          "thread_cpu": [
+            {
+              "process": "bg",
+              "thread": "other",
+              "cpu_ms": "33.953020"
+            },
+            {
+              "process": "main",
+              "thread": "B4Driver",
+              "cpu_ms": "1.269898"
+            },
+            {
+              "process": "main",
+              "thread": "B4Frames",
+              "cpu_ms": "31.985949"
+            },
+            {
+              "process": "main",
+              "thread": "RenderThread",
+              "cpu_ms": "1420.637959"
+            },
+            {
+              "process": "main",
+              "thread": "main_thread",
+              "cpu_ms": "445.154080"
+            },
+            {
+              "process": "main",
+              "thread": "other",
+              "cpu_ms": "226.573834"
+            }
+          ]
+        }
+      },
+      "trace_stats": [],
+      "trace_sha256": "da0ffb64ffe1791d0e694279a4ea8423ebbe247858a4de69335d2e66d636e498"
+    }
+  },
+  {
+    "run": "aa-02-b-1000-list-warm1-seed",
+    "mode": "seed",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "inserted": 1000,
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "352",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "352",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 0.37073326110839844,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "44712b1931c65a0172d845cd362a669c57a00adb470869565bc42ad3af7c42e0"
+  },
+  {
+    "run": "aa-02-b-1000-list-warm1",
+    "mode": "list",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "load_ms": 101.335468,
+    "scroll": {
+      "elapsed_ms": 4087.896248,
+      "process_cpu_ms": 1623,
+      "driver_cpu_ms": 2.019481,
+      "sql": {
+        "queries": 0,
+        "profile_reads": 0,
+        "writes": 0
+      },
+      "memory_before": {
+        "pss_kb": 109715,
+        "java_used_bytes": 19686936
+      },
+      "memory_after": {
+        "pss_kb": 113240,
+        "java_used_bytes": 21390872
+      },
+      "window_callback_frames": 976,
+      "window_dropped": 0
+    },
+    "refresh": {
+      "elapsed_ms": 47.623593,
+      "process_cpu_ms": 51,
+      "driver_cpu_ms": 0.364997,
+      "sql": {
+        "queries": 6,
+        "profile_reads": 1,
+        "writes": 1
+      },
+      "memory_before": {
+        "pss_kb": 113812,
+        "java_used_bytes": 21816856
+      },
+      "memory_after": {
+        "pss_kb": 120827,
+        "java_used_bytes": 24012488
+      },
+      "window_callback_frames": 2,
+      "window_dropped": 0
+    },
+    "burst": {
+      "elapsed_ms": 50.608229,
+      "process_cpu_ms": 46,
+      "driver_cpu_ms": 1.666773,
+      "sql": {
+        "queries": 12,
+        "profile_reads": 2,
+        "writes": 2
+      },
+      "memory_before": {
+        "pss_kb": 120831,
+        "java_used_bytes": 24012488
+      },
+      "memory_after": {
+        "pss_kb": 124738,
+        "java_used_bytes": 25978696
+      },
+      "window_callback_frames": 4,
+      "window_dropped": 0
+    },
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "352",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "352",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 6.48134183883667,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "7574a5f554250deedcd372a4f3f0658aafc7307a3166d670d143034d6ecf5d1b",
+    "label": "L1",
+    "pair": 2,
+    "side": "b",
+    "phase": "warmup",
+    "plan_sha256": "f4815b67039e51c89d75180dcb915ee6ab2ef4ce30df9d19bf3d1e9bfbfb01e8"
+  },
+  {
+    "run": "aa-02-b-1000-list-warm2-seed",
+    "mode": "seed",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "inserted": 1000,
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "352",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "352",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 0.370668888092041,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "89eafbc578557b553063abe93a3367593efbdc1c1e5ac24913194b599b997df2"
+  },
+  {
+    "run": "aa-02-b-1000-list-warm2",
+    "mode": "list",
+    "nodes": 1000,
+    "seed": 413,
+    "debuggable": false,
+    "load_ms": 113.038021,
+    "scroll": {
+      "elapsed_ms": 4094.690051,
+      "process_cpu_ms": 1668,
+      "driver_cpu_ms": 2.161665,
+      "sql": {
+        "queries": 0,
+        "profile_reads": 0,
+        "writes": 0
+      },
+      "memory_before": {
+        "pss_kb": 113072,
+        "java_used_bytes": 19625344
+      },
+      "memory_after": {
+        "pss_kb": 115465,
+        "java_used_bytes": 21329280
+      },
+      "window_callback_frames": 978,
+      "window_dropped": 0
+    },
+    "refresh": {
+      "elapsed_ms": 65.867604,
+      "process_cpu_ms": 67,
+      "driver_cpu_ms": 0.587605,
+      "sql": {
+        "queries": 6,
+        "profile_reads": 1,
+        "writes": 1
+      },
+      "memory_before": {
+        "pss_kb": 116005,
+        "java_used_bytes": 21755264
+      },
+      "memory_after": {
+        "pss_kb": 123049,
+        "java_used_bytes": 23967424
+      },
+      "window_callback_frames": 4,
+      "window_dropped": 0
+    },
+    "burst": {
+      "elapsed_ms": 48.459739,
+      "process_cpu_ms": 46,
+      "driver_cpu_ms": 1.843178,
+      "sql": {
+        "queries": 12,
+        "profile_reads": 2,
+        "writes": 2
+      },
+      "memory_before": {
+        "pss_kb": 123049,
+        "java_used_bytes": 23967424
+      },
+      "memory_after": {
+        "pss_kb": 126824,
+        "java_used_bytes": 25950016
+      },
+      "window_callback_frames": 2,
+      "window_dropped": 0
+    },
+    "ok": true,
+    "fixture_hash": "6974a24070835cd22b86d940ecc496a84d645a07ffcb522675c65582a83711f5",
+    "environment_before": {
+      "level": "100",
+      "temperature_tenths_c": "352",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "environment_after": {
+      "level": "100",
+      "temperature_tenths_c": "352",
+      "ac": "true",
+      "usb": "false",
+      "status": "5",
+      "thermal_status": 0
+    },
+    "host_elapsed_s": 6.503763914108276,
+    "device": "D1",
+    "provenance": {
+      "libcore.aar": "929898e26985e983bd9868fe4a6e8df55fd4fa6476534a54346b773344701c11",
+      "L1.apk": "0832ff115b90d459e7d66ad35b9401be54bc1e231c1e04958ad968a69df5985a",
+      "source_sha": "79533396032099f5c02eb2c344ad36af03c0d627",
+      "overlay_sha256": "ac6075562245da5146e02045e798e450985eb9ff4c66d439966cbe36ab9f7ac9",
+      "application_id": "com.vialen.app.benchmark",
+      "version_code": 900001
+    },
+    "exclude_reasons": [],
+    "raw_sha256": "bad8548dda30cbb5ba04845150d84cf066e0b5e2f98c0a4fd02b9abcbf4edd86",
+    "label": "L1",
+    "pair": 2,
+    "side": "b",
+    "phase": "warmup",
+    "plan_sha256": "f4815b67039e51c89d75180dcb915ee6ab2ef4ce30df9d19bf3d1e9bfbfb01e8"
+  }
+]

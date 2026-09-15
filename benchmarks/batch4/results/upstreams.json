@@ -1,0 +1,14 @@
+{
+  "libneko": {
+    "head": "1c47a3af71990a7b2192e03292b4d246c308ef0b",
+    "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "sing-box": {
+    "head": "0b8995879f29a9b98ee027bc17b75e101445b238",
+    "diff_sha256": "65bd223ff4262197c05b30898a22a2c32a1487ea450219076957ce061e462c45"
+  },
+  "sing-tun": {
+    "head": "f4c1f3ae265b930460774295b8fe5c73596c81cf",
+    "diff_sha256": "c5536309c843fc7f943e05cda502ecc21fb34df98142f29d7345c497cafd1a6d"
+  }
+}

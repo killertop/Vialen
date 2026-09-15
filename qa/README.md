@@ -407,3 +407,29 @@ A、B 源码问题确认并优化，保留已有正确的版本/事务/统计/�
 收尾再次查询基线三个工作流仍为 success，远端 main 仍为 `7953339`；没有取消或触发远端运行。完整暂存 diff 人工复核、`git diff --cached --check` 和公开内容检查通过，0 findings；未包含凭据、真实订阅、设备标识、原始日志、数据库或无关改动。
 
 本地实现提交：`a4a636598bd2f3e2bcb014924aa5c911211c8570`（压力条件与进程内 GC 单飞/冷却），`535d7680048ab747b9943a27f5ea06c19c6706bf`（按组订阅调度、结构化结果、取消/通知/迁移及回归）。QA 单独提交；收尾仍为 main、单一工作树、2.1.3 / VERSION_CODE=101，本任务全部修改提交完整，无既有修改需要保全。
+
+## 第四批：性能与功耗基准测量（部分交付）
+
+开始基线 `c32f461ec1621b2e57abf27116a2b727a46a6e8b`，main，单一分支和工作树，工作区干净；2.1.3 / VERSION_CODE=101。核对 L0 为 `c3ade8f37a390ecc195ccb9704ae042c1df261c1`、L1/B0 为 `79533396032099f5c02eb2c344ad36af03c0d627`，第三批本地提交关系成立。本批不改变生产算法、版本或依赖，不推送、不打标签、不发布。
+
+交付集中在 [benchmarks/batch4](../benchmarks/batch4/README.md)：固定协议、设备能力、性能报告、能耗报告、构建/采集/分析脚本、逐轮脱敏数据及生成数值表。原始日志、系统 trace、设备标识、测试密钥和独立构建目录均保存在仓库外，未删除用户内容。
+
+三份历史 archive 各自完成中性路径原生 AAR 与 Release 等效 benchmark APK 构建，测试签名、同一专用包名、arm64、R8/资源压缩、非 debuggable、profileable shell=true。三份产物 SHA、上游 SHA/补丁摘要和共同观察点摘要均记录。再次用 aapt2/apksigner 核对三包 manifest、ABI 与同一测试证书；没有读取或修改正式签名。观察入口只存在于仓库外 archive，主项目生产源码未修改。
+
+本轮实际执行：
+
+```text
+bash scripts/build-private-android.sh                 # 三份独立 archive 各自执行
+./gradlew :app:assembleBenchmark                     # 三份 archive 各自执行成功
+./gradlew :app:testDebugUnitTest :app:lintDebug --rerun-tasks
+python3 -m unittest discover -s benchmarks/batch4/tools -p test_tools.py
+python3 -m py_compile benchmarks/batch4/tools/*.py
+```
+
+本轮全量宿主 JVM/Room 354 tests / 0 failures / 0 errors / 0 skipped；Lint 0 errors / 0 warnings / 11 hints。分析和采集防护测试 6 项通过，固定源码校验接受正确归属并拒绝错误标签。真实 Android 上完成 100 节点工具预检和 L1 同 APK 3 对 A/A：6 个校准窗口、另 12 个预热窗口，全部成功，没有温度/供电/trace 完整性排除。不是重跑第三批 14 项 instrumentation，不以宿主 Room 结果替代真机专项。
+
+A/A 滚动 P95、主进程 CPU、加载时间的配对差区间均跨零；短刷新存在顺序/缓存噪声，不能推断生产收益。下一步预检安装时 USB ADB 断开，后续只读检查无设备。已请求恢复原 USB 连接，没有切换网络或修改手机设置；按本批“环境不足时交付，不无限等待”要求收尾。正式 L/B 对照、10,000 节点、导入/JNI/GC 窗口未采；完整 Binder、消费者、后台订阅计量驱动亦未完成。原有未验证项继续保留。
+
+硬件能力预检仅取得固定零电源轨和外部供电下的电池净量，不支持可信应用能耗归因；本轮没有完成硬件能耗对照或软件能耗估算，没有省电百分比。最后成功窗口已停止专用测量包；断连后无法再次核查设备，隔离包及原始文件保留。生产包、VPN、Wi-Fi、充电及显示设置未改。
+
+目前没有足够证据支持下一批生产算法修改，建议先恢复测量条件并补齐正式对照与缺失驱动。此结论是部分交付，不能关闭本批性能或功耗验收。
