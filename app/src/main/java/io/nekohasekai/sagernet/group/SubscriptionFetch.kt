@@ -36,10 +36,17 @@ internal object SubscriptionFetch {
                 launch(Dispatchers.IO, start = CoroutineStart.ATOMIC) {
                     try {
                         ensureActive()
-                        val response = request.execute()
+                        val response = request.executeSubscription()
+                        when (response.code) {
+                            "OK" -> Unit
+                            "CANCELLED" -> throw CancellationException("订阅更新已取消")
+                            "TEMPORARY", "TIMEOUT" -> throw SubscriptionFailure(true, "暂时无法更新，请稍后重试", response.code)
+                            "TOO_LARGE" -> throw SubscriptionFailure(false, "订阅文件过大", response.code)
+                            "TLS_REJECTED" -> throw SubscriptionFailure(false, "订阅证书无效，请检查链接")
+                            else -> throw SubscriptionFailure(false, "订阅访问被拒绝，请检查链接或权限")
+                        }
                         val text = response.content.decodeToString(throwOnInvalidSequence = true)
-                        val result = Result(text, Util.getStringBox(response.getHeader("Subscription-Userinfo")),
-                            Util.getStringBox(response.getHeader("Content-Disposition")))
+                        val result = Result(text, response.userinfo, response.disposition)
                         continuation.resume(result)
                     } catch (error: Exception) {
                         continuation.resumeWithException(error)

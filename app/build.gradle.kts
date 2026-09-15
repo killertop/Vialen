@@ -93,6 +93,7 @@ dependencies {
     implementation(libs.appcompat)
     implementation(libs.work.runtime.ktx)
     implementation(libs.work.multiprocess)
+    testImplementation("androidx.work:work-testing:${libs.versions.work.get()}")
 
     implementation(libs.material)
     implementation(libs.gson)

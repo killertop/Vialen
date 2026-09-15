@@ -90,28 +90,39 @@ abstract class GroupUpdater {
             }
         }
 
-        suspend fun executeUpdate(proxyGroup: ProxyGroup, byUser: Boolean): Boolean = coroutineScope {
-            if (!updating.add(proxyGroup.id)) return@coroutineScope false
+        suspend fun executeUpdate(proxyGroup: ProxyGroup, byUser: Boolean): Boolean =
+            executeUpdateResult(proxyGroup, byUser) == SubscriptionOutcome.UPDATED
+
+        internal suspend fun executeUpdateResult(proxyGroup: ProxyGroup, byUser: Boolean,
+            expectedConfig: String? = null): SubscriptionOutcome = coroutineScope {
+            if (!updating.add(proxyGroup.id)) return@coroutineScope SubscriptionOutcome.SKIPPED
             try {
-                GroupManager.postReload(proxyGroup.id)
+                subscriptionFeedback { GroupManager.postReload(proxyGroup.id) }
                 val ticket = SubscriptionRefresh.begin(io.nekohasekai.sagernet.database.SagerDatabase.instance,
-                    proxyGroup.id, requireAutoUpdate = !byUser)
+                    proxyGroup.id, requireAutoUpdate = !byUser, expectedConfig = if (byUser) null else expectedConfig)
                 val subscription = checkNotNull(ticket.group.subscription)
+                if (!byUser) {
+                    if (!io.nekohasekai.sagernet.bg.SubscriptionSchedule.due(subscription, DataStore.serviceState.connected,
+                            System.currentTimeMillis() / 1000)) return@coroutineScope SubscriptionOutcome.SKIPPED
+                }
                 val userInterface = GroupManager.userInterface
                 if (byUser && (subscription.link?.startsWith("http://") == true || subscription.updateWhenConnectedOnly) &&
                     !DataStore.serviceState.connected) {
                     if (userInterface == null || !userInterface.confirm(app.getString(R.string.update_subscription_warning))) {
-                        return@coroutineScope false
+                        return@coroutineScope SubscriptionOutcome.SKIPPED
                     }
                 }
                 RawUpdater.refresh(ticket, userInterface, byUser)
-                true
+                SubscriptionOutcome.UPDATED
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Logs.w(e)
-                GroupManager.userInterface?.onUpdateFailure(proxyGroup, e.readableMessage)
-                false
+                val outcome = subscriptionFailure(e)
+                if (outcome != SubscriptionOutcome.SUPERSEDED) subscriptionFeedback {
+                    GroupManager.userInterface?.onUpdateFailure(proxyGroup, e.readableMessage)
+                }
+                outcome
             } finally {
                 withContext(NonCancellable) { finishUpdate(proxyGroup) }
             }
@@ -120,7 +131,7 @@ abstract class GroupUpdater {
         suspend fun finishUpdate(proxyGroup: ProxyGroup) {
             updating.remove(proxyGroup.id)
             progress.remove(proxyGroup.id)
-            GroupManager.postUpdate(proxyGroup.id)
+            subscriptionFeedback { GroupManager.postUpdate(proxyGroup.id) }
         }
 
     }

@@ -149,4 +149,19 @@ class SubscriptionRefreshRaceTest {
         assertOriginal()
         assertEquals(0, db.groupDao().getById(group.id)!!.subscription!!.lastUpdated)
     }
+    @Test fun obsoleteQueuedConfigurationCannotInvalidateNewerRefresh() = runBlocking {
+        val queued = io.nekohasekai.sagernet.bg.SubscriptionSchedule.fingerprint(group.subscription!!)
+        val edited = peer.groupDao().getById(group.id)!!
+        edited.subscription!!.link = "content://synthetic/new-source"
+        peer.groupDao().updateGroup(edited)
+        val current = SubscriptionRefresh.begin(peer, group.id, requireAutoUpdate = true)
+        val obsolete = runCatching {
+            SubscriptionRefresh.begin(db, group.id, requireAutoUpdate = true, expectedConfig = queued)
+        }.exceptionOrNull()
+        assertTrue(obsolete is SubscriptionRefresh.Stale)
+        SubscriptionPersistence.apply(peer, current, listOf(node("current")))
+        assertEquals("current", db.proxyDao().getByGroup(group.id).single().requireProfile().name)
+        assertEquals("content://synthetic/new-source", db.groupDao().getById(group.id)!!.subscription!!.link)
+    }
+
 }

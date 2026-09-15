@@ -10,7 +10,8 @@ internal object SubscriptionRefresh {
     data class Ticket(val group: ProxyGroup, val configVersion: Long, val generation: Long)
     class Stale : IllegalStateException("订阅已修改或已有新刷新，请重试")
 
-    suspend fun begin(db: SagerDatabase, id: Long, requireAutoUpdate: Boolean = false): Ticket = db.withTransaction {
+    suspend fun begin(db: SagerDatabase, id: Long, requireAutoUpdate: Boolean = false,
+        expectedConfig: String? = null): Ticket = db.withTransaction {
         val sql = db.openHelper.writableDatabase
         // Installed before any request leaves this transaction. The trigger also covers
         // other processes and direct DAO writers; no editor can bypass its revision.
@@ -23,6 +24,10 @@ internal object SubscriptionRefresh {
         val group = db.groupDao().getById(id)?.takeIf { it.type == GroupType.SUBSCRIPTION }
             ?: throw Stale()
         if (requireAutoUpdate && group.subscription?.autoUpdate != true) throw Stale()
+        // An obsolete queued worker must not advance the generation of a valid newer refresh.
+        if (expectedConfig != null && group.subscription?.let {
+                io.nekohasekai.sagernet.bg.SubscriptionSchedule.fingerprint(it)
+            } != expectedConfig) throw Stale()
         sql.execSQL("INSERT OR IGNORE INTO subscription_refresh_state(groupId, configVersion, generation) VALUES (?, 0, 0)", arrayOf(id))
         sql.execSQL("UPDATE subscription_refresh_state SET generation = generation + 1 WHERE groupId = ?", arrayOf(id))
         sql.query("SELECT configVersion, generation FROM subscription_refresh_state WHERE groupId = ?", arrayOf(id)).use {

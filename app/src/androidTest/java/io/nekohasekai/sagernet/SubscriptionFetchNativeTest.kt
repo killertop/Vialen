@@ -118,7 +118,7 @@ class SubscriptionFetchNativeTest {
                 runCatching { SubscriptionFetch.fetch(fixture.url, "Vialen-Synthetic-Test") }
             }
             assertTrue("16 MiB + 1 response must be rejected", result.isFailure)
-            assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("size limit"))
+            assertEquals("TOO_LARGE", (result.exceptionOrNull() as io.nekohasekai.sagernet.group.SubscriptionFailure).code)
             fixture.assertPeerClosed()
         }
     }
@@ -136,7 +136,7 @@ class SubscriptionFetchNativeTest {
                 val elapsed = (System.nanoTime() - started) / 1_000_000
                 assertTrue("Native deadline must reject held body", result.isFailure)
                 assertTrue("Must observe production 30s deadline, not an early transport failure: $elapsed", elapsed in 28_000..37_999)
-                assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("deadline"))
+                assertEquals("TIMEOUT", (result.exceptionOrNull() as io.nekohasekai.sagernet.group.SubscriptionFailure).code)
                 assertTrue(fetch.children.none())
                 fixture.assertPeerClosed()
                 println("SUBSCRIPTION_FETCH_TIMEOUT elapsed_ms=$elapsed peer_eof_before_cleanup=true")

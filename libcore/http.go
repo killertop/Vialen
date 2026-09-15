@@ -52,6 +52,7 @@ type HTTPRequest interface {
 	SetResponseSizeLimit(bytes int64)
 	SetTimeoutMillis(milliseconds int64)
 	Execute() (HTTPResponse, error)
+	ExecuteSubscription() *SubscriptionHTTPResult
 }
 
 type HTTPResponse interface {
@@ -235,6 +236,13 @@ func safeHTTPError(err error) error {
 	if err == nil {
 		return nil
 	}
+	if errors.Is(err, errResponseTooLarge) {
+		return errResponseTooLarge
+	}
+	var status httpStatusError
+	if errors.As(err, &status) {
+		return status
+	}
 	var urlError *url.Error
 	if errors.As(err, &urlError) {
 		return safeHTTPError(urlError.Err)
@@ -249,6 +257,14 @@ func safeHTTPError(err error) error {
 }
 
 func (r *httpRequest) Execute() (HTTPResponse, error) {
+	response, err := r.execute()
+	if err != nil {
+		return nil, safeHTTPError(err)
+	}
+	return response, nil
+}
+
+func (r *httpRequest) execute() (HTTPResponse, error) {
 	ctx := r.ctx
 	release := r.cancel
 	if r.timeout > 0 {
@@ -272,13 +288,13 @@ func (r *httpRequest) Execute() (HTTPResponse, error) {
 			response.Body.Close()
 		}
 		release()
-		return nil, safeHTTPError(err)
+		return nil, err
 	}
 	response.Body = &releaseBody{ReadCloser: response.Body, release: release}
 	context.AfterFunc(ctx, func() { response.Body.Close() })
 	if response.StatusCode != http.StatusOK {
 		response.Body.Close()
-		return nil, fmt.Errorf("HTTP status %d", response.StatusCode)
+		return nil, httpStatusError(response.StatusCode)
 	}
 	if r.responseSizeLimit > 0 && response.ContentLength > r.responseSizeLimit {
 		response.Body.Close()

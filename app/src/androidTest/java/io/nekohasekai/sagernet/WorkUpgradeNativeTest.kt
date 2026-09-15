@@ -7,6 +7,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.*
 import androidx.work.multiprocess.RemoteWorkManager
 import io.nekohasekai.sagernet.bg.BaseService
+import io.nekohasekai.sagernet.bg.SubscriptionSchedule
 import io.nekohasekai.sagernet.bg.SubscriptionUpdater
 import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.database.preference.KeyValuePair
@@ -38,7 +39,7 @@ class WorkUpgradeNativeTest {
         .invoke(null, context) as WorkManager
     private val remote get() = RemoteWorkManager.getInstance(context)
     private val checkpoint get() = AtomicFile(File(context.filesDir, "work-upgrade-fixture.json"))
-    private val uniqueName = "SubscriptionUpdater"
+    private var uniqueName = "SubscriptionUpdater"
 
     @Test fun stagedUpgrade() {
         val phase = InstrumentationRegistry.getArguments().getString("vialenWorkUpgrade")
@@ -167,18 +168,23 @@ class WorkUpgradeNativeTest {
             link = "http://127.0.0.1:1/not-due-before-verify"
         }
         SagerDatabase.groupDao.updateGroup(fixture)
-        val id = UUID.fromString(state.getString("periodicId"))
+        val legacyId = UUID.fromString(state.getString("periodicId"))
         stage("verify: query old WorkSpec")
-        val existing = manager.getWorkInfoById(id).get(10, TimeUnit.SECONDS)
+        val existing = manager.getWorkInfoById(legacyId).get(10, TimeUnit.SECONDS)
         assertNotNull("Old runtime WorkSpec survives replacement install", existing)
-        assertFalse(existing!!.state.isFinished)
+        assertTrue(existing!!.state == WorkInfo.State.ENQUEUED || existing.state == WorkInfo.State.CANCELLED)
         assertEquals("Old periodic already ran; a fresh old-runtime WorkSpec is required. Cleanup + UPDATE prepare does not reset its run count",
-            0, periodicRunCount(id))
+            0, periodicRunCount(legacyId))
         stage("verify: reconfigure begin")
         runBlocking { SubscriptionUpdater.reconfigureUpdaterOrThrow() }
         stage("verify: reconfigure complete")
-        val after = manager.getWorkInfosForUniqueWork(uniqueName).get(10, TimeUnit.SECONDS).filterNot { it.state.isFinished }
-        assertEquals("Reconfigure UPDATE preserves the unique periodic identity", listOf(id), after.map { it.id })
+        assertEquals(WorkInfo.State.CANCELLED, manager.getWorkInfoById(legacyId).get(10, TimeUnit.SECONDS)!!.state)
+        uniqueName = SubscriptionSchedule.name(fixture)
+        var id = manager.getWorkInfosForUniqueWork(uniqueName).get(10, TimeUnit.SECONDS).single { !it.state.isFinished }.id
+        state.put("currentWorkName", uniqueName).put("currentPeriodicId", id.toString()); save(state)
+        runBlocking { SubscriptionUpdater.reconfigureUpdaterOrThrow() }
+        assertEquals("Unchanged per-group UPDATE preserves identity", listOf(id),
+            manager.getWorkInfosForUniqueWork(uniqueName).get(10, TimeUnit.SECONDS).filterNot { it.state.isFinished }.map { it.id })
         val server = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))
         val served = List(2) { CountDownLatch(1) }
         val serverFailure = java.util.concurrent.atomic.AtomicReference<Throwable?>()
@@ -203,14 +209,23 @@ class WorkUpgradeNativeTest {
         // Save the previous ID before replacing it, so another force-stop remains recoverable.
         state.put("priorOneTimeIds", JSONArray(fixtureRequestIds(state).map { it.toString() }))
         save(state)
-        val request = OneTimeWorkRequest.Builder(SubscriptionUpdater.UpdateTask::class.java).build()
-        state.put("oneTimeId", request.id.toString()); save(state)
+        var request: OneTimeWorkRequest? = null
         try {
             fixture.subscription!!.apply {
                 link = "http://127.0.0.1:${server.localPort}/fixture"
-                autoUpdateDelay = 15; lastUpdated = 0
+                autoUpdateDelay = 15; lastUpdated = (System.currentTimeMillis() / 1000).toInt()
             }
             SagerDatabase.groupDao.updateGroup(fixture)
+            runBlocking { SubscriptionUpdater.reconfigureUpdaterOrThrow() }
+            uniqueName = SubscriptionSchedule.name(fixture)
+            id = manager.getWorkInfosForUniqueWork(uniqueName).get(10, TimeUnit.SECONDS).single { !it.state.isFinished }.id
+            state.put("currentWorkName", uniqueName).put("currentPeriodicId", id.toString()); save(state)
+            fixture.subscription!!.lastUpdated = 0
+            SagerDatabase.groupDao.updateGroup(fixture)
+            request = OneTimeWorkRequest.Builder(SubscriptionUpdater.UpdateTask::class.java)
+                .setInputData(workDataOf(SubscriptionSchedule.ID to fixture.id,
+                    SubscriptionSchedule.CONFIG to SubscriptionSchedule.fingerprint(fixture.subscription!!))).build()
+            state.put("oneTimeId", request.id.toString()); save(state)
             stage("verify: enqueue fixture")
             remote.enqueue(request).get(10, TimeUnit.SECONDS)
             stage("verify: await fixture worker")
@@ -231,7 +246,11 @@ class WorkUpgradeNativeTest {
             SagerDatabase.groupDao.updateGroup(fixture)
             try {
                 val periodic = PeriodicWorkRequest.Builder(SubscriptionUpdater.UpdateTask::class.java,
-                    1440, TimeUnit.MINUTES)
+                    15, TimeUnit.MINUTES)
+                    .setInputData(workDataOf(SubscriptionSchedule.ID to fixture.id,
+                        SubscriptionSchedule.CONFIG to SubscriptionSchedule.fingerprint(fixture.subscription!!)))
+                    .addTag(SubscriptionSchedule.TAG).addTag(uniqueName)
+                    .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                     .setNextScheduleTimeOverride(System.currentTimeMillis()).build()
                 remote.enqueueUniquePeriodicWork(uniqueName, ExistingPeriodicWorkPolicy.UPDATE, periodic)
                     .get(10, TimeUnit.SECONDS)
@@ -239,14 +258,14 @@ class WorkUpgradeNativeTest {
                 stage("verify: await old periodic body id=$id")
                 while (true) {
                     val info = manager.getWorkInfoById(id).get(5, TimeUnit.SECONDS)
-                    assertNotNull("Old periodic UUID must survive UPDATE", info)
+                    assertNotNull("Migrated periodic UUID must survive UPDATE", info)
                     assertFalse("Periodic work must remain active", info!!.state.isFinished)
                     if (periodicRunCount(id) > 0 && info.state == WorkInfo.State.ENQUEUED) break
                     check(android.os.SystemClock.elapsedRealtime() < deadline) { "Old periodic body did not complete" }
                     CountDownLatch(1).await(100, TimeUnit.MILLISECONDS)
                 }
                 probeMainThread()
-                assertTrue("Old periodic fetched its distinct fixture", served[1].await(1, TimeUnit.SECONDS))
+                assertTrue("Migrated periodic fetched its distinct fixture", served[1].await(1, TimeUnit.SECONDS))
                 serverFailure.get()?.let { throw AssertionError("Periodic HTTP fixture failed", it) }
                 val periodicNode = SagerDatabase.proxyDao.getByGroup(fixture.id).single().requireBean()
                 assertEquals("WorkUpgradePeriodicFixture", periodicNode.name)
@@ -265,7 +284,7 @@ class WorkUpgradeNativeTest {
             save(state)
         } finally {
             try {
-                remote.cancelWorkById(request.id).get(10, TimeUnit.SECONDS)
+                request?.let { remote.cancelWorkById(it.id).get(10, TimeUnit.SECONDS) }
             } finally {
                 server.close()
                 serverThread.join(2000)
@@ -290,9 +309,16 @@ class WorkUpgradeNativeTest {
         val live = manager.getWorkInfosForUniqueWork(uniqueName).get(10, TimeUnit.SECONDS)
             .filterNot { it.state.isFinished }
         check(live.map { it.id } == listOf(id)) { "Refuse to create or replace missing old periodic during recovery" }
-        val request = PeriodicWorkRequest.Builder(SubscriptionUpdater.UpdateTask::class.java,
+        val builder = PeriodicWorkRequest.Builder(SubscriptionUpdater.UpdateTask::class.java,
             1440, TimeUnit.MINUTES).setInitialDelay(1, TimeUnit.DAYS)
-            .clearNextScheduleTimeOverride().build()
+        if (uniqueName != SubscriptionSchedule.LEGACY) {
+            val fixture = requireNotNull(SagerDatabase.groupDao.getById(load().getLong("groupId")))
+            builder.setInputData(workDataOf(SubscriptionSchedule.ID to fixture.id,
+                SubscriptionSchedule.CONFIG to SubscriptionSchedule.fingerprint(fixture.subscription!!)))
+                .addTag(SubscriptionSchedule.TAG).addTag(uniqueName)
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+        }
+        val request = builder.clearNextScheduleTimeOverride().build()
         remote.enqueueUniquePeriodicWork(uniqueName, ExistingPeriodicWorkPolicy.UPDATE, request)
             .get(10, TimeUnit.SECONDS)
     }
@@ -370,7 +396,8 @@ class WorkUpgradeNativeTest {
             val previous = recoveryFailure
             if (previous == null) recoveryFailure = error else previous.addSuppressed(error)
         }
-        val periodicId = state.optString("periodicId").takeIf { it.isNotEmpty() }?.let(UUID::fromString)
+        uniqueName = state.optString("currentWorkName", SubscriptionSchedule.LEGACY)
+        val periodicId = state.optString("currentPeriodicId", state.optString("periodicId")).takeIf { it.isNotEmpty() }?.let(UUID::fromString)
         var ownsPeriodic = false
         // A lost/cancelled/replaced UUID must not cause UPDATE to create or modify another
         // task, and must not prevent restoration of user data below.

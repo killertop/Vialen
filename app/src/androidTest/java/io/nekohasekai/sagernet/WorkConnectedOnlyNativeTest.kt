@@ -63,9 +63,12 @@ class WorkConnectedOnlyNativeTest {
         }
     }
     private suspend fun runWorker(
-        ids: MutableList<UUID>, completed: MutableSet<UUID>, pid: String, checkpoint: () -> Unit
+        ids: MutableList<UUID>, completed: MutableSet<UUID>, pid: String, group: ProxyGroup, checkpoint: () -> Unit
     ) {
-        val request = OneTimeWorkRequest.Builder(SubscriptionUpdater.UpdateTask::class.java).build()
+        val current = SagerDatabase.groupDao.getById(group.id)!!
+        val request = OneTimeWorkRequest.Builder(SubscriptionUpdater.UpdateTask::class.java)
+            .setInputData(androidx.work.workDataOf(io.nekohasekai.sagernet.bg.SubscriptionSchedule.ID to current.id,
+                io.nekohasekai.sagernet.bg.SubscriptionSchedule.CONFIG to io.nekohasekai.sagernet.bg.SubscriptionSchedule.fingerprint(current.subscription!!))).build()
         ids.add(request.id)
         checkpoint() // Persist ownership before enqueue can create work in the other process.
         remote.enqueue(request).get(10, TimeUnit.SECONDS)
@@ -225,7 +228,7 @@ class WorkConnectedOnlyNativeTest {
             backgroundPid = pid
             assertEquals("${app.packageName}:bg", app.packageManager.getServiceInfo(
                 ComponentName(app, "androidx.work.multiprocess.RemoteWorkManagerService"), 0).processName)
-            runWorker(requests, completedRequests, pid, ::checkpoint)
+            runWorker(requests, completedRequests, pid, group, ::checkpoint)
             assertEquals(BaseService.State.Stopped.ordinal, connection.service!!.state)
             assertEquals(0, hits.get())
             assertEquals(0, db.groupDao().getById(group.id)!!.subscription!!.lastUpdated)
@@ -250,7 +253,7 @@ class WorkConnectedOnlyNativeTest {
                 assertEquals("RUST_VPN_E2E_$nonce", probe.inputStream.bufferedReader().use { it.readText() })
             } finally { probe.disconnect() }
             assertEquals(1, checkNotNull(socks).requests.get())
-            runWorker(requests, completedRequests, pid, ::checkpoint)
+            runWorker(requests, completedRequests, pid, group, ::checkpoint)
             serverError.get()?.let { throw AssertionError("HTTP fixture failed", it) }
             assertEquals(1, hits.get())
             val updated = db.proxyDao().getByGroup(group.id).single().requireProfile()

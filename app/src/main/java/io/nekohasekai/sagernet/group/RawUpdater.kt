@@ -38,8 +38,7 @@ object RawUpdater : GroupUpdater() {
         var remoteUserinfo: String? = null
         var remoteGroupName: String? = null
         if (link.startsWith("content://")) {
-            val contentText = app.contentResolver.openInputStream(link.toUri())
-                ?.use { it.readProfileText() }
+            val contentText = SubscriptionDocument.read(app.contentResolver, link.toUri())
 
             proxies = contentText?.let { parseRaw(contentText, showWarnings = byUser) }
                 ?: error(app.getString(R.string.no_proxies_found_in_subscription))
@@ -74,17 +73,19 @@ object RawUpdater : GroupUpdater() {
         currentCoroutineContext().ensureActive()
         val result = SubscriptionPersistence.apply(SagerDatabase.instance, ticket, proxies, remoteUserinfo, remoteGroupName)
         currentCoroutineContext().ensureActive()
-        io.nekohasekai.sagernet.database.ProfileManager.selectFirstIfNeeded(proxyGroup.id)
+        subscriptionFeedback { io.nekohasekai.sagernet.database.ProfileManager.selectFirstIfNeeded(proxyGroup.id) }
 
-        userInterface?.onUpdateSuccess(
-            SagerDatabase.groupDao.getById(proxyGroup.id) ?: return,
+        subscriptionFeedback { userInterface?.onUpdateSuccess(
+            SagerDatabase.groupDao.getById(proxyGroup.id) ?: return@subscriptionFeedback,
             result.changed, result.added, result.updated, result.deleted, duplicate, byUser
-        )
+        ) }
     }
 
     suspend fun parseRaw(text: String, fileName: String = "", showWarnings: Boolean = true): List<Profile> {
         currentCoroutineContext().ensureActive()
-        val result = CoreClient.importProfiles(text, fileName = fileName)
+        val result = try { CoreClient.importProfiles(text, fileName = fileName) }
+        catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (error: Exception) { throw SubscriptionFailure(false, "订阅格式无效，请检查链接", "FORMAT") }
         val profiles = result.requireComplete()
         val warnings = result.issues.filter { it.severity == "warning" && it.code != "NON_PROXY_ENTRY" }
         if (warnings.isNotEmpty()) {
