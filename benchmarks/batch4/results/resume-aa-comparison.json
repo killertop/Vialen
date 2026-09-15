@@ -1,0 +1,527 @@
+{
+  "comparison": [
+    "a",
+    "b"
+  ],
+  "estimates": [
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "load_ms",
+      "n": 3,
+      "baseline_mean": 108.37840266666666,
+      "candidate_mean": 110.77810766666667,
+      "mean_difference": 2.399705000000002,
+      "relative_percent": 2.2141911496708886,
+      "ci95": [
+        -13.403905999999992,
+        14.522760000000005
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "scroll.elapsed_ms",
+      "n": 3,
+      "baseline_mean": 4139.504495333334,
+      "candidate_mean": 4136.132203666667,
+      "mean_difference": -3.3722916666662663,
+      "relative_percent": -0.08146607089008646,
+      "ci95": [
+        -9.163645999999972,
+        8.112552000000505
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "refresh.elapsed_ms",
+      "n": 3,
+      "baseline_mean": 77.51057333333333,
+      "candidate_mean": 70.47979166666667,
+      "mean_difference": -7.030781666666667,
+      "relative_percent": -9.070738822213146,
+      "ci95": [
+        -15.945729,
+        4.341769999999997
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "burst.elapsed_ms",
+      "n": 3,
+      "baseline_mean": 68.36746500000001,
+      "candidate_mean": 59.056979000000005,
+      "mean_difference": -9.310486,
+      "relative_percent": -13.618299288996605,
+      "ci95": [
+        -37.127083000000006,
+        19.615156000000006
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "scroll.process_cpu_ms",
+      "n": 3,
+      "baseline_mean": 1535.3333333333333,
+      "candidate_mean": 1512.3333333333333,
+      "mean_difference": -23.0,
+      "relative_percent": -1.4980460269214069,
+      "ci95": [
+        -225.0,
+        86.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "scroll.driver_cpu_ms",
+      "n": 3,
+      "baseline_mean": 1.5680020000000001,
+      "candidate_mean": 1.4089589999999999,
+      "mean_difference": -0.15904300000000013,
+      "relative_percent": -10.14303553184245,
+      "ci95": [
+        -0.36104100000000017,
+        0.23369899999999988
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "scroll.sql.profile_reads",
+      "n": 3,
+      "baseline_mean": 0.0,
+      "candidate_mean": 0.0,
+      "mean_difference": 0.0,
+      "relative_percent": null,
+      "ci95": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "scroll.sql.queries",
+      "n": 3,
+      "baseline_mean": 0.0,
+      "candidate_mean": 0.0,
+      "mean_difference": 0.0,
+      "relative_percent": null,
+      "ci95": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "scroll.sql.writes",
+      "n": 3,
+      "baseline_mean": 0.0,
+      "candidate_mean": 0.0,
+      "mean_difference": 0.0,
+      "relative_percent": null,
+      "ci95": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "scroll.memory_after.pss_kb",
+      "n": 3,
+      "baseline_mean": 107015.66666666667,
+      "candidate_mean": 107433.66666666667,
+      "mean_difference": 418.0,
+      "relative_percent": 0.39059701539027,
+      "ci95": [
+        -3272.0,
+        4217.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "refresh.process_cpu_ms",
+      "n": 3,
+      "baseline_mean": 65.0,
+      "candidate_mean": 56.666666666666664,
+      "mean_difference": -8.333333333333334,
+      "relative_percent": -12.820512820512825,
+      "ci95": [
+        -23.0,
+        1.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "refresh.driver_cpu_ms",
+      "n": 3,
+      "baseline_mean": 0.46336866666666665,
+      "candidate_mean": 0.35996633333333333,
+      "mean_difference": -0.10340233333333332,
+      "relative_percent": -22.315348613702838,
+      "ci95": [
+        -0.25989399999999996,
+        -0.024999999999999967
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "refresh.sql.profile_reads",
+      "n": 3,
+      "baseline_mean": 1.0,
+      "candidate_mean": 1.0,
+      "mean_difference": 0.0,
+      "relative_percent": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "refresh.sql.queries",
+      "n": 3,
+      "baseline_mean": 6.0,
+      "candidate_mean": 6.0,
+      "mean_difference": 0.0,
+      "relative_percent": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "refresh.sql.writes",
+      "n": 3,
+      "baseline_mean": 1.0,
+      "candidate_mean": 1.0,
+      "mean_difference": 0.0,
+      "relative_percent": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "refresh.memory_after.pss_kb",
+      "n": 3,
+      "baseline_mean": 115142.33333333333,
+      "candidate_mean": 115522.33333333333,
+      "mean_difference": 380.0,
+      "relative_percent": 0.3300263152561902,
+      "ci95": [
+        -3336.0,
+        4355.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "burst.process_cpu_ms",
+      "n": 3,
+      "baseline_mean": 50.666666666666664,
+      "candidate_mean": 42.666666666666664,
+      "mean_difference": -8.0,
+      "relative_percent": -15.789473684210527,
+      "ci95": [
+        -19.0,
+        4.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "burst.driver_cpu_ms",
+      "n": 3,
+      "baseline_mean": 2.126943333333333,
+      "candidate_mean": 2.2187843333333332,
+      "mean_difference": 0.09184099999999999,
+      "relative_percent": 4.317980576194636,
+      "ci95": [
+        -1.8729700000000002,
+        1.7989600000000001
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "burst.sql.profile_reads",
+      "n": 3,
+      "baseline_mean": 2.0,
+      "candidate_mean": 2.0,
+      "mean_difference": 0.0,
+      "relative_percent": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "burst.sql.queries",
+      "n": 3,
+      "baseline_mean": 12.0,
+      "candidate_mean": 12.0,
+      "mean_difference": 0.0,
+      "relative_percent": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "burst.sql.writes",
+      "n": 3,
+      "baseline_mean": 2.0,
+      "candidate_mean": 2.0,
+      "mean_difference": 0.0,
+      "relative_percent": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "burst.memory_after.pss_kb",
+      "n": 3,
+      "baseline_mean": 119078.0,
+      "candidate_mean": 119345.0,
+      "mean_difference": 267.0,
+      "relative_percent": 0.22422277834696583,
+      "ci95": [
+        -3484.0,
+        4236.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "scroll_frame_count",
+      "n": 3,
+      "baseline_mean": 384.6666666666667,
+      "candidate_mean": 385.0,
+      "mean_difference": 0.3333333333333333,
+      "relative_percent": 0.08665511265164152,
+      "ci95": [
+        -1.0,
+        1.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "scroll_overrun_fraction",
+      "n": 3,
+      "baseline_mean": 0.00781024531024531,
+      "candidate_mean": 0.0,
+      "mean_difference": -0.00781024531024531,
+      "relative_percent": -100.0,
+      "ci95": [
+        -0.020833333333333332,
+        0.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "scroll_cpu_p5",
+      "n": 3,
+      "baseline_mean": 3.4679945,
+      "candidate_mean": 3.4156074999999997,
+      "mean_difference": -0.052387000000000405,
+      "relative_percent": -1.5105848639610127,
+      "ci95": [
+        -0.6326305000000003,
+        0.3155209999999995
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "scroll_cpu_p95",
+      "n": 3,
+      "baseline_mean": 6.1727237499999985,
+      "candidate_mean": 4.982743083333332,
+      "mean_difference": -1.1899806666666661,
+      "relative_percent": -19.27804831160096,
+      "ci95": [
+        -3.7247338500000042,
+        0.09348480000000414
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "scroll_cpu_p99",
+      "n": 3,
+      "baseline_mean": 6.83337206333333,
+      "candidate_mean": 5.712143756666662,
+      "mean_difference": -1.1212283066666684,
+      "relative_percent": -16.408126123893968,
+      "ci95": [
+        -3.4814079100000086,
+        0.11506318000000437
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "refresh_frame_count",
+      "n": 3,
+      "baseline_mean": 4.0,
+      "candidate_mean": 3.3333333333333335,
+      "mean_difference": -0.6666666666666666,
+      "relative_percent": -16.666666666666664,
+      "ci95": [
+        -2.0,
+        0.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "refresh_overrun_fraction",
+      "n": 3,
+      "baseline_mean": 0.6666666666666666,
+      "candidate_mean": 0.6666666666666666,
+      "mean_difference": 0.0,
+      "relative_percent": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "refresh_cpu_p5",
+      "n": 3,
+      "baseline_mean": 13.744748000000001,
+      "candidate_mean": 15.108003666666665,
+      "mean_difference": 1.3632556666666653,
+      "relative_percent": 9.918375125296322,
+      "ci95": [
+        -3.0046609999999996,
+        6.046015499999996
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "refresh_cpu_p95",
+      "n": 3,
+      "baseline_mean": 33.53977594999999,
+      "candidate_mean": 34.820572899999995,
+      "mean_difference": 1.2807969500000016,
+      "relative_percent": 3.818740327631804,
+      "ci95": [
+        -8.571461549999992,
+        7.996620499999999
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "refresh_cpu_p99",
+      "n": 3,
+      "baseline_mean": 36.14149678999999,
+      "candidate_mean": 37.26382284666666,
+      "mean_difference": 1.1223260566666724,
+      "relative_percent": 3.1053668396412664,
+      "ci95": [
+        -9.215417909999992,
+        7.767408100000004
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "burst_frame_count",
+      "n": 3,
+      "baseline_mean": 2.6666666666666665,
+      "candidate_mean": 3.0,
+      "mean_difference": 0.3333333333333333,
+      "relative_percent": 12.500000000000005,
+      "ci95": [
+        -2.0,
+        2.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "burst_overrun_fraction",
+      "n": 3,
+      "baseline_mean": 0.8333333333333334,
+      "candidate_mean": 0.3611111111111111,
+      "mean_difference": -0.47222222222222227,
+      "relative_percent": -56.666666666666664,
+      "ci95": [
+        -0.75,
+        0.0
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "burst_cpu_p5",
+      "n": 3,
+      "baseline_mean": 14.829070999999999,
+      "candidate_mean": 9.168203,
+      "mean_difference": -5.660867999999999,
+      "relative_percent": -38.17412432646657,
+      "ci95": [
+        -12.816171999999998,
+        6.580885999999999
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "burst_cpu_p95",
+      "n": 3,
+      "baseline_mean": 24.434929949999997,
+      "candidate_mean": 17.07643288333333,
+      "mean_difference": -7.358497066666668,
+      "relative_percent": -30.114664055612195,
+      "ci95": [
+        -11.6204617,
+        -4.109307549999997
+      ]
+    },
+    {
+      "mode": "list",
+      "nodes": 1000,
+      "metric": "burst_cpu_p99",
+      "n": 3,
+      "baseline_mean": 25.461333456666665,
+      "candidate_mean": 17.87209191,
+      "mean_difference": -7.589241546666664,
+      "relative_percent": -29.8069288459813,
+      "ci95": [
+        -11.514176339999999,
+        -5.577195109999995
+      ]
+    }
+  ],
+  "excluded_pairs": []
+}

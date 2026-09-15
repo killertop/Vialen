@@ -1,3 +1,5 @@
+> 后续进展和当前限制见 [续验记录](resume-report.md)；以下保留首次测量过程。
+
 # 第四批测量工具与交付
 
 本次是**部分测量交付**：完成设备能力盘点、三份独立测量 APK/AAR、100 节点预检及同一 L1 构建的 6 个 A/A 校准窗口。USB 真机随后断开，尚无 L0/L1 或 B0/B1 正式对照；不能得出性能提升或省电结论。
@@ -31,14 +33,17 @@ python3 benchmarks/batch4/tools/build.py --source "$BENCH_RAW/versions/B1" --out
 ```sh
 python3 benchmarks/batch4/tools/probe.py --target-file "$BENCH_RAW/target" --output "$BENCH_RAW/capability" --trace-processor "$TRACE_PROCESSOR"
 python3 benchmarks/batch4/tools/run_plan.py --target-file "$BENCH_RAW/target" --artifacts "$BENCH_RAW/artifacts" --output "$BENCH_RAW/aa" --plan aa
-# 以下正式计划本轮尚未完成；每个目录只能启动一次，先确认预检和环境。
+# 每个目录只能启动一次，先确认预检和环境。
+# 先仅运行已具备完成断言的列表入口；仍为 10 对、两种节点规模。
+python3 benchmarks/batch4/tools/run_plan.py --target-file "$BENCH_RAW/target" --artifacts "$BENCH_RAW/artifacts" --output "$BENCH_RAW/L-list" --plan L-list
+# 以下完整入口尚需补齐文末列出的导入/JNI/GC 预检：
 python3 benchmarks/batch4/tools/run_plan.py --target-file "$BENCH_RAW/target" --artifacts "$BENCH_RAW/artifacts" --output "$BENCH_RAW/L" --plan L
 python3 benchmarks/batch4/tools/run_plan.py --target-file "$BENCH_RAW/target" --artifacts "$BENCH_RAW/artifacts" --output "$BENCH_RAW/B-gc" --plan B-gc
 ```
 
 Trace Processor 必须固定并回读版本，本轮为 v58.2 / add693d8b338ba9599dbcbc3e300b1ab8c000897。A/A 是 3 对同版本重复，L/B 是 10 对 AB/BA；安装后每次 Full 等效 ART 编译。GC 使用新进程，不预热强制回收以免消耗真实冷却。清理只 force-stop 本工具的专用包；原始数据、隔离包不自动卸载或删除。
 
-自动排除仅实现温度、thermal status、供电变化、工作完成、摘要/trace 完整性。前台遮挡、通知和显示变化仍需人工核对并记录；当前脚本没有自动补足无效轮，需遵守协议最多两轮的预先安排补采，不能无限运行到显著。A/A 之后补充了输出目录限制、运行 ID 唯一性和启动失败清理，未重跑设备；这些宿主防护改动不改变已构建 APK 的观察点。
+自动排除仅实现温度、thermal status、供电变化、工作完成、摘要/trace 完整性。续验后增加种子失败和运行环境排除即停止的防护，见续验记录。前台遮挡、通知和显示变化仍需人工核对并记录；当前脚本没有自动补足无效轮，需遵守协议最多两轮的预先安排补采，不能无限运行到显著。A/A 之后补充了输出目录限制、运行 ID 唯一性和启动失败清理，未重跑设备；这些宿主防护改动不改变已构建 APK 的观察点。
 
 目前 `jni` 仅直接真实原生接口的空闲采样；`B-gc` 仅人工调用入口。它们未实测，不能替代完整服务/Binder、变化 tag、消费者、真实系统 GC 或后台订阅窗口。后者驱动仍未实现。不要把脚本能启动称为全部矩阵已覆盖。
 
