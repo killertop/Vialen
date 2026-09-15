@@ -2,6 +2,7 @@ package libcore
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -300,6 +301,31 @@ func (b *BoxInstance) QueryStats(tag, direct string) int64 {
 		return 0
 	}
 	return stats.QueryStats(fmt.Sprintf("outbound>>>%s>>>traffic>>>%s", tag, direct))
+}
+
+// QueryStatsBatch returns little-endian (uplink, downlink) int64 pairs in tag order.
+// One JNI transfer per sample; retained counters remain readable after Close.
+func (b *BoxInstance) QueryStatsBatch(tags string) []byte {
+	if tags == "" {
+		return nil
+	}
+	names := strings.Split(tags, "\n")
+	result := make([]byte, 16*len(names))
+	stats := b.statsSnapshot()
+	if stats == nil {
+		return result
+	}
+	values := make(map[string][2]int64, len(names))
+	for i, tag := range names {
+		pair, exists := values[tag]
+		if !exists {
+			pair = [2]int64{stats.QueryStats("outbound>>>" + tag + ">>>traffic>>>uplink"), stats.QueryStats("outbound>>>" + tag + ">>>traffic>>>downlink")}
+			values[tag] = pair
+		}
+		binary.LittleEndian.PutUint64(result[i*16:], uint64(pair[0]))
+		binary.LittleEndian.PutUint64(result[i*16+8:], uint64(pair[1]))
+	}
+	return result
 }
 
 func (b *BoxInstance) SelectOutbound(tag string) bool {
