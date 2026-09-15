@@ -78,7 +78,8 @@ class MainActivity : ThemedActivity(),
     }
 
     private fun updateConnectionSummary(showControls: Boolean) {
-        binding.connectionSummary.visibility = if (showControls && !renderedState.connected) View.VISIBLE else View.GONE
+        val transitioning = renderedState == BaseService.State.Connecting || renderedState == BaseService.State.Stopping
+        binding.connectionSummary.visibility = if (showControls && transitioning) View.VISIBLE else View.GONE
         binding.connectionSummary.setText(when (renderedState) {
             BaseService.State.Connecting -> R.string.connecting
             BaseService.State.Stopping -> R.string.stopping

@@ -1,19 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Native, static surface: no bitmap, blur pass, animation or added hit target. -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@color/vialen_pearl_background" />
-    <item>
-        <shape>
-            <gradient android:type="radial" android:centerX="0" android:centerY="0"
-                android:gradientRadius="480dp" android:startColor="@color/vialen_pearl_edge"
-                android:endColor="#00DCE7FA" />
-        </shape>
-    </item>
-    <item>
-        <shape>
-            <gradient android:type="radial" android:centerX="1" android:centerY="1"
-                android:gradientRadius="440dp" android:startColor="@color/vialen_pearl_edge"
-                android:endColor="#00DCE7FA" />
-        </shape>
-    </item>
-</layer-list>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@android:color/white" />
+</shape>
