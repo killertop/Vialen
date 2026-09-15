@@ -547,9 +547,4 @@
     <string name="vialen_releases">Vialen releases</string>
     <string name="close">Close</string>
     <string name="ui_app_routing">App routing</string>
-    <string name="subscription_update_complete">Subscription updated</string>
-    <string name="subscription_update_summary">%1$s\n\nAdded  %2$d\nUpdated  %3$d\nRemoved  %4$d\nDuplicates  %5$d</string>
-    <string name="subscription_done">Done</string>
-    <string name="subscription_show_details">View details</string>
-    <string name="subscription_hide_details">Back to summary</string>
 </resources>
