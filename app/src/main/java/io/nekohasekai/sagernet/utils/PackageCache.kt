@@ -1,103 +1,65 @@
 package io.nekohasekai.sagernet.utils
 
-import android.Manifest
 import android.annotation.SuppressLint
-import android.content.pm.ApplicationInfo
-import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.listenForPackageChanges
 import io.nekohasekai.sagernet.ktx.Logs
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import java.util.concurrent.atomic.AtomicBoolean
 
 object PackageCache {
+    private val registered = AtomicBoolean(false)
+    private val loader = SnapshotLoader(::readPackages)
+    private val refreshes = Channel<Unit>(Channel.CONFLATED)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // Derived labels are separate from the immutable package indexes and versioned together.
+    private var labelSnapshot: PackageSnapshot? = null
+    private val labels = HashMap<String, String>()
 
-    var installedPackages: Map<String, PackageInfo> = emptyMap()
-    var installedApps: Map<String, ApplicationInfo> = emptyMap()
-    var packageMap: Map<String, Int> = emptyMap()
-    val uidMap = HashMap<Int, HashSet<String>>()
-    val loaded = Mutex(true)
-    var registerd = AtomicBoolean(false)
+    init { scope.launch { for (ignored in refreshes) reload() } }
 
-    // called from init (suspend)
     fun register() {
-        if (registerd.getAndSet(true)) return
-        reload()
-        app.listenForPackageChanges(false) {
-            reload()
-            labelMap.clear()
-        }
-        loaded.unlock()
+        if (!registered.compareAndSet(false, true)) return
+        try {
+            // Register before the initial scan so changes during that scan cannot be missed.
+            app.listenForPackageChanges(false) { refreshes.trySend(Unit) }
+        } catch (error: Exception) {
+            registered.set(false) // A later caller can retry listener registration.
+            Logs.w(error)
+        } finally { reload() } // Initial waiters get a terminal result even if registration fails.
+    }
+
+    fun reload(): Boolean = loader.refresh().also { success ->
+        if (!success) loader.failure?.let { Logs.w(it) }
     }
 
     @SuppressLint("InlinedApi")
-    fun reload() {
-        try {
-            reloadAvailablePackages()
-        } catch (error: Exception) {
-            // OEM app-list revocation must not crash application startup or lock cache consumers forever.
-            Logs.w(error)
-            installedPackages = emptyMap()
-            installedApps = emptyMap()
-            packageMap = emptyMap()
-            uidMap.clear()
-        }
+    private fun readPackages(): PackageSnapshot {
+        val packages = app.packageManager.getInstalledPackages(
+            PackageManager.MATCH_UNINSTALLED_PACKAGES or PackageManager.GET_PERMISSIONS or
+                PackageManager.GET_PROVIDERS or PackageManager.GET_META_DATA)
+        val apps = app.packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+        check(apps.isNotEmpty()) { "应用列表不可用，请检查权限后重试" }
+        return PackageSnapshot(packages, apps)
     }
 
-    private fun reloadAvailablePackages() {
-        val rawPackageInfo = app.packageManager.getInstalledPackages(
-            PackageManager.MATCH_UNINSTALLED_PACKAGES
-                    or PackageManager.GET_PERMISSIONS
-                    or PackageManager.GET_PROVIDERS
-                    or PackageManager.GET_META_DATA
-        )
-
-        installedPackages = rawPackageInfo.filter {
-            when (it.packageName) {
-                "android" -> true
-                else -> it.requestedPermissions?.contains(Manifest.permission.INTERNET) == true
-            }
-        }.associateBy { it.packageName }
-
-        val installed = app.packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
-        installedApps = installed.associateBy { it.packageName }
-        packageMap = installed.associate { it.packageName to it.uid }
-        uidMap.clear()
-        for (info in installed) {
-            val uid = info.uid
-            uidMap.getOrPut(uid) { HashSet() }.add(info.packageName)
-        }
+    /** Capture once per multi-package operation, including an entire configuration build. */
+    fun snapshot(): PackageSnapshot {
+        if (!registered.get()) register()
+        return loader.await()
     }
 
-    operator fun get(uid: Int) = uidMap[uid]
-    operator fun get(packageName: String) = packageMap[packageName]
+    fun awaitLoadSync() { snapshot() }
+    fun currentOrNull(): PackageSnapshot? = loader.currentOrNull()
+    val installedPackages get() = snapshot().installedPackages
 
-    fun awaitLoadSync() {
-        if (!loaded.isLocked) {
-            return
-        }
-        if (!registerd.get()) {
-            register()
-            return
-        }
-        runBlocking {
-            loaded.withLock {
-                // just await
-            }
+    @Synchronized fun loadLabel(packageName: String): String {
+        val snapshot = loader.currentOrNull() ?: return packageName // Display-only fallback, never a routing UID.
+        if (labelSnapshot !== snapshot) { labels.clear(); labelSnapshot = snapshot }
+        return labels.getOrPut(packageName) {
+            snapshot.application(packageName)?.loadLabel(app.packageManager)?.toString() ?: packageName
         }
     }
-
-    private val labelMap = mutableMapOf<String, String>()
-    fun loadLabel(packageName: String): String {
-        var label = labelMap[packageName]
-        if (label != null) return label
-        val info = installedApps[packageName] ?: return packageName
-        label = info.loadLabel(app.packageManager).toString()
-        labelMap[packageName] = label
-        return label
-    }
-
 }

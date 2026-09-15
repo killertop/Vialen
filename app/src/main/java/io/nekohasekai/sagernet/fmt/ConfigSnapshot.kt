@@ -265,10 +265,10 @@ internal class ConfigSnapshot private constructor(
                     ProfileDocument.decode(row.document).takeIf { it.kind == "chain" }?.hops?.forEach(::load)
                 }
             })
-            if (rules.any { it.packages.isNotEmpty() }) PackageCache.awaitLoadSync()
+            val packageSnapshot = if (rules.any { it.packages.isNotEmpty() }) PackageCache.snapshot() else null
             val request = assemble(proxy.id, entities, groups, candidates, rules, policy, platform,
                 if (forTest) "probe" else if (forExport) "export" else "run", insecure,
-                uids = { packages -> packages.map { requireNotNull(PackageCache[it]) { "Application $it is not installed" }.also { uid -> require(uid >= 0) { "Invalid application UID" } } } },
+                uids = { packages -> packages.map { requireNotNull(packageSnapshot?.packageMap?.get(it)) { "Application $it is not installed" }.also { uid -> require(uid >= 0) { "Invalid application UID" } } } },
                 ruleSetSnapshot = { it.snapshotJson { SagerNet.application.filesDir } })
             return ConfigSnapshot(request, entities, rules.associate { it.id to it.displayName() }, proxy.id, selectorGroup)
         }

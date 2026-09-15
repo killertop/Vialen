@@ -68,9 +68,9 @@ data class RouteRuleSet(
                 require(file.isFile && file.canRead()) { "规则文件不存在，请重新导入" }
             }
             val uids = if (row.packages.isEmpty()) emptyList() else {
-                io.nekohasekai.sagernet.utils.PackageCache.awaitLoadSync()
+                val packages = io.nekohasekai.sagernet.utils.PackageCache.snapshot()
                 row.packages.map {
-                    requireNotNull(io.nekohasekai.sagernet.utils.PackageCache[it]) { "应用已卸载，请重新选择" }
+                    requireNotNull(packages.packageMap[it]) { "应用已卸载，请重新选择" }
                         .also { uid -> require(uid >= 0) { "应用信息无效，请重新选择" } }
                 }
             }

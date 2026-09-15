@@ -178,7 +178,15 @@ class AppListActivity : ThemedActivity() {
         loader = lifecycleScope.launch {
             loading.crossFadeFrom(binding.list)
             val adapter = binding.list.adapter as AppsAdapter
-            withContext(Dispatchers.IO) { adapter.reload() }
+            try {
+                withContext(Dispatchers.IO) { adapter.reload() }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                binding.appPlaceholder.root.crossFadeFrom(loading)
+                snackbar("无法读取应用列表，请检查权限后重试").show()
+                return@launch
+            }
             adapter.filter.filter(binding.search.text?.toString() ?: "")
             if (apps.isEmpty()) {
                 binding.list.visibility = View.GONE

@@ -48,13 +48,13 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
     }
 
     override fun packageNameByUid(uid: Int): String {
-        PackageCache.awaitLoadSync()
+        val packages = PackageCache.snapshot()
 
         if (uid <= 1000L) {
             return "android"
         }
 
-        val packageNames = PackageCache.uidMap[uid]
+        val packageNames = packages.uidMap[uid]
         if (!packageNames.isNullOrEmpty()) for (packageName in packageNames) {
             return packageName
         }
@@ -63,8 +63,8 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
     }
 
     override fun uidByPackageName(packageName: String): Int {
-        PackageCache.awaitLoadSync()
-        return PackageCache[packageName] ?: 0
+        val packages = PackageCache.snapshot()
+        return requireNotNull(packages.packageMap[packageName]) { "应用已卸载，请重新选择" }
     }
 
     // TODO: 'getter for connectionInfo: WifiInfo!' is deprecated

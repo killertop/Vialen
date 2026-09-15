@@ -21,8 +21,9 @@ class AppListPreference : Preference {
     ) : super(context, attrs, defStyleAttr, defStyleRes)
 
     override fun getSummary(): CharSequence {
+        val snapshot = PackageCache.currentOrNull()
         val packages = DataStore.routePackages.split("\n").filter { it.isNotBlank() }.map {
-            PackageCache.installedPackages[it]?.applicationInfo?.loadLabel(app.packageManager)
+            snapshot?.application(it)?.loadLabel(app.packageManager)
                 ?: it
         }
         if (packages.isEmpty()) {
