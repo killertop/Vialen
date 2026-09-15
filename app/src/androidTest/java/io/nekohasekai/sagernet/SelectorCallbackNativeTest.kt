@@ -48,6 +48,7 @@ class SelectorCallbackNativeTest {
         override fun stateChanged(state: Int, profileName: String?, msg: String?) = Unit
         override fun cbSpeedUpdate(stats: SpeedDisplayData?) = Unit
         override fun cbTrafficUpdate(stats: TrafficData?) = Unit
+        override fun cbTrafficBatch(stats: MutableList<TrafficData>) { stats.forEach { cbTrafficUpdate(it) } }
         override fun cbSelectorUpdate(id: Long) { selected.set(id) }
     }
 

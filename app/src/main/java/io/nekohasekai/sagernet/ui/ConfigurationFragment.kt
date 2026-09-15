@@ -1371,6 +1371,10 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         override suspend fun groupUpdated(groupId: Long) = Unit
 
+        override suspend fun onAdded(profiles: List<ProxyEntity>) {
+            profiles.distinctBy { it.groupId }.forEach { onAdd(it) }
+        }
+
         override suspend fun onAdd(profile: ProxyEntity) {
             if (groupList.find { it.id == profile.groupId } == null) {
                 DataStore.selectedGroup = profile.groupId
@@ -1379,6 +1383,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         override suspend fun onUpdated(data: TrafficData) = Unit
+        override suspend fun onTrafficUpdated(rows: List<TrafficData>) = Unit
 
         override suspend fun onUpdated(profile: ProxyEntity, noTraffic: Boolean) = Unit
 
@@ -1655,6 +1660,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             fabPaddingObserver = null
             fabPaddingListener = null
             adapter?.let {
+                it.disposeReads()
                 ProfileManager.removeListener(it)
                 GroupManager.removeListener(it)
             }
@@ -1686,10 +1692,18 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             var configurationIdList: MutableList<Long> = mutableListOf()
             val configurationList = HashMap<Long, ProxyEntity>()
-            private val contentSnapshots = HashMap<Long, List<Byte>>()
+            private val contentSnapshots = HashMap<Long, io.nekohasekai.sagernet.ui.state.ProfileListContent>()
+            private val liveTraffic = HashMap<Long, TrafficData>()
+            fun trafficFor(id: Long) = liveTraffic[id]
+            private val readsDisposed = java.util.concurrent.atomic.AtomicBoolean()
+            fun disposeReads() {
+                readsDisposed.set(true)
+                reloadGeneration.incrementAndGet()
+                profileWrites.cancelLatest(this)
+            }
             private val pendingRemovals = HashSet<Long>()
             fun pendingRemovalIds(): List<Long> = pendingRemovals.toList()
-            private fun snapshot(profile: ProxyEntity) = io.nekohasekai.sagernet.fmt.KryoConverters.serialize(profile).toList()
+            private fun snapshot(profile: ProxyEntity) = io.nekohasekai.sagernet.ui.state.ProfileListContent.capture(profile)
 
             private fun getItem(profileId: Long): ProxyEntity {
                 var profile = configurationList[profileId]
@@ -1720,7 +1734,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             override fun onBindViewHolder(holder: ConfigurationHolder, position: Int) {
                 try {
-                    holder.bind(getItemAt(position))
+                    holder.bind(getItemAt(position), liveTraffic[getItemId(position)])
                 } catch (ignored: NullPointerException) { // when group deleted
                 }
             }
@@ -1826,32 +1840,35 @@ class ConfigurationFragment @JvmOverloads constructor(
                         undoManager.flush()
                     }
                     reloadGeneration.incrementAndGet()
-                    val oldProfile = configurationList[profile.id]
                     contentSnapshots[profile.id] = snapshot(profile)
                     configurationList[profile.id] = profile
                     notifyItemChanged(index)
-                    if (noTraffic && oldProfile != null) {
-                        runOnDefaultDispatcher {
-                            onUpdated(
-                                TrafficData(
-                                    id = profile.id,
-                                    rx = oldProfile.rx,
-                                    tx = oldProfile.tx
-                                )
-                            )
-                        }
+
+                }
+            }
+
+            override suspend fun onUpdated(data: TrafficData) = onTrafficUpdated(listOf(data))
+
+            override suspend fun onTrafficUpdated(rows: List<TrafficData>) {
+                onMainDispatcher {
+                    if (!alive()) return@onMainDispatcher
+                    val positions by lazy { configurationIdList.withIndex().associate { it.value to it.index } }
+                    rows.forEach { data ->
+                        val previous = liveTraffic.put(data.id, data.copy())
+                        if (previous == data) return@forEach
+                        val index = positions[data.id] ?: return@forEach
+                        val holder = configurationListView.findViewHolderForAdapterPosition(index) as? ConfigurationHolder
+                        if (holder != null && holder.entity.id == data.id) holder.bindTraffic(data)
                     }
                 }
             }
 
-            override suspend fun onUpdated(data: TrafficData) {
+            override suspend fun onAdded(profiles: List<ProxyEntity>) {
+                if (profiles.none { it.groupId == proxyGroup.id }) return
                 onMainDispatcher {
-                    if (!alive()) return@onMainDispatcher
-                    val index = configurationIdList.indexOf(data.id)
-                    if (index < 0) return@onMainDispatcher
-                    val holder = configurationListView.findViewHolderForAdapterPosition(index) as? ConfigurationHolder
-                    if (holder != null && holder.entity.id == data.id) holder.bind(holder.entity, data)
+                    if (alive() && ::undoManager.isInitialized) undoManager.flush()
                 }
+                reloadProfiles()
             }
 
             override suspend fun onRemoved(groupId: Long, profileId: Long) {
@@ -1863,6 +1880,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     configurationIdList.removeAt(index)
                     configurationList.remove(profileId)
                     contentSnapshots.remove(profileId)
+                    liveTraffic.remove(profileId)
                     notifyItemRemoved(index)
                 }
             }
@@ -1885,50 +1903,59 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             fun reloadProfiles() {
+                if (readsDisposed.get()) return
                 val request = reloadGeneration.incrementAndGet()
-                profileWrites.submit { reloadProfilesNow(request) }
+                profileWrites.submitLatest(this) { reloadProfilesNow(request) }
             }
 
-            private fun reloadProfilesNow(request: Long) {
-                var newProfiles = SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
-                when (proxyGroup.order) {
-                    GroupOrder.BY_NAME -> {
-                        newProfiles = newProfiles.sortedBy { it.displayName() }
-
-                    }
-
-                    GroupOrder.BY_DELAY -> {
-                        newProfiles =
-                            newProfiles.sortedBy { if (it.status == 1) it.ping else 114514 }
-                    }
-                }
-
+            private suspend fun reloadProfilesNow(request: Long) {
+                fun current() = !readsDisposed.get() && request == reloadGeneration.get()
+                if (!current()) return
+                // Capture mutable adapter state on Main; diff only these immutable copies.
+                val before = onMainDispatcher {
+                    if (!alive() || !current()) null else Triple(
+                        configurationIdList.toList(), contentSnapshots.toMap(), pendingRemovals.toSet())
+                } ?: return
+                if (!current()) return
+                val group = onMainDispatcher { proxyGroup.id to proxyGroup.order }
+                var newProfiles = SagerDatabase.proxyDao.getByGroup(group.first)
+                // Capture before sorting calls displayName()/projects mutable beans.
                 val newSnapshots = newProfiles.associate { it.id to snapshot(it) }
-                val selectedProxy = selectedItem?.id ?: DataStore.selectedProxy
-                post {
-                    if (!alive() || request != reloadGeneration.get()) return@post
-                    val visibleProfiles = newProfiles.filter { it.id !in pendingRemovals }
-                    val newProfileIds = visibleProfiles.map { it.id }
-                    val oldIds = configurationIdList.toList()
-                    val changedIds = visibleProfiles.filter { contentSnapshots[it.id] != newSnapshots[it.id] }.map { it.id }.toSet()
-                    val diff = androidx.recyclerview.widget.DiffUtil.calculateDiff(object : androidx.recyclerview.widget.DiffUtil.Callback() {
-                        override fun getOldListSize() = oldIds.size
-                        override fun getNewListSize() = newProfileIds.size
-                        override fun areItemsTheSame(old: Int, new: Int) = oldIds[old] == newProfileIds[new]
-                        override fun areContentsTheSame(old: Int, new: Int) = newProfileIds[new] !in changedIds
-                    })
+                when (group.second) {
+                    GroupOrder.BY_NAME -> newProfiles = newProfiles.sortedBy { it.displayName() }
+                    GroupOrder.BY_DELAY -> newProfiles = newProfiles.sortedBy { if (it.status == 1) it.ping else 114514 }
+                }
+                if (!current()) return
+                val visibleProfiles = newProfiles.filter { it.id !in before.third }
+                val newIds = visibleProfiles.map { it.id }
+                val diff = androidx.recyclerview.widget.DiffUtil.calculateDiff(object : androidx.recyclerview.widget.DiffUtil.Callback() {
+                    override fun getOldListSize() = before.first.size
+                    override fun getNewListSize() = newIds.size
+                    override fun areItemsTheSame(old: Int, new: Int) = before.first[old] == newIds[new]
+                    override fun areContentsTheSame(old: Int, new: Int) = before.second[newIds[new]] == newSnapshots[newIds[new]]
+                })
+                val selectedProxy = onMainDispatcher { selectedItem?.id } ?: DataStore.selectedProxy
+                onMainDispatcher {
+                    if (!alive() || !current()) return@onMainDispatcher
                     configurationList.clear()
                     configurationList.putAll(visibleProfiles.associateBy { it.id })
                     contentSnapshots.clear()
                     contentSnapshots.putAll(newSnapshots)
+                    liveTraffic.keys.retainAll(newIds.toSet())
                     configurationIdList.clear()
-                    configurationIdList.addAll(newProfileIds)
-                    diff.dispatchUpdatesTo(this)
+                    configurationIdList.addAll(newIds)
+                    diff.dispatchUpdatesTo(this@ConfigurationAdapter)
+                    for (index in 0 until configurationListView.childCount) {
+                        val holder = configurationListView.getChildViewHolder(configurationListView.getChildAt(index)) as? ConfigurationHolder ?: continue
+                        val row = configurationList[holder.entity.id] ?: continue
+                        holder.bindTraffic(liveTraffic[row.id] ?: TrafficData(row.id, row.tx, row.rx))
+                    }
                     if (!loaded) {
-                        val index = if (selected) newProfileIds.indexOf(selectedProxy) else -1
+                        val index = if (selected) newIds.indexOf(selectedProxy) else -1
                         if (index >= 0) configurationListView.scrollTo(index, true)
                         loaded = true
                     }
+                    updateEmptyState()
                 }
             }
 
@@ -1969,6 +1996,21 @@ class ConfigurationFragment @JvmOverloads constructor(
                 ))
             }
 
+            private var trafficAddress = ""
+            fun bindTraffic(data: TrafficData) {
+                if (!::entity.isInitialized || entity.id != data.id) return
+                val show = data.tx != 0L || data.rx != 0L
+                trafficText.isVisible = show
+                trafficText.text = if (show) view.context.getString(R.string.traffic,
+                    Formatter.formatFileSize(view.context, data.tx), Formatter.formatFileSize(view.context, data.rx)) else ""
+                profileAddress.text = if (show && trafficAddress.length >= 30) trafficAddress.take(27) + "..." else trafficAddress
+                (trafficText.parent as View).isGone = (!show || entity.status <= 0) && trafficAddress.isBlank()
+                if (entity.status == 0) {
+                    profileStatus.text = trafficText.text
+                    trafficText.text = ""
+                }
+            }
+
             fun bind(proxyEntity: ProxyEntity, trafficData: TrafficData? = null) {
                 val pf = parentFragment as? ConfigurationFragment ?: return
 
@@ -1997,7 +2039,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                                 lastSelected = DataStore.selectedProxy
                                 DataStore.selectedProxy = proxyEntity.id
                                 onMainDispatcher {
-                                    if (valid(clickedBinding)) bind(proxyEntity)
+                                    if (valid(clickedBinding)) bind(proxyEntity, adapter?.trafficFor(proxyEntity.id))
                                 }
                             }
 
@@ -2023,48 +2065,15 @@ class ConfigurationFragment @JvmOverloads constructor(
                 profileType.text = proxyEntity.displayType()
                 profileType.setTextColor(requireContext().getProtocolColor(proxyEntity.type))
 
-                var rx = proxyEntity.rx
-                var tx = proxyEntity.tx
-                if (trafficData != null) {
-                    // use new data
-                    tx = trafficData.tx
-                    rx = trafficData.rx
-                }
-
-                val showTraffic = rx + tx != 0L
-                trafficText.isVisible = showTraffic
-                if (showTraffic) {
-                    trafficText.text = view.context.getString(
-                        R.string.traffic,
-                        Formatter.formatFileSize(view.context, tx),
-                        Formatter.formatFileSize(view.context, rx)
-                    )
-                }
-
-                var address = proxyEntity.displayAddress()
-                if (showTraffic && address.length >= 30) {
-                    address = address.substring(0, 27) + "..."
-                }
-
-                if (proxyEntity.requireBean().name.isBlank() || !pf.alwaysShowAddress) {
-                    address = ""
-                }
-
-                profileAddress.text = address
-                (trafficText.parent as View).isGone =
-                    (!showTraffic || proxyEntity.status <= 0) && address.isBlank()
+                trafficAddress = if (proxyEntity.requireBean().name.isNotBlank() && pf.alwaysShowAddress)
+                    proxyEntity.displayAddress() else ""
 
                 if (proxyEntity.status == -1) {
                     profileStatus.text = proxyEntity.error.orEmpty()
                     profileStatus.setTextColor(requireContext().getColorAttr(android.R.attr.textColorSecondary))
                 } else if (proxyEntity.status == 0) {
-                    if (showTraffic) {
-                        profileStatus.text = trafficText.text
-                        profileStatus.setTextColor(requireContext().getColorAttr(android.R.attr.textColorSecondary))
-                        trafficText.text = ""
-                    } else {
-                        profileStatus.text = ""
-                    }
+                    profileStatus.text = ""
+                    profileStatus.setTextColor(requireContext().getColorAttr(android.R.attr.textColorSecondary))
                 } else if (proxyEntity.status == 1) {
                     profileStatus.text = getString(R.string.available, proxyEntity.ping)
                     profileStatus.setTextColor(requireContext().getColour(R.color.vialen_success))
@@ -2085,6 +2094,8 @@ class ConfigurationFragment @JvmOverloads constructor(
                 } else {
                     profileStatus.setOnClickListener(null)
                 }
+
+                bindTraffic(trafficData ?: TrafficData(proxyEntity.id, proxyEntity.tx, proxyEntity.rx))
 
                 editButton.setOnClickListener {
                     it.context.startActivity(

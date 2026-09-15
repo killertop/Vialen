@@ -115,6 +115,7 @@ class BaseService {
             }
         }
 
+        val trafficSubscriptionVersion = java.util.concurrent.atomic.AtomicLong()
         val callbackIdMap = java.util.concurrent.ConcurrentHashMap<ISagerNetServiceCallback, Int>()
 
         override val coroutineContext = Dispatchers.Main.immediate + Job()
@@ -166,7 +167,7 @@ class BaseService {
             if (!callbackIdMap.contains(cb)) {
                 callbacks.register(cb)
             }
-            callbackIdMap[cb] = id
+            if (callbackIdMap.put(cb, id) != id) trafficSubscriptionVersion.incrementAndGet()
             data?.proxy?.looper?.onConsumersChanged()
         }
 

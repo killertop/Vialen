@@ -43,6 +43,7 @@ class TrafficLooper internal constructor(
     private val persistenceMutex = Mutex()
     private var selectedId = Long.MIN_VALUE // -1 is the bypass counter, never a selection sentinel.
     private val owners = linkedMapOf<String, Set<Long>>()
+    private val displayChanges = TrafficChanges()
     private val sampled = mutableMapOf<String, TrafficData>()
     private val statistics = DataStore.profileTrafficStatistics
 
@@ -71,7 +72,8 @@ class TrafficLooper internal constructor(
             }
             selectedId = proxy.config.mainEntId
             (installStats ?: proxy.box::setV2rayStats)(tagMap.keys.joinToString("\n"))
-            updater = TrafficUpdater(readStats ?: proxy.box::queryStats, tagMap.values.toList())
+            updater = TrafficUpdater(readStats ?: proxy.box::queryStats, tagMap.values.toList(),
+                queryBatch = if (readStats == null) proxy.box::queryStatsBatch else null)
             writer = scope.launch {
                 for (@Suppress("UNUSED_VARIABLE") ignored in writes) {
                     val ids = synchronized(lock) {
@@ -251,10 +253,11 @@ class TrafficLooper internal constructor(
                     }
                     if (foreground) displaySnapshot() else null
                 }
+                val changes = display?.let { displayChanges.next(it.second, data.binder.trafficSubscriptionVersion.get()) }
                 if (display != null) data.binder.broadcast { callback ->
                     if (data.binder.callbackIdMap[callback] == SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND) {
                         callback.cbSpeedUpdate(display.first)
-                        display.second.forEach { callback.cbTrafficUpdate(it) }
+                        changes.orEmpty().chunked(TrafficChanges.MAX_ROWS_PER_CALLBACK).forEach { callback.cbTrafficBatch(it) }
                     }
                 }
             }

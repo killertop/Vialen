@@ -54,6 +54,7 @@ class TrafficEfficiencyNativeTest {
             speeds.incrementAndGet()
         }
         override fun cbTrafficUpdate(stats:TrafficData?) { if(stats!=null) traffic[stats.id]=stats.copy() }
+        override fun cbTrafficBatch(stats: MutableList<TrafficData>) { stats.forEach { cbTrafficUpdate(it) } }
         override fun cbSelectorUpdate(id:Long)=Unit
     }
     private suspend fun awaitCondition(predicate:()->Boolean)=withTimeout(3000) {

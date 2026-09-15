@@ -354,6 +354,25 @@ class FormLifecycleNativeTest {
                     assertTrue("Expected node/connection UI state", matched)
                 }
                 awaitUi { it.findViewById<View>(R.id.remove)?.isShown == true && it.binding.fab.isShown }
+                scenario.onActivity { activity ->
+                    val page = activity.supportFragmentManager.findFragmentById(R.id.fragment_holder)
+                        as io.nekohasekai.sagernet.ui.ConfigurationFragment
+                    val group = page.getCurrentGroupFragment()!!
+                    val holder = group.configurationListView.findViewHolderForAdapterPosition(0)
+                        as io.nekohasekai.sagernet.ui.ConfigurationFragment.GroupFragment.ConfigurationHolder
+                    val sentinel = "content must not rebind on traffic"
+                    holder.profileName.text = sentinel
+                    kotlinx.coroutines.runBlocking {
+                        group.adapter!!.onTrafficUpdated(listOf(io.nekohasekai.sagernet.aidl.TrafficData(id, 4096, 8192)))
+                    }
+                    assertEquals(sentinel, holder.profileName.text.toString())
+                    assertTrue(holder.profileStatus.text.isNotEmpty())
+                    kotlinx.coroutines.runBlocking {
+                        group.adapter!!.onTrafficUpdated(listOf(io.nekohasekai.sagernet.aidl.TrafficData(id, 0, 0)))
+                    }
+                    assertEquals(sentinel, holder.profileName.text.toString())
+                    assertEquals("", holder.profileStatus.text.toString())
+                }
                 scenario.onActivity { it.findViewById<View>(R.id.remove).performClick() }
                 awaitUi { it.findViewById<View>(R.id.empty_state)?.isShown == true && !it.binding.fab.isShown }
                 // The row is still persisted while Undo is offered, but must not be connectable.

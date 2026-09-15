@@ -21,6 +21,8 @@ object ProfileManager {
 
     interface Listener {
         suspend fun onAdd(profile: ProxyEntity)
+        suspend fun onAdded(profiles: List<ProxyEntity>) { profiles.forEach { onAdd(it) } }
+        suspend fun onTrafficUpdated(rows: List<TrafficData>) { rows.forEach { onUpdated(it) } }
         suspend fun onUpdated(data: TrafficData)
         suspend fun onUpdated(profile: ProxyEntity, noTraffic: Boolean)
         suspend fun onRemoved(groupId: Long, profileId: Long)
@@ -121,10 +123,8 @@ object ProfileManager {
                 }
             }
         }
-        for (profile in profiles) {
-            selectFirstIfNeeded(groupId)
-            iterator { onAdd(profile) }
-        }
+        selectFirstIfNeeded(groupId)
+        iterator { onAdded(profiles) }
         return profiles
     }
 
@@ -245,6 +245,14 @@ object ProfileManager {
 
     suspend fun postUpdate(profile: ProxyEntity, noTraffic: Boolean = false) {
         iterator { onUpdated(profile, noTraffic) }
+    }
+
+    suspend fun postTrafficUpdates(rows: List<TrafficData>) {
+        iterator {
+            try { onTrafficUpdated(rows) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { Logs.w(error) }
+        }
     }
 
     suspend fun postUpdate(data: TrafficData) {

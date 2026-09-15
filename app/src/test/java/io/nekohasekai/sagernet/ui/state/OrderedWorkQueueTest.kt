@@ -50,4 +50,39 @@ class OrderedWorkQueueTest {
         assertThrows(IllegalStateException::class.java) { queue.submit { error("must not run") } }
     }
 
+
+    @Test fun thousandReplaceableReadsCoalesceWithoutLosingWrites() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val entered = CompletableDeferred<Unit>(); val release = CompletableDeferred<Unit>()
+        val done = CompletableDeferred<Unit>(); val writes = mutableListOf<Int>()
+        var reads = 0; var applied = -1
+        val queue = OrderedWorkQueue(scope) { done.completeExceptionally(it) }
+        try {
+            queue.submit { entered.complete(Unit); release.await() }
+            entered.await()
+            repeat(1000) { n -> queue.submitLatest("group") { reads++; applied = n } }
+            repeat(10) { n -> queue.submit { writes.add(n) } }
+            queue.submit { done.complete(Unit) }
+            release.complete(Unit); withTimeout(5000) { done.await() }
+            assertEquals(1, reads); assertEquals(999, applied)
+            assertEquals((0..9).toList(), writes)
+        } finally { scope.cancel() }
+    }
+
+    @Test fun cancelledViewReadDoesNotCancelCommittedUserWorkOrOtherGroupRead() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val entered = CompletableDeferred<Unit>(); val release = CompletableDeferred<Unit>()
+        val done = CompletableDeferred<Unit>(); val events = mutableListOf<String>()
+        val queue = OrderedWorkQueue(scope) { done.completeExceptionally(it) }
+        try {
+            queue.submit { entered.complete(Unit); release.await() }; entered.await()
+            queue.submitLatest("old view") { error("disposed view must not query") }
+            queue.submit { events.add("delete") }
+            queue.submitLatest("other group") { events.add("read") }
+            queue.cancelLatest("old view")
+            queue.submit { done.complete(Unit) }; release.complete(Unit)
+            withTimeout(5000) { done.await() }
+            assertEquals(listOf("delete", "read"), events)
+        } finally { scope.cancel() }
+    }
 }

@@ -8,4 +8,5 @@ oneway interface ISagerNetServiceCallback {
   void cbSpeedUpdate(in SpeedDisplayData stats);
   void cbTrafficUpdate(in TrafficData stats);
   void cbSelectorUpdate(long id);
+  void cbTrafficBatch(in List<TrafficData> stats);
 }

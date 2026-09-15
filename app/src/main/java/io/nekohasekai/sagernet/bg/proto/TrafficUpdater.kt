@@ -6,6 +6,7 @@ class TrafficUpdater(
     private val queryStats: (String, String) -> Long,
     val items: List<TrafficLooperData>,
     private val clock: () -> Long = SystemClock::elapsedRealtime,
+    private val queryBatch: ((String) -> ByteArray)? = null,
 ) {
     class TrafficLooperData(
         var tag: String,
@@ -34,11 +35,20 @@ class TrafficUpdater(
     fun updateAll() {
         val now = clock()
         samples.clear()
+        val tags = items.filterNot { it.ignore }.map { it.tag }.distinct()
+        val batch = queryBatch?.let { query ->
+            if (tags.isEmpty()) emptyMap() else {
+                val bytes = query(tags.joinToString("\n"))
+                require(bytes.size == tags.size * 16) { "Invalid traffic snapshot size" }
+                val buffer = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                tags.associateWith { buffer.long to buffer.long }
+            }
+        }
         items.forEach { item ->
             if (item.ignore) return@forEach
             val sample = samples.getOrPut(item.tag) {
-                val tx = queryStats(item.tag, "uplink")
-                val rx = queryStats(item.tag, "downlink")
+                val tx = batch?.getValue(item.tag)?.first ?: queryStats(item.tag, "uplink")
+                val rx = batch?.getValue(item.tag)?.second ?: queryStats(item.tag, "downlink")
                 val elapsed = now - item.lastUpdate
                 // Still drain bytes when selection/stop occurs in the same millisecond.
                 Sample(tx, rx, if (elapsed > 0) tx * 1000 / elapsed else 0,

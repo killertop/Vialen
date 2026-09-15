@@ -386,10 +386,12 @@ class MainActivity : ThemedActivity(),
         binding.stats.updateSpeed(stats.txRateProxy, stats.rxRateProxy)
     }
 
+    override fun cbTrafficBatch(data: List<TrafficData>) {
+        lifecycleScope.launch { ProfileManager.postTrafficUpdates(data) }
+    }
+
     override fun cbTrafficUpdate(data: TrafficData) {
-        runOnDefaultDispatcher {
-            ProfileManager.postUpdate(data)
-        }
+        cbTrafficBatch(listOf(data))
     }
 
     override fun cbSelectorUpdate(id: Long) {

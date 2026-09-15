@@ -42,6 +42,7 @@ class SagerConnection(
 
         fun cbSpeedUpdate(stats: SpeedDisplayData) {}
         fun cbTrafficUpdate(data: TrafficData) {}
+        fun cbTrafficBatch(data: List<TrafficData>) { data.forEach(::cbTrafficUpdate) }
         fun cbSelectorUpdate(id: Long) {}
 
         fun stateChanged(state: BaseService.State, profileName: String?, msg: String?)
@@ -81,6 +82,14 @@ class SagerConnection(
             val callback = callback ?: return
             runOnMainDispatcher {
                 callback.cbTrafficUpdate(stats)
+            }
+        }
+
+        override fun cbTrafficBatch(stats: MutableList<TrafficData>) {
+            val target = callback ?: return
+            val snapshot = stats.map { it.copy() }
+            runOnMainDispatcher {
+                if (callback === target) target.cbTrafficBatch(snapshot)
             }
         }
 
