@@ -496,4 +496,167 @@ class TrafficEfficiencyLifecycleTest {
         assertEquals(9L, database.proxyDao().getById(30)!!.rx)
     }
 
+
+    @Test fun clearReleasesStatisticsLockDuringDatabaseWorkAndCountsNewBytesOnce() = runBlocking {
+        val loop = start(selector = true)
+        val dao = database.proxyDao()
+        val entered = CountDownLatch(1); val release = CountDownLatch(1)
+        val threads = java.util.concurrent.Executors.newSingleThreadExecutor()
+        val guarded = object : ProxyEntity.Dao by dao {
+            override fun clearTraffic(ids: List<Long>) {
+                assertNotEquals(android.os.Looper.getMainLooper(), android.os.Looper.myLooper())
+                entered.countDown(); check(release.await(5, TimeUnit.SECONDS))
+                dao.clearTraffic(ids)
+            }
+        }
+        every { SagerDatabase.proxyDao } returns guarded
+        add(TAG_PROXY, 7, 11)
+        val clearing = async(Dispatchers.IO) { loop.clearTraffic(0) }
+        try {
+            assertTrue(entered.await(5, TimeUnit.SECONDS))
+            // A selection callback must finish while the DB is deliberately blocked.
+            add(TAG_PROXY, 3, 5)
+            threads.submit { loop.selectMain(2) }.get(2, TimeUnit.SECONDS)
+            add(TAG_PROXY, 13, 17)
+        } finally { release.countDown(); threads.shutdownNow() }
+        assertTrue(clearing.await())
+        stop()
+        assertEquals(3L, dao.getById(1)!!.tx); assertEquals(5L, dao.getById(1)!!.rx)
+        assertEquals(13L, dao.getById(2)!!.tx); assertEquals(17L, dao.getById(2)!!.rx)
+    }
+
+    @Test fun binderClearFailureIsFalseAndLeavesPendingBytesForFinalFlush() = runBlocking {
+        // Host JVM cannot initialize the Android Go logger; keep the real DB exception.
+        mockkObject(Logs)
+        every { Logs.w(any<String>(), any<Throwable>()) } just Runs
+        start(selector = true)
+        val actualBinder = BaseService.Binder(data)
+        val sql = database.openHelper.writableDatabase
+        sql.execSQL("CREATE TRIGGER reject_clear BEFORE UPDATE OF tx ON proxy_entities WHEN NEW.tx = 0 BEGIN SELECT RAISE(ABORT, 'fixture'); END")
+        add(TAG_PROXY, 7, 11)
+        try {
+            assertFalse(withContext(Dispatchers.IO) { actualBinder.clearTraffic(0) })
+            assertEquals(10L, database.proxyDao().getById(1)!!.tx)
+            sql.execSQL("DROP TRIGGER reject_clear")
+            stop()
+            assertEquals(17L, database.proxyDao().getById(1)!!.tx)
+            assertEquals(111L, database.proxyDao().getById(1)!!.rx)
+        } finally { actualBinder.close() }
+    }
+
+    @Test fun stopWaitsForAcceptedResetAndOldInstanceCannotClearReplacement() = runBlocking {
+        val loop = start(selector = true)
+        val dao = database.proxyDao()
+        val entered = CountDownLatch(1); val release = CountDownLatch(1)
+        every { SagerDatabase.proxyDao } returns object : ProxyEntity.Dao by dao {
+            override fun clearTraffic(ids: List<Long>) {
+                entered.countDown(); check(release.await(5, TimeUnit.SECONDS)); dao.clearTraffic(ids)
+            }
+        }
+        add(TAG_PROXY, 7, 11)
+        val clearing = async(Dispatchers.IO) { loop.clearTraffic(0) }
+        assertTrue(entered.await(5, TimeUnit.SECONDS))
+        add(TAG_PROXY, 3, 5)
+        val stopping = async(Dispatchers.IO) { loop.stop() }
+        release.countDown()
+        withTimeout(5000) { assertTrue(clearing.await()); stopping.await() }
+        looper = null
+        assertEquals(3L, dao.getById(1)!!.tx); assertEquals(5L, dao.getById(1)!!.rx)
+        every { data.proxy } returns mockk(relaxed = true)
+        assertFalse(loop.clearTraffic(0))
+        assertEquals(3L, dao.getById(1)!!.tx)
+    }
+
+    @Test fun repeatedBinderResetsAndStoppedResetReportActualCommit() = runBlocking {
+        start()
+        val actualBinder = BaseService.Binder(data)
+        val dao = database.proxyDao()
+        val calls = AtomicInteger()
+        every { SagerDatabase.proxyDao } returns object : ProxyEntity.Dao by dao {
+            override fun clearTraffic(ids: List<Long>) {
+                assertNotEquals(android.os.Looper.getMainLooper(), android.os.Looper.myLooper())
+                calls.incrementAndGet(); dao.clearTraffic(ids)
+            }
+        }
+        try {
+            assertTrue(withContext(Dispatchers.IO) { actualBinder.clearTraffic(0) })
+            assertTrue(withContext(Dispatchers.IO) { actualBinder.clearTraffic(0) })
+            stop()
+            every { data.state } returns BaseService.State.Stopped
+            assertTrue(withContext(Dispatchers.IO) { actualBinder.clearTraffic(0) })
+            assertEquals(3, calls.get())
+            assertEquals(0L, dao.getById(1)!!.tx)
+            // A synchronous in-process main-thread misuse is rejected, not queued as success.
+            assertFalse(actualBinder.clearTraffic(0))
+            assertEquals(3, calls.get())
+        } finally { actualBinder.close() }
+    }
+
+    @Test fun cancellationAfterResetAcceptanceJoinsCommitAndDoesNotLoseNewTraffic() = runBlocking {
+        val loop = start(selector = true)
+        val dao = database.proxyDao()
+        val entered = CountDownLatch(1); val release = CountDownLatch(1)
+        every { SagerDatabase.proxyDao } returns object : ProxyEntity.Dao by dao {
+            override fun clearTraffic(ids: List<Long>) {
+                entered.countDown(); check(release.await(5, TimeUnit.SECONDS)); dao.clearTraffic(ids)
+            }
+        }
+        add(TAG_PROXY, 7, 11)
+        val clearing = async(Dispatchers.IO) { loop.clearTraffic(0) }
+        try {
+            assertTrue(entered.await(5, TimeUnit.SECONDS))
+            clearing.cancel()
+            add(TAG_PROXY, 3, 5)
+        } finally { release.countDown() }
+        clearing.join() // The accepted non-cancellable section has fully finished.
+        assertTrue(clearing.isCancelled)
+        assertEquals(0L, dao.getById(1)!!.tx)
+        stop()
+        assertEquals(3L, dao.getById(1)!!.tx); assertEquals(5L, dao.getById(1)!!.rx)
+    }
+
+    @Test fun queuedBinderRequestRejectsChangedLifecycleBeforeTouchingDatabase() = runBlocking {
+        start()
+        val actualBinder = BaseService.Binder(data)
+        val gate = BaseService.trafficOperations
+        val versionRead = CountDownLatch(1)
+        val reads = AtomicInteger()
+        every { data.stateVersion } answers { versionRead.countDown(); reads.get().toLong() }
+        gate.lock()
+        val clearing = async(Dispatchers.IO) { actualBinder.clearTraffic(0) }
+        try {
+            assertTrue(versionRead.await(5, TimeUnit.SECONDS))
+            reads.incrementAndGet()
+        } finally { gate.unlock() }
+        try {
+            assertFalse(clearing.await())
+            assertEquals(10L, database.proxyDao().getById(1)!!.tx)
+        } finally { actualBinder.close() }
+    }
+
+    @Test fun concurrentBinderResetsAreSerializedAndNewBytesAreAddedOnce() = runBlocking {
+        start(selector = true)
+        val actualBinder = BaseService.Binder(data)
+        val dao = database.proxyDao()
+        val firstEntered = CountDownLatch(1); val release = CountDownLatch(1)
+        val calls = AtomicInteger()
+        every { SagerDatabase.proxyDao } returns object : ProxyEntity.Dao by dao {
+            override fun clearTraffic(ids: List<Long>) {
+                if (calls.incrementAndGet() == 1) {
+                    firstEntered.countDown(); check(release.await(5, TimeUnit.SECONDS))
+                }
+                dao.clearTraffic(ids)
+            }
+        }
+        val first = async(Dispatchers.IO) { actualBinder.clearTraffic(0) }
+        assertTrue(firstEntered.await(5, TimeUnit.SECONDS))
+        val second = async(Dispatchers.IO) { actualBinder.clearTraffic(0) }
+        release.countDown()
+        try {
+            assertTrue(first.await()); assertTrue(second.await()); assertEquals(2, calls.get())
+            add(TAG_PROXY, 3, 5)
+            stop()
+            assertEquals(3L, dao.getById(1)!!.tx); assertEquals(5L, dao.getById(1)!!.rx)
+        } finally { actualBinder.close() }
+    }
 }

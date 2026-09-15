@@ -22,7 +22,7 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
     var displayProfileName = ServiceNotification.genTitle(profile)
 
     // for TrafficLooper
-    var looper: TrafficLooper? = null
+    @Volatile var looper: TrafficLooper? = null
 
     override fun buildConfig() {
         super.buildConfig()

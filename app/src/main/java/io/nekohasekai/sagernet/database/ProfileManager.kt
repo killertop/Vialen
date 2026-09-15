@@ -155,15 +155,20 @@ object ProfileManager {
         return total
     }
 
-    suspend fun clearTraffic(groupId: Long): List<Long> {
-        val ids = SagerDatabase.instance.runInTransaction<List<Long>> {
-            val ids = SagerDatabase.proxyDao.getIdsByGroup(groupId)
-            if (ids.isNotEmpty()) SagerDatabase.proxyDao.clearTraffic(ids)
-            ids
+    suspend fun clearTraffic(groupId: Long): List<Long> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            currentCoroutineContext().ensureActive()
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                val ids = SagerDatabase.instance.runInTransaction<List<Long>> {
+                    val ids = SagerDatabase.proxyDao.getIdsByGroup(groupId)
+                    if (ids.isNotEmpty()) SagerDatabase.proxyDao.clearTraffic(ids)
+                    ids
+                }
+                try { ids.forEach { postUpdate(TrafficData(id = it)) } }
+                catch (error: Exception) { Logs.w("Traffic reset notification failed", error) }
+                ids
+            }
         }
-        ids.forEach { postUpdate(TrafficData(id = it)) }
-        return ids
-    }
 
     suspend fun updateProfile(profile: ProxyEntity) {
         if (profile.type != ProxyEntity.TYPE_CHAIN && profile.type != ProxyEntity.TYPE_CONFIG) CoreClient.validate(profile.requireProfile())

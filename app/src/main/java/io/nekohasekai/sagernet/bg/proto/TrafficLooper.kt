@@ -163,32 +163,51 @@ class TrafficLooper internal constructor(
         saved
     }
 
-    /** Drain pre-reset native bytes and reset database/checkpoints together. Queued writes
-     * read fresh totals only after this transaction, so they cannot resurrect old bytes. */
-    suspend fun clearTraffic(groupId: Long): Boolean = persistenceMutex.withLock {
-        val ids = synchronized(lock) {
-            if (stopped || data.proxy?.looper !== this || data.state != BaseService.State.Connected)
-                return@withLock false
-            sampleLocked()
-            val ids = SagerDatabase.instance.runInTransaction<List<Long>> {
-                val ids = SagerDatabase.proxyDao.getIdsByGroup(groupId)
-                if (ids.isNotEmpty()) SagerDatabase.proxyDao.clearTraffic(ids)
-                ids
+    /** Linearization boundary: drain counters and capture each owner's total, then commit
+     * the reset. Sampling/selection can continue during IO; subtract only the captured bytes.
+     * Lock order is persistenceMutex -> lock. Neither database IO nor notifications hold lock. */
+    suspend fun clearTraffic(groupId: Long): Boolean = withContext(Dispatchers.IO) {
+        persistenceMutex.withLock {
+            currentCoroutineContext().ensureActive()
+            val boundary = synchronized(lock) {
+                if (stopped || data.proxy?.looper !== this@TrafficLooper || data.state != BaseService.State.Connected)
+                    return@withLock false
+                sampleLocked()
+                idMap.mapValues { (id, row) -> TrafficData(id, row.tx, row.rx) }
             }
-            ids.forEach { id ->
-                idMap[id]?.let { row ->
-                    row.tx = 0; row.rx = 0; row.txBase = 0; row.rxBase = 0
-                    row.txRate = 0; row.rxRate = 0
+            // Once accepted, DB commit and checkpoint adjustment must finish together, even
+            // if the caller exits. On DB failure no checkpoints are changed and bytes remain.
+            withContext(NonCancellable) {
+                val ids = SagerDatabase.instance.runInTransaction<List<Long>> {
+                    val ids = SagerDatabase.proxyDao.getIdsByGroup(groupId)
+                    if (ids.isNotEmpty()) SagerDatabase.proxyDao.clearTraffic(ids)
+                    ids
                 }
-                if (id in persisted) persisted[id] = TrafficData(id)
+                synchronized(lock) {
+                    ids.forEach { id ->
+                        val before = boundary[id]
+                        if (before != null) idMap[id]?.let { row ->
+                            row.tx -= before.tx; row.rx -= before.rx
+                            row.txBase = 0; row.rxBase = 0
+                            row.txRate = 0; row.rxRate = 0
+                        }
+                        if (id in persisted) persisted[id] = TrafficData(id)
+                    }
+                    // Queued writers may already have taken IDs. They read fresh totals only
+                    // after this mutex is released, so post-boundary bytes are saved once.
+                    pendingWrites.removeAll(ids.toSet())
+                }
+                try {
+                    ids.forEach { ProfileManager.postUpdate(TrafficData(it)) }
+                    data.binder.broadcast { callback -> ids.forEach { callback.cbTrafficUpdate(TrafficData(it)) } }
+                } catch (error: Exception) {
+                    // Notification failure cannot turn an already committed reset into failure.
+                    Logs.w("Traffic reset notification failed", error)
+                }
+                wake.trySend(Unit)
+                true
             }
-            pendingWrites.removeAll(ids.toSet())
-            ids
         }
-        ids.forEach { ProfileManager.postUpdate(TrafficData(it)) }
-        data.binder.broadcast { callback -> ids.forEach { callback.cbTrafficUpdate(TrafficData(it)) } }
-        wake.trySend(Unit)
-        true
     }
 
     /** Core counters remain readable after close and include final socket bytes. */

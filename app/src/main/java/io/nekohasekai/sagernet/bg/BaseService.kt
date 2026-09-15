@@ -34,6 +34,8 @@ class BaseService {
         // A new Service object cannot prove that a failed native close completed.
         // Keep this gate for the background process lifetime, as with the VPN stop gate.
         @Volatile internal var cleanupFailure: String? = null
+        // A stopped Binder and a replacement Service may be different Data objects.
+        internal val trafficOperations = Mutex()
     }
 
     enum class State(
@@ -50,6 +52,7 @@ class BaseService {
     interface ExpectedException
 
     class Data internal constructor(private val service: Interface) {
+        @Volatile internal var stateVersion = 0L
         @Volatile var state = State.Stopped
         @Volatile var proxy: ProxyInstance? = null
         var notification: ServiceNotification? = null
@@ -94,6 +97,7 @@ class BaseService {
 
         fun changeState(s: State, msg: String? = null) {
             if (state == s && msg == null) return
+            stateVersion++
             state = s
             DataStore.serviceState = s
             proxy?.looper?.onConsumersChanged()
@@ -101,7 +105,7 @@ class BaseService {
         }
     }
 
-    class Binder(private var data: Data? = null) : ISagerNetService.Stub(), CoroutineScope,
+    class Binder(@Volatile private var data: Data? = null) : ISagerNetService.Stub(), CoroutineScope,
         AutoCloseable {
         private val callbacks = object : RemoteCallbackList<ISagerNetServiceCallback>() {
             override fun onCallbackDied(callback: ISagerNetServiceCallback?, cookie: Any?) {
@@ -121,19 +125,35 @@ class BaseService {
         override fun setDiagnosticMode(enabled: Boolean) = Libcore.setDiagnosticMode(enabled)
         override fun getDiagnosticRemainingMillis(): Long = Libcore.diagnosticRemainingMillis()
 
-        override fun clearTraffic(groupId: Long): Boolean = runBlocking {
-            withContext(Dispatchers.Main.immediate) {
-                val current = data ?: return@withContext false
-                when (current.state) {
-                    State.Stopped, State.Idle -> {
-                        val ids = ProfileManager.clearTraffic(groupId)
-                        current.binder.broadcast { callback ->
-                            ids.forEach { callback.cbTrafficUpdate(io.nekohasekai.sagernet.aidl.TrafficData(it)) }
+        override fun clearTraffic(groupId: Long): Boolean {
+            // A local synchronous call on Main cannot wait for IO without blocking Main.
+            // The actual UI caller and remote Binder calls use worker threads.
+            if (Looper.myLooper() == Looper.getMainLooper()) return false
+            val current = data ?: return false
+            val version = current.stateVersion
+            val expectedProxy = current.proxy
+            return runBlocking(Dispatchers.IO) {
+                BaseService.trafficOperations.withLock {
+                    if (data !== current || current.stateVersion != version || current.proxy !== expectedProxy)
+                        return@withLock false
+                    try {
+                        when (current.state) {
+                            State.Stopped, State.Idle -> {
+                                val ids = ProfileManager.clearTraffic(groupId)
+                                try {
+                                    current.binder.broadcast { callback ->
+                                        ids.forEach { callback.cbTrafficUpdate(io.nekohasekai.sagernet.aidl.TrafficData(it)) }
+                                    }
+                                } catch (error: Exception) { Logs.w("Traffic reset notification failed", error) }
+                                true
+                            }
+                            State.Connected -> expectedProxy?.looper?.clearTraffic(groupId) ?: false
+                            else -> false
                         }
-                        true
+                    } catch (error: Exception) {
+                        Logs.w("Traffic reset failed", error)
+                        false
                     }
-                    State.Connected -> current.proxy?.looper?.clearTraffic(groupId) ?: false
-                    else -> false // Do not race a launch or final accounting flush.
                 }
             }
         }
@@ -316,7 +336,7 @@ class BaseService {
                 val proxy = data.proxy
                 val closeFailure = withContext(Dispatchers.IO) {
                     try {
-                        proxy?.closeAndAwait()
+                        BaseService.trafficOperations.withLock { proxy?.closeAndAwait() }
                         null
                     } catch (error: Throwable) {
                         error
@@ -565,10 +585,18 @@ class BaseService {
                     data.notification!!.start()
 
                     preInit()
-                    withContext(Dispatchers.IO) { proxy.init() }
-                    DataStore.currentProfile = profile.id
-
-                    startProcesses()
+                    BaseService.trafficOperations.withLock {
+                        withContext(Dispatchers.IO) {
+                            // onStartCommand may have captured the selected row before an idle
+                            // reset committed. Seed the new runtime from committed traffic.
+                            SagerDatabase.proxyDao.getTraffic(profile.id)?.let {
+                                profile.tx = it.tx; profile.rx = it.rx
+                            }
+                            proxy.init()
+                        }
+                        DataStore.currentProfile = profile.id
+                        startProcesses()
+                    }
                     currentCoroutineContext().ensureActive()
                     data.changeState(State.Connected)
                     data.recovery?.connected()
