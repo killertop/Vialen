@@ -186,3 +186,85 @@ git diff --check
 - 最终 JUnit XML 汇总 318 tests / 0 failures / 0 errors / 0 skipped；Lint 0 errors / 0 warnings / 11 hints；两个 Debug APK 编译成功。
 - 连接真机上的 5 项 instrumentation 专项通过，使用隔离测试包、内存数据库和合成回环监听，不是对正式安装包全部界面的验收。没有关闭 Wi-Fi、变更显示参数、创建模拟器或操作个人节点删除。原始测试输出保留在仓库外。
 - 版本递增至 2.1.2 / VERSION_CODE=100。本轮未推送、未发布 APK，也未替换手机上的正式包。旧 Android、长期网络切换与全部页面交互不因这些测试转为通过。
+
+## 第一批：数据一致性与线程安全
+
+### 范围和基线
+
+- 起点：main，`b85c21762f14ca7915bb85064be855ac84f9290c`，Vialen 2.1.2 / VERSION_CODE=100。开始时没有已有修改，只有 main 和单一工作树。
+- 本批只修改删除/排序、进程内包缓存，以及清流量调用链。不升级版本、工具链、依赖或数据库 schema，不修改签名和生产配置，不推送、打标签或发布。
+- 本文件只记录合成夹具和脱敏结果；原始构建输出、测试 XML 和设备输出不纳入 Git。
+
+### A：删除与排序（确认并修复）
+
+根因：GroupManager.rearrange 读取旧整行后通过列表 UPDATE 回写；撤销栏提交逐节点删除，每项重新排序。删除不可用节点还有独立的逐项删除入口。拖拽已经字段级写入，但整批排序没有事务保护。
+
+- ProxyEntity.Dao.rearrange 只读取有序 ID，并仅更新 userOrder。普通删除与不可用节点删除统一通过 deleteProfiles；同一 Room 事务内重新读取当前记录、核对组归属和适用的文档/不可用状态，删除后每组重排一次。手动去重的独立复核入口保持不变。
+- 拖拽保留原 order 值，使用 updateOrders 的同库事务；当前已移动到其他组的记录不受旧拖拽影响。任一删除/排序 SQL 失败会回滚本批。
+- 撤销栏仍按原来的操作代次确定一个批次；撤销不会调用数据库删除，已退役的 Snackbar 回调不会提交后续操作。
+- 只有数据库提交后才调用选择条件更新与 onRemoved。保留现有各消费者的逐节点事件，不在本批引入新的列表事件协议。
+- **跨库边界**：节点库和 PublicDatabase 是两个数据库。节点提交后调用既有 clearDeletedSelection；它不会清除用户刚切换的新选择。进程在两库之间退出的恢复仍依靠既有 selectFirstIfNeeded，不能宣称跨库原子提交。
+- 取消边界：进入事务前响应取消；已接受的操作完成删除、选择与通知后退出，不因页面离开产生半批写入。
+
+修复前动态证据：OrderConsistencyTest 在真实 Room/SQLite 的 BEFORE UPDATE 触发器中安排配置、增量/清零流量和测速更新；旧实现实际失败，配置 expected=new、actual=old。触发器是确定性同库交错，并非声称复现了两条真实订阅/统计进程。
+
+修复后：上述字段全部保留；删除、重排与拖拽故障触发器验证整批回滚；跨组、错误组归属、不可用节点结果/文档变化、撤销与迟到回调、删除当前选择/无关组/切换新选择、接受后取消均有回归。宿主真实 SQLite 计数夹具：8 行跨两组，删除 3 行，剩余 5 行各发生一次排序更新（总数=5，distinct ID=5）。真机合成夹具删除两行后，剩余两行各更新一次。这些是夹具中的 SQL 行更新计数，不是 fsync、耗电或大数据性能结论。
+
+### B：PackageCache（确认并修复）
+
+根因：多个映射分别赋值，UID 的 HashMap/HashSet 原地清空并填充，读者可能观察中间状态。旧失败处理还会清空可用缓存。
+
+- PackageSnapshot 在局部完成全部索引；SnapshotLoader 通过 volatile 引用一次发布。外层映射和 UID 的内部集合不可修改；Android PackageInfo/ApplicationInfo 使用 Parcel 深拷贝保护，消费者取得的可变元数据也是独立副本。
+- 完整扫描串行执行；事件通过单一、有界合并信号交给 IO worker，不增加轮询。较早扫描无法在较新扫描之后完成发布。
+- 注册监听发生在初始扫描前；安装/卸载（含替换的移除/新增事件）继续触发刷新。初始失败总会释放等待信号并给出明确异常；刷新失败保留旧快照及失败信息，不发布空映射。
+- 配置构建、规则校验和原生包/UID 查询各自固定一份快照。未知包不再默认为 UID 0。应用列表首次失败显示中文提示；仅名称显示允许回退包名，这不参与路由 UID 决策。
+- 这是**进程内**一致性，两个进程各自维护缓存；不是跨进程共享内存，也不宣称两次 Android PackageManager 调用构成系统级事务。
+
+修复前证据为源码调用链，未补写修复前动态复现。回归覆盖：并发刷新/查询不混合映射版本、第二次扫描不能越过被 barrier 阻塞的第一次扫描、失败保留旧快照、初次失败等待者终止、共享 UID、安装/卸载/替换的合成版本变化、源集合及消费者修改不污染已发布结果。因选择串行方案，逆序完成被禁止，而非放任逆序后才覆盖检查。
+
+### C：清流量（确认并修复）
+
+根因：Binder.clearTraffic 切到 Main 后执行同步 DAO；连接态还持有统计 monitor 写数据库，主线程选择回调可能等待该 monitor。
+
+- 同步 Binder 返回值保持不变，工作在 IO 调度器完成；本地 Main 线程错误调用直接返回 false，不排队伪报成功。实际界面调用原本就在工作线程。
+- 锁顺序：进程级 trafficOperations → looper persistenceMutex → 短暂统计 monitor。初始化、关闭与 Binder 清零共享前者；清零不在统计 monitor 内等待数据库或通知，也不反向同步等待 Main。
+- 清零边界：持统计锁采样并捕获各归属累计值，随后释放统计锁进行 SQL 清零。提交成功后扣除捕获值，保留期间新采样字节；持久化基线改为零。已取出的旧队列任务只会在 persistenceMutex 释放后读取新累计值，不会恢复历史字节。所有出站、链路归属和最终刷新路径保留。
+- SQL 失败不改变持久化基线，已采样字节留待后续 checkpoint/最终刷新；已接受操作在取消后仍完成提交与基线调整并可 join。通知失败不把成功提交误报为数据库失败。
+- 请求排队前后核对 Binder 所属 Data、状态代次及代理实例。停止后旧 looper 拒绝清零。初始化在同一门控内重读主节点已提交流量，避免沿用停止态清零前的计数。
+- 不移除 allowMainThreadQueries、不切换日志模式。其他入口的同步数据库查询仍是后续范围，不宣称本批完成全项目主线程数据库迁移。
+
+修复前证据为源码调用链。回归覆盖 DAO 非 Main、数据库被 latch 阻塞时选择仍能完成、排队 checkpoint/清零/新增流量/最终刷新、停止与清零交错、实例失效、状态代次变化、SQL 失败返回 false、重复及并发清零、调用方取消后已接受事务完成。历史流量归属和停止失败传播测试一并执行。
+
+### 执行与结果
+
+沿用锁定 Java 25.0.2，SDK 37.0 和现有构建流程；没有修改原生接口声明或 Go 核心，本批不重建原生 AAR、不重复运行 Go/race。
+
+```sh
+# 修复前：实际失败一次，随后相同断言保留。
+./gradlew :app:testDebugUnitTest --tests '*OrderConsistencyTest'
+# 最终完整验证。
+./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+# 隔离真机专项。
+adb shell am instrument -w -r -e class io.nekohasekai.sagernet.BatchConsistencyNativeTest,io.nekohasekai.sagernet.ConnectionTestPersistenceNativeTest com.vialen.app.debug.test/androidx.test.runner.AndroidJUnitRunner
+python3 scripts/check-public-content.py
+git diff --check
+```
+
+- JVM/Room：337 tests / 0 failures / 0 errors / 0 skipped，包含本批新增 19 项；测试使用真实 Room/SQLite，服务/原生计数等外部边界按各测试说明控制。
+- Lint：0 errors、0 warnings、11 hints。Debug 与 instrumentation APK 构建通过；仅安装 com.vialen.app.debug 和对应测试 APK。
+- 真机：BatchConsistencyNativeTest 的排序字段隔离/回滚、快照发布/失败、清零与主线程选择/最终刷新，以及既有 ConnectionTestPersistenceNativeTest 两项，共 5 项通过；最终代码构建的隔离 APK 重新安装后再跑同组 5 项，仍全部通过。清流量使用真实 Binder 实现的进程内同步入口、真实 Room 和 Android 主线程，计数器为合成可控输入，不启动 Android VPN 或转发核心。
+- 真机曾短暂断开，第一次安装命令失败；恢复连接后两次隔离 APK 安装成功，并执行上述专项。没有替换正式包、清正式数据、关闭 Wi-Fi 或改变显示参数。
+- 过程失败如实保留：最初新增选择测试漏导入 coEvery，编译失败后补齐导入；宿主故障注入触发 Android Go 日志初始化失败，仅 mock 日志边界，保留真实 SQL 故障断言；一次全量回归中两个既有关闭失败用例因 strict mock Data 上新增锁 getter 失败，生产锁改为真正进程级入口后原断言通过。没有删除用例、放宽业务断言或升级依赖。
+
+### 验收界限
+
+三项源码缺陷及本批可控并发回归可关闭。仍未覆盖：不同 Android/OEM 的真实安装、卸载、替换广播风暴；实际跨进程 Binder 调用方死亡；系统杀进程以及真实 Android VPN 服务启动/重启的故障注入。这些未验证项不能用宿主或进程内测试替代。
+
+具备进入第二批列表/统计优化的代码基础；第二批须保留本批与历史全部统计、取消、预检和最终刷新回归。不报告省电比例，也不使用旧报告的 94,950 或 4.96 倍作为本批实测收益。
+
+### 本地提交
+
+- `9ba9cdfd2e95a01192210b206e56038d18c243d4`：删除与排序同库事务、选择条件更新及撤销回归。
+- `716129163c9b4cf2fee2d42f19215b05d30f02a5`：不可变包快照、串行刷新和同版本消费者。
+- `e6a0371046babadeec1c61fb879f058e3e770ba6`：清流量 IO、统计边界及服务实例门控。
+- 代码收尾仍为 main、2.1.2 / VERSION_CODE=100，无 schema、原生核心、工具链、签名或发布配置变化。QA 记录单独提交；最终状态在任务回复中回读。
