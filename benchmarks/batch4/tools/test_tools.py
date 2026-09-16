@@ -4,7 +4,7 @@ from unittest.mock import patch,MagicMock
 from compare import estimate,get
 from analyze import percentile
 from build import REFS
-from collect import Device
+from collect import Device,workload_failures
 
 class AnalysisContracts(unittest.TestCase):
  def test_constant_pair_has_zero_difference_without_fake_zero_baseline_percentage(self):
@@ -44,6 +44,16 @@ class AnalysisContracts(unittest.TestCase):
    measured=[c for c in calls if c.kwargs.get('trace')]
    self.assertEqual(len(measured),40)
    self.assertTrue(all(c.args[1]=='list' for c in measured))
+ def test_import_requires_committed_selection_and_exact_notifications(self):
+  valid={'committed_rows':100,'selection_valid':True,'notification_batches':1,'notification_rows':100}
+  self.assertEqual(workload_failures('import',100,valid),[])
+  for key,value in [('committed_rows',99),('selection_valid',False),('notification_batches',0),('notification_rows',99)]:
+   with self.subTest(key=key):
+    bad=dict(valid);bad[key]=value
+    self.assertTrue(workload_failures('import',100,bad))
+  old=dict(valid,provenance={'source_sha':REFS['L0']},notification_batches=0)
+  self.assertEqual(workload_failures('import',100,old),[])
+  self.assertTrue(workload_failures('import',100,dict(old,notification_batches=1)))
  def test_invalid_seed_or_environment_stops_without_more_work(self):
   for stage in ['seed','workload']:
    with self.subTest(stage=stage),tempfile.TemporaryDirectory() as temp:

@@ -26,6 +26,7 @@ def main():
    r=subprocess.run(cmd,cwd=d,env=env,stdout=f,stderr=subprocess.STDOUT,timeout=timeout)
   if r.returncode: raise SystemExit('Build step failed; inspect private '+log)
  shutil.copy2(root/'benchmarks/batch4/overlay/benchmark_runtime.go',d/'libcore/benchmark_runtime.go')
+ shutil.copy2(root/'benchmarks/batch4/overlay'/('benchmark_gc_gate_b1.go' if a.label=='B1' else 'benchmark_gc_gate_legacy.go'),d/'libcore/benchmark_gc_gate.go')
  run(['bash','scripts/build-private-android.sh'],a.label+'-aar.log')
  # Restore only the known overlay inputs from the pinned source on reruns.
  for relative in ['buildSrc/src/main/kotlin/Helpers.kt','app/build.gradle.kts','app/src/main/java/io/nekohasekai/sagernet/database/SagerDatabase.kt']:
@@ -39,6 +40,17 @@ def main():
  env['VIALEN_BENCH_KEYSTORE']=str(key)
  target=d/'app/src/benchmark/java/io/nekohasekai/sagernet/benchmark';target.mkdir(parents=True,exist_ok=True)
  for f in (root/'benchmarks/batch4/overlay').glob('*.kt'): shutil.copy2(f,target/f.name)
+ if a.label=='L0':
+  activity=target/'BenchActivity.kt';s=activity.read_text()
+  bulk='''                                    override suspend fun onAdded(profiles:List<ProxyEntity>) {
+                                        batches++
+                                        profiles.forEach { onAdd(it) }
+                                    }
+'''
+  if s.count(bulk)!=1 or s.count('val expectedBatches=1 // BENCH_EXPECTED_BATCHES')!=1:
+   raise SystemExit('L0 observer overlay marker missing')
+  s=s.replace(bulk,'').replace('val expectedBatches=1 // BENCH_EXPECTED_BATCHES','val expectedBatches=0 // BENCH_EXPECTED_BATCHES')
+  activity.write_text(s)
  native=target/'BenchNative.kt';s=native.read_text()
  if a.label!='L0': s=s.replace('/* BATCH_QUERY */',', queryBatch={t-> calls++;val data=box.queryStatsBatch(t);bytes+=t.length+data.size;data}')
  native.write_text(s)

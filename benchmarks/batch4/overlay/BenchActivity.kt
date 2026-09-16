@@ -39,6 +39,8 @@ class BenchActivity : Activity(), Application.ActivityLifecycleCallbacks {
     private val framesThread = HandlerThread("B4Frames")
     private val frames = ArrayList<LongArray>()
     @Volatile private var recording = false
+    @Volatile private var mainResumed = false
+    @Volatile private var lostForeground = false
     private lateinit var output: File
     private val result = JSONObject()
     private val metrics = Window.OnFrameMetricsAvailableListener { _, m, dropped ->
@@ -102,12 +104,36 @@ class BenchActivity : Activity(), Application.ActivityLifecycleCallbacks {
                                 }
                             }
                             "import" -> window("import") {
-                                val imported=ProfileManager.createProfilesForImport(group.id,nodes(n))
-                                result.put("committed_rows",imported.size)
-                                check(SagerDatabase.proxyDao.getIdsByGroup(group.id).size==n)
-                                awaitCondition { fragment.adapter!!.itemCount==n }
-                                drawn(fragment.configurationListView)
-                                result.put("selection_valid",DataStore.selectedProxy in imported.map { it.id })
+                                var batches=0
+                                var notifiedRows=0
+                                val expectedBatches=1 // BENCH_EXPECTED_BATCHES
+                                val observer=object:ProfileManager.Listener {
+                                    override suspend fun onAdd(profile:ProxyEntity) { notifiedRows++ }
+                                    override suspend fun onAdded(profiles:List<ProxyEntity>) {
+                                        batches++
+                                        profiles.forEach { onAdd(it) }
+                                    }
+                                    override suspend fun onUpdated(data:io.nekohasekai.sagernet.aidl.TrafficData) {}
+                                    override suspend fun onUpdated(profile:ProxyEntity,noTraffic:Boolean) {}
+                                    override suspend fun onRemoved(groupId:Long,profileId:Long) {}
+                                }
+                                ProfileManager.addListener(observer)
+                                try {
+                                    val imported=ProfileManager.createProfilesForImport(group.id,nodes(n))
+                                    result.put("committed_rows",imported.size)
+                                    check(imported.size==n)
+                                    check(SagerDatabase.proxyDao.getIdsByGroup(group.id).size==n)
+                                    awaitCondition { fragment.adapter!!.itemCount==n }
+                                    drawn(fragment.configurationListView)
+                                    val selectionValid=DataStore.selectedProxy in imported.map { it.id }
+                                    result.put("selection_valid",selectionValid)
+                                    result.put("notification_batches",batches)
+                                    result.put("expected_notification_batches",expectedBatches)
+                                    result.put("notification_rows",notifiedRows)
+                                    check(selectionValid && batches==expectedBatches && notifiedRows==n)
+                                } finally {
+                                    ProfileManager.removeListener(observer)
+                                }
                             }
                             "jni" -> BenchNative.run(n,result)
                             "gc" -> BenchNative.gc(result)
@@ -133,12 +159,17 @@ class BenchActivity : Activity(), Application.ActivityLifecycleCallbacks {
         }
     }
     private suspend fun window(name:String, block:suspend ()->Unit) {
+        check(mainResumed) { "Measured activity is not foreground" }
+        lostForeground=false
         BenchCounters.reset();BenchCounters.enabled=true
         synchronized(frames){frames.clear()};recording=true
         val memBefore=memory()
         val start=SystemClock.elapsedRealtimeNanos();val cpu=Process.getElapsedCpuTime();val driver=Debug.threadCpuTimeNanos()
         android.os.Trace.beginAsyncSection("B4_$name",1)
-        try { block() } finally {
+        try {
+            block()
+            check(mainResumed && !lostForeground) { "Measured activity lost foreground" }
+        } finally {
             android.os.Trace.endAsyncSection("B4_$name",1)
             val elapsed=SystemClock.elapsedRealtimeNanos()-start
             val entry=JSONObject().put("elapsed_ms",elapsed/1e6).put("process_cpu_ms",Process.getElapsedCpuTime()-cpu)
@@ -199,8 +230,9 @@ class BenchActivity : Activity(), Application.ActivityLifecycleCallbacks {
         return java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString(""){"%02x".format(it)}
     }
     override fun onActivityCreated(a:Activity,b:Bundle?) { if(a is MainActivity){measured=a;recording=true;a.window.addOnFrameMetricsAvailableListener(metrics,Handler(framesThread.looper))} }
-    override fun onActivityResumed(a:Activity){if(a is MainActivity){measured=a;resumed.complete(a)}}
-    override fun onActivityStarted(a:Activity){};override fun onActivityPaused(a:Activity){}
+    override fun onActivityResumed(a:Activity){if(a is MainActivity){measured=a;mainResumed=true;resumed.complete(a)}}
+    override fun onActivityStarted(a:Activity){}
+    override fun onActivityPaused(a:Activity){if(a is MainActivity){mainResumed=false;lostForeground=true}}
     override fun onActivityStopped(a:Activity){};override fun onActivitySaveInstanceState(a:Activity,b:Bundle){}
     override fun onActivityDestroyed(a:Activity){}
 }

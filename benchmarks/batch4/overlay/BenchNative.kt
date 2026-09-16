@@ -25,12 +25,26 @@ object BenchNative {
     }
     fun gc(out:JSONObject) {
         val before=JSONObject(Libcore.benchmarkRuntimeSnapshot())
+        val gateBefore=JSONObject(Libcore.benchmarkGCGateSnapshot())
+        check(gateBefore.getBoolean("supported")) { "Legacy GC completion signal unavailable" }
+        check(!gateBefore.getBoolean("seen")) { "GC gate was already used in this process" }
         val cpu=Process.getElapsedCpuTime();val start=SystemClock.elapsedRealtimeNanos()
         repeat(100){Libcore.forceGc()}
-        // Window fixed on both versions. No second cleanup GC is requested.
-        Thread.sleep(2000)
+        val deadline=SystemClock.elapsedRealtime()+10_000
+        var gateAfter:JSONObject
+        do {
+            gateAfter=JSONObject(Libcore.benchmarkGCGateSnapshot())
+            if (gateAfter.getBoolean("seen") && !gateAfter.getBoolean("busy")) break
+            check(SystemClock.elapsedRealtime()<deadline) { "GC completion timed out" }
+            Thread.sleep(10)
+        } while (true)
+        val after=JSONObject(Libcore.benchmarkRuntimeSnapshot())
+        check(after.getLong("forced_gc_cycles")>before.getLong("forced_gc_cycles")) {
+            "GC gate completed without a forced GC cycle"
+        }
         out.put("gc",JSONObject().put("requests",100).put("elapsed_ms",(SystemClock.elapsedRealtimeNanos()-start)/1e6)
             .put("process_cpu_ms",Process.getElapsedCpuTime()-cpu).put("kind","injected ForceGc; not system pressure")
-            .put("runtime_before",before).put("runtime_after",JSONObject(Libcore.benchmarkRuntimeSnapshot())))
+            .put("runtime_before",before).put("runtime_after",after)
+            .put("gate_before",gateBefore).put("gate_after",gateAfter))
     }
 }

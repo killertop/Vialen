@@ -1,7 +1,17 @@
 #!/usr/bin/env python3
 """Only controls the dedicated benchmark package. Raw ADB output stays outside the repository."""
 import argparse,hashlib,json,pathlib,re,subprocess,time,shlex
+from build import REFS
 PACKAGE='com.vialen.app.benchmark'
+def workload_failures(mode,count,data):
+ if mode!='import':return []
+ failures=[]
+ if data.get('committed_rows')!=count:failures.append('import row count mismatch')
+ if data.get('selection_valid') is not True:failures.append('import selection invalid')
+ expected=0 if data.get('provenance',{}).get('source_sha')==REFS['L0'] else 1
+ if data.get('notification_batches')!=expected or data.get('notification_rows')!=count:
+  failures.append('import notification count mismatch')
+ return failures
 class Device:
  def __init__(self,target,root):
   self.root=pathlib.Path(root).resolve()
@@ -69,6 +79,7 @@ data_sources {{ config {{ name: "linux.process_stats" process_stats_config {{ sc
    if e['temperature_tenths_c'] is None: reasons.append('temperature missing')
    elif int(e['temperature_tenths_c'])>=400: reasons.append('battery temperature >=40C')
   if not data.get('ok'):reasons.append('workload failed')
+  reasons.extend(workload_failures(mode,count,data))
   if data.get('debuggable'):reasons.append('debuggable target')
   data['exclude_reasons']=sorted(set(reasons));data['raw_sha256']=hashlib.sha256(text.encode()).hexdigest()
   (self.root/(run+'.json')).write_text(json.dumps(data,indent=2));return data

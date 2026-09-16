@@ -1,4 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- The inert test APK is the explicit external app in isolated VPN allowlists. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <permission android:name="com.vialen.app.debug.test.READ_SYNTHETIC_DOCUMENT"
+        android:protectionLevel="signature" />
+    <application>
+        <provider android:name="io.nekohasekai.sagernet.RemoteDocumentFixtureProvider"
+            android:authorities="com.vialen.app.debug.test.remote-document"
+            android:exported="true"
+            android:process=":remote-document"
+            android:grantUriPermissions="true"
+            android:readPermission="com.vialen.app.debug.test.READ_SYNTHETIC_DOCUMENT" />
+    </application>
 </manifest>
