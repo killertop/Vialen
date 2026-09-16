@@ -21,7 +21,9 @@ internal object SubscriptionRefresh {
               OR OLD.ungrouped IS NOT NEW.ungrouped OR OLD.userOrder IS NOT NEW.userOrder OR OLD.`order` IS NOT NEW.`order`
               OR OLD.isSelector IS NOT NEW.isSelector OR OLD.frontProxy IS NOT NEW.frontProxy OR OLD.landingProxy IS NOT NEW.landingProxy
             BEGIN UPDATE subscription_refresh_state SET configVersion = configVersion + 1 WHERE groupId = NEW.id; END""")
-        val group = db.groupDao().getById(id)?.takeIf { it.type == GroupType.SUBSCRIPTION }
+        val group = db.groupDao().getById(id)?.takeIf {
+            it.type == GroupType.SUBSCRIPTION && it.subscription != null
+        }
             ?: throw Stale()
         if (requireAutoUpdate && group.subscription?.autoUpdate != true) throw Stale()
         // An obsolete queued worker must not advance the generation of a valid newer refresh.
@@ -44,6 +46,8 @@ internal object SubscriptionRefresh {
         ).use {
             if (!it.moveToFirst() || it.getLong(0) != ticket.configVersion || it.getLong(1) != ticket.generation) throw Stale()
         }
-        return db.groupDao().getById(ticket.group.id)?.takeIf { it.type == GroupType.SUBSCRIPTION } ?: throw Stale()
+        return db.groupDao().getById(ticket.group.id)?.takeIf {
+            it.type == GroupType.SUBSCRIPTION && it.subscription != null
+        } ?: throw Stale()
     }
 }

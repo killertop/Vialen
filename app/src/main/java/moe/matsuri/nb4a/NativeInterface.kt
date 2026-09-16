@@ -28,10 +28,8 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
     }
 
     override fun openTun(singTunOptionsJson: String, tunPlatformOptionsJson: String): Long {
-        if (DataStore.vpnService == null) {
-            throw Exception("no VpnService")
-        }
-        return DataStore.vpnService!!.startVpn(singTunOptionsJson, tunPlatformOptionsJson).toLong()
+        val service = DataStore.vpnService ?: throw Exception("no VpnService")
+        return service.startVpn(singTunOptionsJson, tunPlatformOptionsJson).toLong()
     }
 
     override fun useProcFS(): Boolean {

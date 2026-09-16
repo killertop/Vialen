@@ -225,6 +225,7 @@ class SagerNet : Application(),
         fun stopService() =
             application.sendBroadcast(Intent(Action.CLOSE).setPackage(application.packageName))
 
+        @Volatile
         var underlyingNetwork: Network? = null
 
         var appVersionNameForDisplay = {

@@ -38,6 +38,13 @@ class SubscriptionRefreshRaceTest {
         catch (_: SubscriptionRefresh.Stale) { }
     }
 
+    @Test fun malformedSubscriptionGroupIsRejectedBeforeRefreshWork() = runBlocking {
+        val malformed = ProxyGroup(name = "malformed", type = GroupType.SUBSCRIPTION)
+        malformed.id = db.groupDao().createGroup(malformed)
+        assertTrue(runCatching { SubscriptionRefresh.begin(db, malformed.id) }
+            .exceptionOrNull() is SubscriptionRefresh.Stale)
+    }
+
     @Test fun delayedDownloadCannotOverwriteLinkNameOrDisabledAutomation() = runBlocking {
         for (change in listOf<(ProxyGroup) -> Unit>(
             { it.subscription!!.link = "https://example.test/b" },

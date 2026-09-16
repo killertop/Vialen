@@ -66,7 +66,7 @@ public class HysteriaBean extends AbstractBean {
 
         if (authPayloadType == null) authPayloadType = TYPE_NONE;
         if (authPayload == null) authPayload = "";
-        protocol = PROTOCOL_UDP;
+        if (protocol == null) protocol = PROTOCOL_UDP;
         if (obfuscation == null) obfuscation = "";
         if (sni == null) sni = "";
         if (alpn == null) alpn = "";

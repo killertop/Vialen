@@ -580,7 +580,7 @@ class BaseService {
 
             data.changeState(State.Connecting)
             // Publish the job before its first instruction so stopRunner can always join startup.
-            val connectingJob = GlobalScope.launch(Dispatchers.Main.immediate, start = CoroutineStart.LAZY) {
+            val connectingJob = data.binder.launch(Dispatchers.Main.immediate, start = CoroutineStart.LAZY) {
                 try {
                     data.notification = createNotification(ServiceNotification.genTitle(profile))
                     data.notification!!.start()

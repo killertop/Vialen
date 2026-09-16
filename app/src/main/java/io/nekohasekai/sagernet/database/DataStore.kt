@@ -68,8 +68,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     var selectedGroup by configurationStore.long(Key.PROFILE_GROUP) { currentGroupId() } // "ungrouped" group id = 1
 
-    // only in bg process
-    var vpnService: VpnService? = null
+    // only in bg process; the native callback can arrive on a different thread.
+    @Volatile var vpnService: VpnService? = null
     @Volatile var baseService: BaseService.Interface? = null
 
     // main
@@ -112,8 +112,11 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     fun selectedGroupForImport(): Long {
         val current = currentGroup()
         if (current.type == GroupType.BASIC) return current.id
-        val groups = SagerDatabase.groupDao.allGroups()
-        return groups.find { it.type == GroupType.BASIC }!!.id
+        return SagerDatabase.instance.runInTransaction<Long> {
+            val groups = SagerDatabase.groupDao.allGroups()
+            groups.firstOrNull { it.type == GroupType.BASIC }?.id
+                ?: SagerDatabase.groupDao.createGroup(ProxyGroup(ungrouped = true))
+        }
     }
 
     // Legacy values deliberately retained for backup/audit, no longer runtime policy inputs.

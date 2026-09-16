@@ -36,6 +36,7 @@ object LocalResolverImpl : LocalDNSTransport {
     override fun exchange(ctx: ExchangeContext, message: ByteArray) {
         val signal = CancellationSignal()
         ctx.onCancel(signal::cancel)
+        val underlyingNetwork = SagerNet.underlyingNetwork
 
         val callback = object : DnsResolver.Callback<ByteArray> {
             override fun onAnswer(answer: ByteArray, rcode: Int) {
@@ -54,7 +55,7 @@ object LocalResolverImpl : LocalDNSTransport {
         }
 
         DnsResolver.getInstance().rawQuery(
-            SagerNet.underlyingNetwork,
+            underlyingNetwork,
             message,
             DnsResolver.FLAG_NO_RETRY,
             Dispatchers.IO.asExecutor(),
@@ -67,6 +68,7 @@ object LocalResolverImpl : LocalDNSTransport {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val signal = CancellationSignal()
             ctx.onCancel(signal::cancel)
+            val underlyingNetwork = SagerNet.underlyingNetwork
 
             val callback = object : DnsResolver.Callback<Collection<InetAddress>> {
                 override fun onAnswer(answer: Collection<InetAddress>, rcode: Int) {
@@ -105,7 +107,7 @@ object LocalResolverImpl : LocalDNSTransport {
             }
             if (type != null) {
                 DnsResolver.getInstance().query(
-                    SagerNet.underlyingNetwork,
+                    underlyingNetwork,
                     domain,
                     type,
                     DnsResolver.FLAG_NO_RETRY,
@@ -115,7 +117,7 @@ object LocalResolverImpl : LocalDNSTransport {
                 )
             } else {
                 DnsResolver.getInstance().query(
-                    SagerNet.underlyingNetwork,
+                    underlyingNetwork,
                     domain,
                     DnsResolver.FLAG_NO_RETRY,
                     Dispatchers.IO.asExecutor(),
@@ -128,16 +130,12 @@ object LocalResolverImpl : LocalDNSTransport {
                 // 老版本系统，继续用阻塞的 InetAddress
                 try {
                     val u = SagerNet.underlyingNetwork
-                    val answer = try {
-                        u?.getAllByName(domain)
-                    } catch (e: UnknownHostException) {
-                        null
-                    } ?: InetAddress.getAllByName(domain)
-                    if (answer != null) {
-                        ctx.success(answer.mapNotNull { it.hostAddress }.joinToString("\n"))
-                    } else {
-                        ctx.errnoCode(114514)
-                    }
+                    // Do not fall back to the default network after a selected
+                    // network lookup fails; that can leak a DNS query outside
+                    // the network chosen by the service.
+                    val answer = if (u != null) u.getAllByName(domain)
+                    else InetAddress.getAllByName(domain)
+                    ctx.success(answer.mapNotNull { it.hostAddress }.joinToString("\n"))
                 } catch (e: UnknownHostException) {
                     ctx.errorCode(RCODE_NXDOMAIN)
                 } catch (e: Exception) {

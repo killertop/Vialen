@@ -345,10 +345,9 @@ class VpnService : BaseVpnService(),
     }
 
     fun updateUnderlyingNetwork(builder: Builder? = null) {
-        SagerNet.underlyingNetwork?.let {
-            builder?.setUnderlyingNetworks(arrayOf(SagerNet.underlyingNetwork))
-                ?: setUnderlyingNetworks(arrayOf(SagerNet.underlyingNetwork))
-        }
+        val network = SagerNet.underlyingNetwork ?: return
+        builder?.setUnderlyingNetworks(arrayOf(network))
+            ?: setUnderlyingNetworks(arrayOf(network))
     }
 
     override fun onRevoke() = stopRunner()

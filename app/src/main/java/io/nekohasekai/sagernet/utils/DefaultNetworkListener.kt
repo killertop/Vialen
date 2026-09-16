@@ -17,7 +17,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import java.net.UnknownHostException
 
 object DefaultNetworkListener {
@@ -36,8 +35,10 @@ object DefaultNetworkListener {
         class Lost(val network: Network, val source: Callback) : NetworkMessage()
     }
 
-    private val networkScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
-    private val networkActor = Channel<NetworkMessage>(Channel.RENDEZVOUS)
+    // Connectivity callbacks must never wait for the actor. Keep every event
+    // ordered while moving actor/listener work off ConnectivityThread.
+    private val networkScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val networkActor = Channel<NetworkMessage>(Channel.UNLIMITED)
 
     init {
         networkScope.launch {
@@ -122,23 +123,27 @@ object DefaultNetworkListener {
         response.await()
     }
 
-    // NB: this runs in ConnectivityThread, and this behavior cannot be changed until API 26
+    private fun post(message: NetworkMessage) {
+        networkActor.trySend(message)
+    }
+
+    // These callbacks run on ConnectivityThread; posting is deliberately non-blocking.
     private class Callback : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) =
-            runBlocking { networkActor.send(NetworkMessage.Put(network, this@Callback)) }
+            post(NetworkMessage.Put(network, this@Callback))
 
         override fun onCapabilitiesChanged(
             network: Network, networkCapabilities: NetworkCapabilities
         ) { // it's a good idea to refresh capabilities
-            runBlocking { networkActor.send(NetworkMessage.Update(network, this@Callback)) }
+            post(NetworkMessage.Update(network, this@Callback))
         }
 
         override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
-            runBlocking { networkActor.send(NetworkMessage.Update(network, this@Callback)) }
+            post(NetworkMessage.Update(network, this@Callback))
         }
 
         override fun onLost(network: Network) =
-            runBlocking { networkActor.send(NetworkMessage.Lost(network, this@Callback)) }
+            post(NetworkMessage.Lost(network, this@Callback))
     }
 
     private var registeredCallback: Callback? = null

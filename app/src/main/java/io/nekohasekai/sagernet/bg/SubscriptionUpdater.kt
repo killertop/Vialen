@@ -89,7 +89,7 @@ object SubscriptionUpdater {
                             val manager = RemoteWorkManager.getInstance(app)
                             Logs.d("subscription schedule: manager ready, query subscriptions")
                             val subscriptions = SagerDatabase.groupDao.subscriptions()
-                                .filter { it.subscription!!.autoUpdate }
+                                .filter { it.subscription?.autoUpdate == true }
                             Logs.d("subscription schedule: query complete, active=${subscriptions.size}")
                             val desired = subscriptions.associateBy(SubscriptionSchedule::name)
                             // Retire the old all-subscriptions worker, including queued/running work.

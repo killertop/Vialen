@@ -32,6 +32,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import java.util.concurrent.atomic.AtomicReference
 
 @RunWith(CoreBridgeRobolectricTestRunner::class)
 @Config(sdk = [34], application = android.app.Application::class)
@@ -202,14 +203,19 @@ class ListenerStopFailureTest {
             val failure = IllegalStateException("consumer callback failed")
             val broken = key()
             val healthy = key()
-            var observed: Network? = null
+            val observed = AtomicReference<Network?>()
             DefaultNetworkListener.start(broken) { throw failure }
-            DefaultNetworkListener.start(healthy) { observed = it }
+            DefaultNetworkListener.start(healthy) { observed.set(it) }
 
             val current = mockk<Network>()
             callbacks.single().onAvailable(current)
 
-            assertSame("A failed listener must not suppress later listeners", current, observed)
+            withTimeout(5_000) {
+                while (observed.get() !== current && warnings.none { it === failure }) {
+                    kotlinx.coroutines.yield()
+                }
+            }
+            assertSame("A failed listener must not suppress later listeners", current, observed.get())
             assertTrue("The callback failure must remain observable", warnings.any { it === failure })
             assertTrue(DefaultNetworkListener.stop(broken))
             assertTrue("The actor must remain usable after callback failure", DefaultNetworkListener.stop(healthy))

@@ -4,6 +4,7 @@ import com.esotericsoftware.kryo.io.ByteBufferInput
 import com.esotericsoftware.kryo.io.ByteBufferOutput
 import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.fmt.KryoConverters
+import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -54,6 +55,17 @@ class BeanRobustnessTest {
         assertEquals("127.0.0.1", bean.serverAddress)
         assertEquals(1080, bean.serverPort.toInt())
         assertEquals("", bean.name)
+    }
+
+    @Test
+    fun hysteriaDefaultsDoNotOverwriteAnExplicitProtocol() {
+        val bean = HysteriaBean().apply {
+            protocol = HysteriaBean.PROTOCOL_FAKETCP
+        }
+
+        bean.initializeDefaultValues()
+
+        assertEquals(HysteriaBean.PROTOCOL_FAKETCP, bean.protocol)
     }
 
     private class BlockingBean(
