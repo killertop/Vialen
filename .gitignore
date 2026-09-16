@@ -25,6 +25,7 @@ jniLibs/
 *.jks
 *.keystore
 *keystore-password*
+/.local-signing.md
 /.env
 /.env.*
 /qa/*
